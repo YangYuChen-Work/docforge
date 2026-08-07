@@ -1,97 +1,93 @@
 <template>
-  <div style="padding:24px">
-    <h2 style="margin:0 0 20px;font-size:18px;color:#1a2a4a">操作日志</h2>
-
-    <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-      <div
-        v-for="s in statCards"
-        :key="s.label"
-        style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:16px"
-      >
-        <div style="font-size:24px;font-weight:700;color:#1a2a4a">{{ s.value }}</div>
-        <div style="font-size:12px;color:#667;margin-top:4px">{{ s.label }}</div>
-      </div>
+  <header class="page-header">
+    <div class="header-left">
+      <h2>日志审计</h2>
+      <p class="subtitle">查看系统操作记录、生成记录和规则变更历史</p>
     </div>
+  </header>
 
-    <!-- Filters -->
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <select
-        v-model="filterAction"
-        @change="reload"
-        style="border:1px solid #ddd;border-radius:4px;padding:6px 10px;font-size:13px"
-      >
+  <!-- Stat cards -->
+  <div class="audit-stats">
+    <div v-for="s in statCards" :key="s.label" class="stat-card">
+      <div class="stat-number">{{ s.value }}</div>
+      <div class="stat-label">{{ s.label }}</div>
+    </div>
+  </div>
+
+  <!-- Filter Bar -->
+  <div class="audit-filter-bar">
+    <div class="filter-group">
+      <label>操作类型</label>
+      <select v-model="filterAction" class="filter-select" @change="reload">
         <option value="">全部操作类型</option>
         <option v-for="a in actionOptions" :key="a" :value="a">{{ a }}</option>
       </select>
-      <select
-        v-model="filterResult"
-        @change="reload"
-        style="border:1px solid #ddd;border-radius:4px;padding:6px 10px;font-size:13px"
-      >
+    </div>
+    <div class="filter-group">
+      <label>结果</label>
+      <select v-model="filterResult" class="filter-select" @change="reload">
         <option value="">全部结果</option>
         <option value="success">成功</option>
         <option value="failed">失败</option>
       </select>
+    </div>
+    <div class="filter-group">
       <input
         v-model="search"
-        placeholder="搜索操作人 / 实体ID..."
+        type="text"
+        class="filter-input"
+        placeholder="🔍 搜索操作人 / 实体ID..."
         @input="onSearchInput"
-        style="border:1px solid #ddd;border-radius:4px;padding:6px 12px;font-size:13px;width:240px"
       />
     </div>
+  </div>
 
-    <!-- Table -->
-    <table style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden">
-      <thead style="background:#f9fafb">
+  <!-- Log Table -->
+  <div class="audit-table-wrapper">
+    <table class="audit-table">
+      <thead>
         <tr>
-          <th
-            v-for="h in ['时间', '操作人', '操作', '实体类型', '实体ID', '结果']"
-            :key="h"
-            style="text-align:left;padding:10px 16px;font-size:12px;color:#667;font-weight:600"
-          >
-            {{ h }}
-          </th>
+          <th style="width: 160px">时间</th>
+          <th style="width: 100px">操作人</th>
+          <th>操作</th>
+          <th style="width: 140px">实体类型</th>
+          <th style="width: 140px">实体ID</th>
+          <th style="width: 80px">结果</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="!loading && logs.length === 0">
-          <td colspan="6" style="text-align:center;padding:40px;color:#999;font-size:13px">
+          <td colspan="6" style="text-align: center; padding: 40px; color: #999; font-size: 13px">
             暂无操作记录
           </td>
         </tr>
-        <tr v-for="log in logs" :key="log.id" style="border-top:1px solid #f0f0f0">
-          <td style="padding:12px 16px;font-size:12px;color:#999">{{ formatTime(log.created_at) }}</td>
-          <td style="padding:12px 16px;font-size:12px;color:#555">{{ log.actor }}</td>
-          <td style="padding:12px 16px;font-size:13px;color:#1a2a4a">{{ log.action }}</td>
-          <td style="padding:12px 16px;font-size:12px;color:#555">{{ log.entity_type }}</td>
-          <td style="padding:12px 16px;font-size:12px;color:#555">{{ log.entity_id }}</td>
-          <td style="padding:12px 16px">
-            <span :style="resultStyle(log.result)" :title="log.error_message || ''">
+        <tr v-for="log in logs" :key="log.id" class="log-row">
+          <td class="log-time">{{ formatTime(log.created_at) }}</td>
+          <td>{{ log.actor }}</td>
+          <td><div class="log-action">{{ log.action }}</div></td>
+          <td>{{ log.entity_type }}</td>
+          <td><span class="log-task">{{ log.entity_id }}</span></td>
+          <td>
+            <span
+              class="log-result"
+              :class="log.result === 'success' ? 'green' : 'red'"
+              :style="resultStyle(log.result)"
+              :title="log.error_message || ''"
+            >
               {{ log.result === 'success' ? '成功' : '失败' }}
             </span>
           </td>
         </tr>
       </tbody>
     </table>
+  </div>
 
-    <!-- Pagination -->
-    <div style="display:flex;justify-content:flex-end;align-items:center;gap:12px;margin-top:12px">
-      <span style="font-size:12px;color:#667">第 {{ page }} 页 · 共 {{ totalPages }} 页 · {{ total }} 条</span>
-      <button
-        @click="prevPage"
-        :disabled="page <= 1"
-        :style="`padding:6px 14px;border:1px solid #ddd;border-radius:4px;background:#fff;font-size:13px;cursor:pointer;${page <= 1 ? 'opacity:0.4;cursor:not-allowed' : ''}`"
-      >
-        上一页
-      </button>
-      <button
-        @click="nextPage"
-        :disabled="page >= totalPages"
-        :style="`padding:6px 14px;border:1px solid #ddd;border-radius:4px;background:#fff;font-size:13px;cursor:pointer;${page >= totalPages ? 'opacity:0.4;cursor:not-allowed' : ''}`"
-      >
-        下一页
-      </button>
+  <!-- Pagination -->
+  <div class="audit-pagination">
+    <span class="page-info">第 {{ page }} 页 · 共 {{ totalPages }} 页 · {{ total }} 条</span>
+    <div class="page-buttons">
+      <button class="page-btn" :disabled="page <= 1" @click="prevPage">← 上一页</button>
+      <button class="page-btn" :disabled="page >= totalPages" @click="nextPage">下一页 →</button>
     </div>
   </div>
 </template>
