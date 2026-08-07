@@ -87,7 +87,7 @@
             <template v-else>
               <div v-for="c in chapters" :key="c.id" class="config-value" style="margin-bottom: 8px">
                 {{ c.order_index }}. {{ c.title }}（{{ c.required ? '必填' : '选填' }}）
-                <span v-if="c.material_types?.length"> · 资料类型：{{ c.material_types.join('、') }}</span>
+                <span v-if="c.material_types"> · 资料类型：{{ c.material_types.split(',').join('、') }}</span>
               </div>
             </template>
           </div>
