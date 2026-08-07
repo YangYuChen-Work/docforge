@@ -136,6 +136,5 @@ class DeepSeekProvider:
                 {"role": "system", "content": "你是专业文档编辑助手，直接返回处理结果，不加额外解释。"},
                 {"role": "user", "content": prompt},
             ],
-            max_retries=settings.ai_max_retries,
         )
         return response.choices[0].message.content or ""
