@@ -1,119 +1,91 @@
 <template>
-  <div style="padding:24px;max-width:1200px">
-    <div style="display:flex;align-items:center;gap:24px;margin-bottom:24px">
-      <RouterLink to="/" style="color:#1a5ccc;text-decoration:none;font-size:13px">← 返回</RouterLink>
-      <h2 style="margin:0;font-size:18px;color:#1a2a4a">新建文档</h2>
+  <header class="page-header">
+    <div class="header-left">
+      <RouterLink to="/" style="color:#1a5ccc;text-decoration:none;font-size:12px;display:inline-block;margin-bottom:6px">← 返回</RouterLink>
+      <h2>新建文档</h2>
+      <p class="subtitle">项目搜索 / 模板选择 / 关联资料确认</p>
     </div>
-
-    <div style="display:flex;gap:0;margin-bottom:32px">
-      <div
-        v-for="(s, i) in steps"
-        :key="i"
-        :style="`padding:10px 24px;font-size:13px;border-bottom:3px solid ${i === step ? '#1a5ccc' : '#e5e7eb'};color:${i === step ? '#1a5ccc' : '#999'};cursor:pointer`"
-        @click="i < step && (step = i)"
-      >
-        {{ i + 1 }}. {{ s }}
-      </div>
+    <div class="header-right">
+      <span class="badge badge-blue">步骤 {{ step + 1 }}/3</span>
     </div>
+  </header>
 
-    <!-- Step 0: Select project -->
-    <div v-if="step === 0" style="display:grid;grid-template-columns:1fr 360px;gap:20px">
-      <div>
-        <div style="font-weight:600;margin-bottom:12px;font-size:14px">选择项目</div>
-        <div
-          v-for="p in projects"
-          :key="p.id"
-          @click="selectedProject = p"
-          :style="`padding:14px;border:2px solid ${selectedProject?.id === p.id ? '#1a5ccc' : '#e5e7eb'};border-radius:6px;margin-bottom:8px;cursor:pointer;background:${selectedProject?.id === p.id ? '#eff6ff' : '#fff'}`"
-        >
-          <div style="font-weight:500;font-size:13px">{{ p.name }}</div>
-          <div style="font-size:11px;color:#667;margin-top:4px">
-            {{ p.code }} · {{ p.model }} · {{ p.phase }}
+  <div class="step-indicator">
+    <div
+      v-for="(s, i) in steps"
+      :key="i"
+      class="step"
+      :class="{ active: i <= step }"
+      @click="i < step && (step = i)"
+    >
+      <span class="step-num">{{ i + 1 }}</span> {{ s }}
+    </div>
+  </div>
+
+  <div class="doc-new-layout">
+    <div class="doc-new-main">
+      <!-- Step 0: Select project -->
+      <div v-if="step === 0" class="card">
+        <h3>选择项目</h3>
+        <p class="card-desc">选择需要生成文档的项目，系统会根据项目资料匹配模板章节和引用依据。</p>
+        <input type="text" class="doc-search" placeholder="输入项目编号、产品型号、项目名称" style="margin-bottom:16px" />
+        <div class="project-list">
+          <div
+            v-for="p in projects"
+            :key="p.id"
+            class="project-item"
+            :class="{ selected: selectedProject?.id === p.id }"
+            @click="selectedProject = p"
+          >
+            <div class="project-item-name">{{ p.name }}</div>
+            <div class="project-item-meta">{{ p.code }} · {{ p.model }} · {{ p.phase }}</div>
           </div>
         </div>
         <div v-if="!loadingProjects && projects.length === 0" style="font-size:12px;color:#999;padding:12px 0">
           暂无项目
         </div>
       </div>
-      <div style="background:#f9fafb;border-radius:6px;padding:16px">
-        <div style="font-weight:600;margin-bottom:8px;font-size:13px">已选项目</div>
-        <template v-if="selectedProject">
-          <div style="font-size:13px">{{ selectedProject.name }}</div>
-          <div style="font-size:11px;color:#667;margin-top:4px">{{ selectedProject.phase }}</div>
-        </template>
-        <div v-else style="font-size:12px;color:#999">请从左侧选择项目</div>
-        <button
-          @click="step = 1"
-          :disabled="!selectedProject"
-          :style="`margin-top:16px;width:100%;padding:8px;background:#1a5ccc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;${!selectedProject ? 'opacity:0.4;cursor:not-allowed' : ''}`"
-        >
-          下一步：选择模板
-        </button>
-      </div>
-    </div>
 
-    <!-- Step 1: Select template -->
-    <div v-if="step === 1" style="display:grid;grid-template-columns:1fr 360px;gap:20px">
-      <div>
-        <div style="font-weight:600;margin-bottom:12px;font-size:14px">选择模板</div>
-        <div
-          v-for="t in templates"
-          :key="t.id"
-          @click="selectedTemplate = t"
-          :style="`padding:14px;border:2px solid ${selectedTemplate?.id === t.id ? '#1a5ccc' : '#e5e7eb'};border-radius:6px;margin-bottom:8px;cursor:pointer;background:${selectedTemplate?.id === t.id ? '#eff6ff' : '#fff'}`"
-        >
-          <div style="font-weight:500;font-size:13px">{{ t.name }}</div>
-          <div style="font-size:11px;color:#667;margin-top:4px">
-            {{ t.category }} · {{ t.phase }} · {{ t.chapter_count }} 章节
+      <!-- Step 1: Select template -->
+      <div v-if="step === 1" class="card">
+        <h3>选择模板</h3>
+        <p class="card-desc">来自文档助手配置的现有模板库。</p>
+        <div class="template-select-list">
+          <div
+            v-for="t in templates"
+            :key="t.id"
+            class="tpl-select-item"
+            :class="{ selected: selectedTemplate?.id === t.id }"
+            @click="selectedTemplate = t"
+          >
+            <div>
+              <div class="tpl-select-name">{{ t.name }}</div>
+              <div class="tpl-select-meta">{{ t.category }} · {{ t.phase }} · {{ t.chapter_count }} 章节</div>
+            </div>
           </div>
         </div>
         <div v-if="!loadingTemplates && templates.length === 0" style="font-size:12px;color:#999;padding:12px 0">
           暂无可用模板
         </div>
       </div>
-      <div style="background:#f9fafb;border-radius:6px;padding:16px">
-        <template v-if="selectedTemplate">
-          <div style="font-weight:600;margin-bottom:8px;font-size:13px">{{ selectedTemplate.name }}</div>
-          <div style="font-size:11px;color:#667">
-            {{ selectedTemplate.chapter_count }} 个章节 · {{ selectedTemplate.phase }}
-          </div>
-        </template>
-        <div v-else style="font-size:12px;color:#999">请从左侧选择模板</div>
-        <div style="display:flex;gap:8px;margin-top:16px">
-          <button
-            @click="step = 0"
-            style="flex:1;padding:8px;background:#fff;color:#555;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-size:13px"
-          >
-            上一步
-          </button>
-          <button
-            @click="step = 2"
-            :disabled="!selectedTemplate"
-            :style="`flex:2;padding:8px;background:#1a5ccc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;${!selectedTemplate ? 'opacity:0.4;cursor:not-allowed' : ''}`"
-          >
-            下一步：关联资料
-          </button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Step 2: Select/upload sources + confirm -->
-    <div v-if="step === 2" style="display:grid;grid-template-columns:1fr 360px;gap:20px">
-      <div>
-        <div style="font-weight:600;margin-bottom:12px;font-size:14px">来源资料</div>
+      <!-- Step 2: Select/upload sources -->
+      <div v-if="step === 2" class="card">
+        <h3>关联资料</h3>
+        <p class="card-desc">勾选参与本次生成的来源资料，缺少的资料可在此上传。</p>
         <div
           v-for="s in sources"
           :key="s.id"
-          style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #e5e7eb;border-radius:4px;margin-bottom:6px;background:#fff"
+          style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #e8e8e8;border-radius:6px;margin-bottom:6px;background:#fff"
         >
           <input
             type="checkbox"
             :checked="selectedSourceIds.includes(s.id)"
             @change="toggleSource(s.id)"
           />
-          <span style="font-size:12px;flex:1">{{ s.original_name }}</span>
+          <span style="font-size:13px;flex:1">{{ s.original_name }}</span>
           <span
-            :style="`font-size:10px;padding:2px 6px;border-radius:8px;background:${s.parse_status === 'parsed' ? '#dcfce7' : s.parse_status === 'parse_failed' ? '#fee2e2' : '#fef3c7'};color:${s.parse_status === 'parsed' ? '#16a34a' : s.parse_status === 'parse_failed' ? '#dc2626' : '#d97706'}`"
+            :style="`font-size:11px;padding:2px 8px;border-radius:10px;background:${s.parse_status === 'parsed' ? '#f6ffed' : s.parse_status === 'parse_failed' ? '#fff1f0' : '#fff7e6'};color:${s.parse_status === 'parsed' ? '#52c41a' : s.parse_status === 'parse_failed' ? '#e03030' : '#fa8c16'}`"
           >
             {{ s.parse_status }}
           </span>
@@ -122,10 +94,8 @@
           该项目暂无已关联资料，请上传
         </div>
         <div style="margin-top:12px">
-          <label
-            style="display:block;padding:10px;border:2px dashed #d1d5db;border-radius:4px;text-align:center;cursor:pointer;font-size:12px;color:#667"
-          >
-            {{ uploading ? '上传中...' : '点击上传资料（.docx / .xlsx）' }}
+          <label class="import-upload-area" style="padding:16px">
+            <span class="import-upload-text">{{ uploading ? '上传中...' : '点击上传资料（.docx / .xlsx）' }}</span>
             <input
               type="file"
               accept=".docx,.xlsx"
@@ -137,33 +107,82 @@
           </label>
         </div>
       </div>
-      <div style="background:#f9fafb;border-radius:6px;padding:16px">
-        <div style="font-weight:600;margin-bottom:12px;font-size:13px">生成确认</div>
-        <div style="font-size:12px;margin-bottom:6px">项目：{{ selectedProject?.name }}</div>
-        <div style="font-size:12px;margin-bottom:6px">模板：{{ selectedTemplate?.name }}</div>
-        <div style="font-size:12px;margin-bottom:12px">已选资料：{{ selectedSourceIds.length }} 份</div>
-        <div
-          v-if="selectedSourceIds.length === 0"
-          style="font-size:11px;color:#d97706;padding:8px;background:#fffbeb;border-radius:4px;margin-bottom:12px"
-        >
-          请至少选择一份资料
-        </div>
-        <div style="display:flex;gap:8px">
+    </div>
+
+    <!-- Right: Confirmation Panel -->
+    <div class="doc-new-side">
+      <div class="card">
+        <h3>生成前确认</h3>
+        <p class="side-desc">确认项目、模板和资料匹配后生成初稿。</p>
+
+        <template v-if="step === 0">
+          <template v-if="selectedProject">
+            <div class="confirm-card highlight">
+              <div class="confirm-label">已选项目</div>
+              <div class="confirm-title">{{ selectedProject.name }}</div>
+              <div class="confirm-meta">{{ selectedProject.code }} · {{ selectedProject.phase }}</div>
+            </div>
+          </template>
+          <div v-else style="font-size:12px;color:#999">请从左侧选择项目</div>
           <button
+            class="btn btn-primary"
+            style="width:100%;margin-top:20px"
+            :disabled="!selectedProject"
             @click="step = 1"
-            style="flex:1;padding:10px;background:#fff;color:#555;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-size:13px"
           >
-            上一步
+            下一步：选择模板
           </button>
+        </template>
+
+        <template v-else-if="step === 1">
+          <template v-if="selectedTemplate">
+            <div class="confirm-card highlight">
+              <div class="confirm-label">已选模板</div>
+              <div class="confirm-title">{{ selectedTemplate.name }}</div>
+              <div class="confirm-meta">{{ selectedTemplate.chapter_count }} 个章节 · {{ selectedTemplate.phase }}</div>
+            </div>
+          </template>
+          <div v-else style="font-size:12px;color:#999">请从左侧选择模板</div>
+          <div style="display:flex;gap:8px;margin-top:20px">
+            <button class="btn btn-outline" style="flex:1" @click="step = 0">上一步</button>
+            <button
+              class="btn btn-primary"
+              style="flex:2"
+              :disabled="!selectedTemplate"
+              @click="step = 2"
+            >
+              下一步：关联资料
+            </button>
+          </div>
+        </template>
+
+        <template v-else>
+          <div class="confirm-card highlight">
+            <div class="confirm-label">将生成</div>
+            <div class="confirm-title">{{ selectedProject?.name }} - {{ selectedTemplate?.name }}</div>
+            <div class="confirm-meta">{{ selectedProject?.code }} · {{ selectedTemplate?.chapter_count }} 个章节</div>
+          </div>
+
+          <h4 class="side-subtitle" style="margin-top:20px">资料匹配</h4>
+          <div class="match-item">已选资料 {{ selectedSourceIds.length }} 份</div>
+
+          <div v-if="selectedSourceIds.length === 0" class="pending-card">
+            <p>请至少选择一份资料后再生成文档。</p>
+          </div>
+
           <button
-            @click="generate"
+            class="btn btn-primary"
+            style="width:100%;margin-top:20px"
             :disabled="selectedSourceIds.length === 0 || generating"
-            :style="`flex:2;padding:10px;background:#1a5ccc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;${selectedSourceIds.length === 0 || generating ? 'opacity:0.4;cursor:not-allowed' : ''}`"
+            @click="generate"
           >
             {{ generating ? generatingLabel : '生成文档' }}
           </button>
-        </div>
-        <div v-if="errorMsg" style="margin-top:8px;font-size:11px;color:#dc2626">{{ errorMsg }}</div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-outline" style="flex:1" @click="step = 1">上一步</button>
+          </div>
+          <div v-if="errorMsg" style="margin-top:8px;font-size:12px;color:#e03030">{{ errorMsg }}</div>
+        </template>
       </div>
     </div>
   </div>
