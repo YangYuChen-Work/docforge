@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from app.db.models import (
     GeneratedDocument, DocumentChapter, Citation, DocumentVersion, Annotation
 )
+from app.services import audit_service
 
 
 def list_documents(
@@ -58,6 +59,11 @@ def edit_chapter(
 def confirm_chapter(db: Session, doc_id: str, chapter_id: str) -> DocumentChapter:
     ch = get_chapter(db, doc_id, chapter_id)
     if ch.status not in ("generated", "needs_material", "failed", "pending"):
+        audit_service.log(
+            db, "confirm", "document_chapter", chapter_id,
+            result="failed",
+            error_message=f"章节状态 {ch.status} 不可确认",
+        )
         raise HTTPException(
             400,
             {"error_code": "INVALID_STATE", "message": f"章节状态 {ch.status} 不可确认"},
@@ -66,6 +72,10 @@ def confirm_chapter(db: Session, doc_id: str, chapter_id: str) -> DocumentChapte
     ch.confirmed_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(ch)
+    audit_service.log(
+        db, "confirm", "document_chapter", chapter_id,
+        result="success", payload_summary=ch.title,
+    )
     return ch
 
 
@@ -85,6 +95,12 @@ def regenerate_chapter(
     from app.domain.generation import run_chapter_only
     run_chapter_only(db, ch, doc_id, instruction)
     db.refresh(ch)
+    audit_service.log(
+        db, "regenerate", "document_chapter", chapter_id,
+        result="success" if ch.status != "failed" else "failed",
+        payload_summary=ch.title,
+        error_message=ch.error_message,
+    )
     return ch
 
 

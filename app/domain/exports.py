@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from app.db.models import GeneratedDocument, DocumentChapter, Export, DocumentTemplate
 from app.services.validator import validate_document
 from app.services.docx_renderer import render_to_docx
+from app.services import audit_service
 
 
 def create_export(db: Session, doc_id: str, fmt: str) -> Export:
@@ -24,6 +25,12 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
 
     validation = validate_document(chapters, tpl.source_path if tpl else None)
     if not validation["can_export"]:
+        audit_service.log(
+            db, "export", "generated_document", doc_id,
+            result="failed",
+            payload_summary=f"format={fmt}",
+            error_message="导出前校验未通过: " + "; ".join(validation["errors"][:3]),
+        )
         raise HTTPException(
             400,
             {
@@ -69,4 +76,10 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
 
     db.commit()
     db.refresh(export)
+    audit_service.log(
+        db, "export", "generated_document", doc_id,
+        result="success" if export.status == "completed" else "failed",
+        payload_summary=f"format={fmt} export_id={export.id}",
+        error_message=export.error_message,
+    )
     return export

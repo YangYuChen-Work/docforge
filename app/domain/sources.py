@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, UploadFile
 from app.db.models import SourceDocument, ParsedSourceContent
 from app.config import get_storage_path
+from app.services import audit_service
 
 ALLOWED_TYPES = {"docx", "xlsx"}
 
@@ -66,6 +67,11 @@ def upload_source(db: Session, project_id: str, file: UploadFile) -> SourceDocum
     db.add(src)
     db.commit()
     db.refresh(src)
+    audit_service.log(
+        db, "upload", "source_document", src.id,
+        result="success",
+        payload_summary=f"{src.original_name} ({src.file_type})",
+    )
     return src
 
 
@@ -117,6 +123,12 @@ def trigger_parse(db: Session, source_id: str) -> SourceDocument:
 
     db.commit()
     db.refresh(s)
+    audit_service.log(
+        db, "parse", "source_document", s.id,
+        result="success" if s.parse_status == "parsed" else "failed",
+        payload_summary=s.original_name,
+        error_message=s.parse_error,
+    )
     return s
 
 

@@ -7,6 +7,7 @@ from app.db.models import (
     GenerationTask, GeneratedDocument, DocumentChapter, TemplateChapter, Project
 )
 from app.config import settings
+from app.services import audit_service
 
 
 def get_provider():
@@ -32,6 +33,11 @@ def create_task(
     db.add(task)
     db.commit()
     db.refresh(task)
+    audit_service.log(
+        db, "create", "generation_task", task.id,
+        result="success",
+        payload_summary=f"project={project_id} template={template_id} sources={len(source_ids)}",
+    )
     return task
 
 
@@ -40,6 +46,11 @@ def start_task(db: Session, task_id: str) -> GenerationTask:
     if not task:
         raise HTTPException(404, {"error_code": "TASK_NOT_FOUND"})
     if task.status != "created":
+        audit_service.log(
+            db, "start", "generation_task", task_id,
+            result="failed",
+            error_message=f"Task status is {task.status}",
+        )
         raise HTTPException(
             400, {"error_code": "INVALID_STATE", "message": f"Task status is {task.status}"}
         )
@@ -122,15 +133,32 @@ def _run_generation(db: Session, task: GenerationTask, doc: GeneratedDocument):
         tc_info = tc_map.get(chapter.template_chapter_id or "", {})
         try:
             generate_chapter(db, chapter, tc_info, source_ids, project_info, provider)
+            audit_service.log(
+                db, "generate", "document_chapter", chapter.id,
+                result="success" if chapter.status != "failed" else "failed",
+                payload_summary=chapter.title,
+                error_message=chapter.error_message,
+            )
         except Exception as e:
             chapter.status = "failed"
             chapter.error_message = str(e)[:500]
             db.commit()
+            audit_service.log(
+                db, "generate", "document_chapter", chapter.id,
+                result="failed",
+                payload_summary=chapter.title,
+                error_message=chapter.error_message,
+            )
 
     task.status = "awaiting_confirmation"
     task.finished_at = datetime.now(timezone.utc).replace(tzinfo=None)
     doc.status = "editing"
     db.commit()
+    audit_service.log(
+        db, "start", "generation_task", task.id,
+        result="success",
+        payload_summary=f"document={doc.id} chapters={len(chapters)}",
+    )
 
 
 def run_chapter_only(
