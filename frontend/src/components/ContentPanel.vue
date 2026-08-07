@@ -1,44 +1,48 @@
 <template>
-  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;background:#e9ecf1">
-    <!-- Topbar -->
+  <div style="display:flex;flex-direction:column;overflow:hidden;min-width:0">
+    <!-- Toolbar-adjacent chapter bar -->
     <div
-      style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #e5e7eb;background:#fff;flex-shrink:0"
+      style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f0f0f0;background:#fff;flex-shrink:0"
     >
-      <span style="font-size:14px;font-weight:600;color:#1a2a4a">{{ chapter?.title || '请选择章节' }}</span>
+      <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ chapter?.title || '请选择章节' }}</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <span style="font-size:11px;color:#999">{{ saveStatus }}</span>
+        <span class="save-status">{{ saveStatus }}</span>
         <button
           v-if="chapter && chapter.status !== 'confirmed'"
           @click="$emit('confirm')"
-          style="padding:6px 12px;background:#16a34a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px"
+          class="btn btn-outline"
+          style="margin-top:0;padding:6px 14px"
         >
           确认章节
         </button>
         <button
           v-if="chapter"
           @click="$emit('regenerate')"
-          style="padding:6px 12px;background:#f9fafb;color:#333;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-size:12px"
+          class="btn btn-outline"
+          style="margin-top:0;padding:6px 14px"
         >
           重新生成
         </button>
         <div style="position:relative">
           <button
             @click="showExport = !showExport"
-            style="padding:6px 12px;background:#1a5ccc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px"
+            class="btn btn-primary"
+            style="margin-top:0;padding:6px 14px"
           >
             导出 ▾
           </button>
-          <div
-            v-if="showExport"
-            style="position:absolute;right:0;top:32px;background:#fff;border:1px solid #ddd;border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:10;min-width:100px"
-          >
+          <div v-if="showExport" class="export-dropdown">
+            <div class="export-drop-title">选择导出格式</div>
             <div
               v-for="fmt in ['docx', 'pdf', 'xlsx']"
               :key="fmt"
+              class="export-drop-item"
               @click="$emit('export', fmt); showExport = false"
-              style="padding:8px 16px;font-size:12px;cursor:pointer;text-transform:uppercase"
             >
-              {{ fmt.toUpperCase() }}
+              <span class="export-fmt-icon" style="background:#2b5eb8">{{ fmt.charAt(0).toUpperCase() }}</span>
+              <div>
+                <div class="export-fmt-name">{{ fmt.toUpperCase() }}</div>
+              </div>
             </div>
           </div>
         </div>
@@ -46,7 +50,7 @@
     </div>
 
     <!-- Word-like page area -->
-    <div style="flex:1;overflow-y:auto;padding:32px 24px">
+    <div class="editor-content" style="flex:1">
       <div v-if="!chapter" style="color:#999;font-size:13px;text-align:center;padding-top:60px">
         ← 从左侧选择章节
       </div>

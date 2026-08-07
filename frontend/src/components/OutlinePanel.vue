@@ -1,19 +1,21 @@
 <template>
-  <div style="width:240px;border-right:1px solid #e5e7eb;overflow-y:auto;background:#fafafa;flex-shrink:0">
-    <div style="padding:12px 16px;font-size:12px;font-weight:600;color:#1a2a4a;border-bottom:1px solid #e5e7eb">
-      {{ docTitle }}
+  <div class="editor-outline">
+    <div class="outline-header">
+      <div class="outline-title">{{ docTitle }}</div>
     </div>
-    <div
-      v-for="ch in chapters"
-      :key="ch.id"
-      @click="$emit('select', ch)"
-      :style="`padding:9px 16px;font-size:12px;cursor:pointer;border-left:3px solid ${ch.id === activeId ? '#1a5ccc' : 'transparent'};background:${ch.id === activeId ? '#eff6ff' : 'transparent'};color:#333`"
-    >
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px">
-        <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+    <div class="outline-section-title">文档目录</div>
+    <div class="outline-tree">
+      <div
+        v-for="ch in chapters"
+        :key="ch.id"
+        class="outline-item"
+        :class="{ active: ch.id === activeId }"
+        @click="$emit('select', ch)"
+      >
+        <span class="outline-item-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           {{ ch.order_index }}. {{ ch.title }}
         </span>
-        <span :style="tagStyle(ch.status)" style="font-size:10px;padding:1px 5px;border-radius:8px;flex-shrink:0">
+        <span class="outline-status" :style="tagStyle(ch.status)">
           {{ statusTag(ch.status) }}
         </span>
       </div>

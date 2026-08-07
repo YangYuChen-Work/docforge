@@ -1,55 +1,80 @@
 <template>
-  <div style="display:flex;height:100vh;overflow:hidden">
-    <OutlinePanel
-      :docTitle="doc?.title || ''"
-      :chapters="doc?.chapters || []"
-      :activeId="currentChapterId"
-      @select="selectChapter"
-    />
-    <ContentPanel
-      :chapter="currentChapter"
-      :saveStatus="saveStatus"
-      @confirm="confirmChapter"
-      @regenerate="showRegenModal = true"
-      @export="doExport"
-      @edit="onEdit"
-    />
-    <AiPanel
-      ref="aiPanelRef"
-      :annotations="annotations"
-      :chapterId="currentChapterId"
-      :docId="docId"
-      @updateAnnotation="updateAnnotation"
-      @applyAiSuggestion="applyAiSuggestion"
-      @insertAnnotation="insertAnnotation"
-      @aiAction="doAiAction"
-    />
+  <div class="editor-shell" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+    <!-- Editor Top Bar -->
+    <div class="editor-topbar">
+      <div class="editor-topbar-left">
+        <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
+        <span class="editor-breadcrumb">AI 文档助手 / 在线编辑</span>
+      </div>
+    </div>
 
-    <div
-      v-if="showRegenModal"
-      style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:50"
-    >
-      <div style="background:#fff;border-radius:8px;padding:24px;width:400px">
-        <div style="font-weight:600;margin-bottom:12px">重新生成章节</div>
-        <textarea
-          v-model="regenInstruction"
-          placeholder="可选：补充生成指令..."
-          rows="3"
-          style="width:100%;border:1px solid #ddd;border-radius:4px;padding:8px;font-size:12px;resize:vertical;box-sizing:border-box"
-        />
-        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px">
-          <button
-            @click="showRegenModal = false"
-            style="padding:7px 14px;border:1px solid #ddd;border-radius:4px;cursor:pointer;font-size:12px"
-          >
-            取消
-          </button>
-          <button
-            @click="doRegenerate"
-            style="padding:7px 14px;background:#1a5ccc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px"
-          >
-            确认重新生成
-          </button>
+    <!-- Editor Toolbar (visual formatting bar, decorative like demo) -->
+    <div class="editor-toolbar">
+      <button class="tb-btn">↩</button>
+      <button class="tb-btn">↪</button>
+      <span class="tb-sep"></span>
+      <select class="tb-select"><option>正文</option><option>标题1</option><option>标题2</option></select>
+      <select class="tb-select" style="width:60px"><option>标题 1</option></select>
+      <select class="tb-select" style="width:50px"><option>11</option><option>14</option><option>16</option></select>
+      <span class="tb-sep"></span>
+      <button class="tb-btn"><b>B</b></button>
+      <button class="tb-btn"><i>I</i></button>
+      <button class="tb-btn"><u>U</u></button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn">≡</button>
+      <button class="tb-btn">☰</button>
+      <button class="tb-btn">🔗</button>
+      <button class="tb-btn">⋯</button>
+    </div>
+
+    <!-- Editor Body: 3-column layout -->
+    <div class="editor-body">
+      <OutlinePanel
+        :docTitle="doc?.title || ''"
+        :chapters="doc?.chapters || []"
+        :activeId="currentChapterId"
+        @select="selectChapter"
+      />
+      <ContentPanel
+        :chapter="currentChapter"
+        :saveStatus="saveStatus"
+        @confirm="confirmChapter"
+        @regenerate="showRegenModal = true"
+        @export="doExport"
+        @edit="onEdit"
+      />
+      <AiPanel
+        ref="aiPanelRef"
+        :annotations="annotations"
+        :chapterId="currentChapterId"
+        :docId="docId"
+        @updateAnnotation="updateAnnotation"
+        @applyAiSuggestion="applyAiSuggestion"
+        @insertAnnotation="insertAnnotation"
+        @aiAction="doAiAction"
+      />
+    </div>
+
+    <div v-if="showRegenModal" class="modal-overlay">
+      <div class="modal" style="width:420px">
+        <div class="modal-header">
+          <h3>重新生成章节</h3>
+          <button class="modal-close" @click="showRegenModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label>补充生成指令（可选）</label>
+            <textarea
+              v-model="regenInstruction"
+              class="form-textarea"
+              placeholder="可选：补充生成指令..."
+              rows="3"
+            />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" style="margin-top:0" @click="showRegenModal = false">取消</button>
+          <button class="btn btn-primary" style="margin-top:0" @click="doRegenerate">确认重新生成</button>
         </div>
       </div>
     </div>
