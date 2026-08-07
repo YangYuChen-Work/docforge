@@ -29,6 +29,13 @@ class ChapterGenerationRequest:
 
 
 @dataclass
+class TableData:
+    caption: str  # 例如 "表1 产品近年销量（台数）走势及预测表"
+    headers: list[str]  # 表头行，例如 ["序号", "品牌/型号1", "品牌/型号2", ...]
+    rows: list[list[str]]  # 数据行，每行是字符串列表，长度应与headers一致
+
+
+@dataclass
 class ChapterGenerationResult:
     chapter_id: str
     content: str
@@ -36,6 +43,7 @@ class ChapterGenerationResult:
     missing_information: list[str]
     conflicts: list[ConflictItem]
     confidence: str  # high / medium / low
+    tables: list[TableData] = field(default_factory=list)
 
 
 class AIProvider(Protocol):

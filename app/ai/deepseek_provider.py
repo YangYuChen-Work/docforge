@@ -5,6 +5,7 @@ from app.ai.base import (
     ChapterGenerationResult,
     CitationItem,
     ConflictItem,
+    TableData,
 )
 from app.config import settings
 
@@ -50,6 +51,9 @@ class DeepSeekProvider:
             '  "missing_information": array of string  — 缺失或无法确认的信息\n'
             '  "conflicts": array  — 冲突 {description, sources: []}\n'
             '  "confidence": "high"|"medium"|"low"\n'
+            '  "tables": array  — 章节涉及的表格数据（如果本章节要求填写表格），每个表格格式为\n'
+            '    {"caption": "表X 表格标题", "headers": ["列1", "列2", ...], "rows": [["值1", "值2", ...], ...]}\n'
+            "    如果本章节不涉及表格，返回空数组 []\n"
             "规则：\n"
             "- 无来源依据的内容必须标注【待补充】，不得虚构事实\n"
             "- 缺失资料列入 missing_information，不得假设其存在\n"
@@ -103,6 +107,15 @@ class DeepSeekProvider:
             )
             for c in data.get("conflicts", [])
         ]
+        tables = [
+            TableData(
+                caption=t.get("caption", ""),
+                headers=t.get("headers", []),
+                rows=t.get("rows", []),
+            )
+            for t in data.get("tables", [])
+            if t.get("headers")  # 跳过没有表头的脏数据
+        ]
 
         return ChapterGenerationResult(
             chapter_id=request.chapter_id,
@@ -111,6 +124,7 @@ class DeepSeekProvider:
             missing_information=data.get("missing_information", []),
             conflicts=conflicts,
             confidence=data.get("confidence", "medium"),
+            tables=tables,
         )
 
     def ai_action(self, action: str, selection: str, instruction: str, context: str) -> str:

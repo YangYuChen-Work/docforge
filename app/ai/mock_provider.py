@@ -3,6 +3,7 @@ from app.ai.base import (
     ChapterGenerationRequest,
     ChapterGenerationResult,
     CitationItem,
+    TableData,
 )
 
 
@@ -32,6 +33,17 @@ class MockAIProvider:
             "（此为 Mock 模式生成内容，仅用于流程验证。切换至 AI_PROVIDER=deepseek 可获得真实内容。）"
         )
 
+        tables = [
+            TableData(
+                caption=f"表（Mock示例）{request.chapter_title}相关数据",
+                headers=["序号", "示例列1", "示例列2"],
+                rows=[
+                    ["1", "示例数据A", "示例数据B"],
+                    ["2", "示例数据C", "示例数据D"],
+                ],
+            )
+        ]
+
         return ChapterGenerationResult(
             chapter_id=request.chapter_id,
             content=content,
@@ -39,6 +51,7 @@ class MockAIProvider:
             missing_information=missing,
             conflicts=[],
             confidence="low",
+            tables=tables,
         )
 
     def ai_action(self, action: str, selection: str, instruction: str, context: str) -> str:

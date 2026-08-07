@@ -90,7 +90,7 @@ def generate_chapter(
             )
 
         # Build ProseMirror JSON for Tiptap rendering
-        content_json = _text_to_prosemirror(result.content)
+        content_json = _result_to_prosemirror(result)
 
         chapter.plain_text = result.content
         chapter.content_json = json.dumps(content_json, ensure_ascii=False)
@@ -112,10 +112,49 @@ def generate_chapter(
     return chapter
 
 
-def _text_to_prosemirror(text: str) -> dict:
-    """Convert plain text (with optional markdown-style headers) to ProseMirror JSON."""
+def _table_to_prosemirror(table) -> list[dict]:
+    """将一个TableData转换为ProseMirror节点列表：一个caption段落 + 一个table节点。"""
     nodes = []
-    for line in text.split("\n"):
+    if table.caption:
+        nodes.append({
+            "type": "paragraph",
+            "content": [{"type": "text", "marks": [{"type": "bold"}], "text": table.caption}],
+        })
+
+    table_rows = []
+    # 表头行
+    if table.headers:
+        header_cells = [
+            {
+                "type": "tableHeader",
+                "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": str(h)}] if h else []}],
+            }
+            for h in table.headers
+        ]
+        table_rows.append({"type": "tableRow", "content": header_cells})
+
+    # 数据行
+    for row in table.rows:
+        cells = [
+            {
+                "type": "tableCell",
+                "attrs": {"colspan": 1, "rowspan": 1, "colwidth": None},
+                "content": [{"type": "paragraph", "content": [{"type": "text", "text": str(cell)}] if cell else []}],
+            }
+            for cell in row
+        ]
+        table_rows.append({"type": "tableRow", "content": cells})
+
+    if table_rows:
+        nodes.append({"type": "table", "content": table_rows})
+    return nodes
+
+
+def _result_to_prosemirror(result) -> dict:
+    """Convert AI result (text content + structured tables) to ProseMirror JSON."""
+    nodes = []
+    for line in result.content.split("\n"):
         line = line.strip()
         if not line:
             continue
@@ -145,6 +184,10 @@ def _text_to_prosemirror(text: str) -> dict:
                 "type": "paragraph",
                 "content": [{"type": "text", "text": line}],
             })
+
+    for table in result.tables:
+        nodes.extend(_table_to_prosemirror(table))
+
     if not nodes:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": "（内容待生成）"}]})
     return {"type": "doc", "content": nodes}
