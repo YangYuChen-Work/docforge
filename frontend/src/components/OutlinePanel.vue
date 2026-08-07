@@ -2,6 +2,10 @@
   <div class="editor-outline">
     <div class="outline-header">
       <div class="outline-title">{{ docTitle }}</div>
+      <div class="outline-saved">
+        <span class="saved-badge">{{ saveStatus === '保存中...' ? '保存中' : '已保存' }}</span>
+        <span v-if="savedAt"> · 自动保存 {{ savedAt }}</span>
+      </div>
     </div>
     <div class="outline-section-title">文档目录</div>
     <div class="outline-tree">
@@ -15,17 +19,24 @@
         <span class="outline-item-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
           {{ ch.order_index }}. {{ ch.title }}
         </span>
-        <span class="outline-status" :style="tagStyle(ch.status)">
+        <span class="outline-status" :class="statusClass(ch.status)">
           {{ statusTag(ch.status) }}
         </span>
       </div>
     </div>
+    <div class="outline-add" @click="addChapter">+ 新增章节</div>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{ docTitle: string; chapters: any[]; activeId: string }>()
-defineEmits(['select'])
+defineProps<{
+  docTitle: string
+  chapters: any[]
+  activeId: string
+  saveStatus?: string
+  savedAt?: string
+}>()
+const emit = defineEmits<{ select: [chapter: any]; addChapter: [title: string] }>()
 
 function statusTag(s: string) {
   const map: Record<string, string> = {
@@ -39,16 +50,20 @@ function statusTag(s: string) {
   return map[s] || s
 }
 
-function tagStyle(s: string) {
-  const c: Record<string, string> = {
-    confirmed: '#16a34a',
-    failed: '#dc2626',
-    needs_material: '#d97706',
-    generated: '#1a5ccc',
-    generating: '#1a5ccc',
-    pending: '#9ca3af',
+function statusClass(s: string) {
+  const map: Record<string, string> = {
+    confirmed: 'done',
+    generating: 'current',
+    generated: 'current',
+    pending: 'pending',
+    needs_material: 'pending',
+    failed: 'failed',
   }
-  const color = c[s] || '#9ca3af'
-  return `background:${color}22;color:${color}`
+  return map[s] || 'pending'
+}
+
+function addChapter() {
+  const title = window.prompt('新章节标题：')
+  if (title && title.trim()) emit('addChapter', title.trim())
 }
 </script>

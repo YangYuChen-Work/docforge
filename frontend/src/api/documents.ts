@@ -5,6 +5,8 @@ export const getDocument = (id: string) =>
   client.get(`/documents/${id}`).then((r) => r.data)
 export const getChapter = (docId: string, chapId: string) =>
   client.get(`/documents/${docId}/chapters/${chapId}`).then((r) => r.data)
+export const createChapter = (docId: string, title: string) =>
+  client.post(`/documents/${docId}/chapters`, { title }).then((r) => r.data)
 export const editChapter = (docId: string, chapId: string, body: any) =>
   client.post(`/documents/${docId}/chapters/${chapId}/edit`, body).then((r) => r.data)
 export const confirmChapter = (docId: string, chapId: string) =>

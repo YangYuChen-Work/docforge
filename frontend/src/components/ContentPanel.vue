@@ -6,7 +6,6 @@
     >
       <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ chapter?.title || '请选择章节' }}</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <span class="save-status">{{ saveStatus }}</span>
         <button
           v-if="chapter && chapter.status !== 'confirmed'"
           @click="$emit('confirm')"
@@ -99,7 +98,7 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Highlight } from '@tiptap/extension-highlight'
 
-const props = defineProps<{ chapter: any; saveStatus: string }>()
+const props = defineProps<{ chapter: any }>()
 const emit = defineEmits<{
   confirm: []
   regenerate: []

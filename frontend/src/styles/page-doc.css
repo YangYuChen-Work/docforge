@@ -178,7 +178,10 @@
 .outline-status.done { color: #52c41a; }
 .outline-status.pending { color: #fa8c16; }
 .outline-status.current { color: #1677ff; }
-.outline-add { padding: 8px; font-size: 13px; color: #1677ff; cursor: pointer; margin-top: 8px; }
+.outline-status.needs-material { color: #fa8c16; }
+.outline-status.failed { color: #ff4d4f; }
+.outline-add { padding: 8px; font-size: 13px; color: #1677ff; cursor: pointer; margin-top: 8px; text-align: center; border-top: 1px dashed #e8e8e8; }
+.outline-add:hover { background: #f5f5f5; }
 
 /* Content Area */
 .editor-content { padding: 24px 32px; overflow-y: auto; background: #fff; }

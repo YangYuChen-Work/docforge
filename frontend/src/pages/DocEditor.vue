@@ -33,11 +33,13 @@
         :docTitle="doc?.title || ''"
         :chapters="doc?.chapters || []"
         :activeId="currentChapterId"
+        :saveStatus="saveStatus"
+        :savedAt="savedAt"
         @select="selectChapter"
+        @addChapter="addChapter"
       />
       <ContentPanel
         :chapter="currentChapter"
-        :saveStatus="saveStatus"
         @confirm="confirmChapter"
         @regenerate="showRegenModal = true"
         @export="doExport"
@@ -97,6 +99,7 @@ import {
   listAnnotations,
   createAnnotation,
   updateAnnotation as apiUpdateAnnotation,
+  createChapter,
 } from '../api/documents'
 import { createExport } from '../api/exports'
 
@@ -107,6 +110,7 @@ const currentChapterId = ref('')
 const currentChapter = ref<any>(null)
 const annotations = ref<any[]>([])
 const saveStatus = ref('已保存')
+const savedAt = ref('')
 const showRegenModal = ref(false)
 const regenInstruction = ref('')
 const aiPanelRef = ref()
@@ -123,6 +127,13 @@ async function selectChapter(ch: any) {
   annotations.value = await listAnnotations(docId, ch.id)
 }
 
+async function addChapter(title: string) {
+  await createChapter(docId, title)
+  doc.value = await getDocument(docId)
+  const added = doc.value.chapters[doc.value.chapters.length - 1]
+  if (added) await selectChapter(added)
+}
+
 function onEdit(text: string, contentJson: string) {
   if (!currentChapter.value) return
   saveStatus.value = '保存中...'
@@ -130,6 +141,7 @@ function onEdit(text: string, contentJson: string) {
   saveTimer = setTimeout(async () => {
     await editChapter(docId, currentChapterId.value, { plain_text: text, content_json: contentJson })
     saveStatus.value = '已保存'
+    savedAt.value = new Date().toTimeString().slice(0, 5)
   }, 1000)
 }
 

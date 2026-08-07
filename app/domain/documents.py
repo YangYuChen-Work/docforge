@@ -43,6 +43,30 @@ def get_chapter(db: Session, doc_id: str, chapter_id: str) -> DocumentChapter:
     return ch
 
 
+def create_custom_chapter(db: Session, doc_id: str, title: str) -> DocumentChapter:
+    """Add a user-defined chapter not backed by any TemplateChapter (BR-002 exception:
+    user may extend the document beyond the template's fixed structure, but this never
+    removes or reorders the template-driven chapters already present)."""
+    doc = get_document(db, doc_id)
+    max_order = max((c.order_index for c in doc.chapters), default=0)
+    ch = DocumentChapter(
+        id=uuid.uuid4().hex,
+        document_id=doc_id,
+        template_chapter_id=None,
+        title=title,
+        order_index=max_order + 1,
+        status="pending",
+    )
+    db.add(ch)
+    db.commit()
+    db.refresh(ch)
+    audit_service.log(
+        db, "create_chapter", "document_chapter", ch.id,
+        result="success", payload_summary=title,
+    )
+    return ch
+
+
 def edit_chapter(
     db: Session, doc_id: str, chapter_id: str, plain_text: str, content_json: str | None
 ) -> DocumentChapter:

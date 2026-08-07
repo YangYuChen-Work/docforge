@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.db.models import Citation, DocumentTemplate
@@ -52,6 +52,15 @@ def get_document(doc_id: str, db: Session = Depends(get_db)):
         "output_path": doc.output_path,
         "chapters": chapters,
     }
+
+
+@router.post("/documents/{doc_id}/chapters")
+def create_chapter(doc_id: str, body: dict, db: Session = Depends(get_db)):
+    title = (body or {}).get("title", "").strip()
+    if not title:
+        raise HTTPException(422, {"error_code": "TITLE_REQUIRED"})
+    ch = domain.create_custom_chapter(db, doc_id, title)
+    return {"id": ch.id, "title": ch.title, "order_index": ch.order_index, "status": ch.status}
 
 
 @router.get("/documents/{doc_id}/chapters/{chapter_id}")
