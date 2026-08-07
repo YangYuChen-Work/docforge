@@ -1,9 +1,9 @@
 <template>
-  <div style="display: flex; height: 100vh; font-family: -apple-system, 'PingFang SC', sans-serif">
+  <div class="app">
     <AppSidebar />
-    <div style="flex: 1; overflow: auto; background: #f5f7fa">
+    <main class="main-content">
       <RouterView />
-    </div>
+    </main>
   </div>
 </template>
 

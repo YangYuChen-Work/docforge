@@ -1,115 +1,165 @@
 <template>
-  <div style="padding:24px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-      <h2 style="margin:0;font-size:18px;color:#1a2a4a">项目文档</h2>
-      <RouterLink
-        to="/doc/new"
-        style="background:#1a5ccc;color:#fff;padding:8px 16px;text-decoration:none;border-radius:4px;font-size:13px"
-      >
-        + 新建文档
-      </RouterLink>
+  <header class="page-header">
+    <div class="header-left">
+      <h2>AI 文档助手</h2>
+      <p class="subtitle">基于项目、模板和资料库生成项目文档</p>
     </div>
+    <div class="header-right">
+      <span class="badge badge-blue">编辑中 {{ editingCount }}</span>
+      <span class="badge badge-green">已归档 {{ archivedCount }}</span>
+    </div>
+  </header>
 
-    <!-- Stat cards -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-      <div
-        v-for="s in stats"
-        :key="s.label"
-        style="background:#fff;border:1px solid #e5e7eb;border-radius:6px;padding:16px"
-      >
-        <div style="font-size:24px;font-weight:700;color:#1a2a4a">{{ s.value }}</div>
-        <div style="font-size:12px;color:#667;margin-top:4px">{{ s.label }}</div>
+  <div class="doc-stats">
+    <div class="doc-stat-card">
+      <div class="doc-stat-number">{{ docs.length }}</div>
+      <div class="doc-stat-label">项目文档</div>
+      <div class="doc-stat-dot blue"></div>
+    </div>
+    <div class="doc-stat-card">
+      <div class="doc-stat-number">{{ draftCount }}</div>
+      <div class="doc-stat-label">待生成</div>
+      <div class="doc-stat-dot orange"></div>
+    </div>
+    <div class="doc-stat-card">
+      <div class="doc-stat-number">{{ editingCount }}</div>
+      <div class="doc-stat-label">编辑中</div>
+      <div class="doc-stat-dot blue"></div>
+    </div>
+    <div class="doc-stat-card">
+      <div class="doc-stat-number">{{ archivedCount }}</div>
+      <div class="doc-stat-label">已归档</div>
+      <div class="doc-stat-dot green"></div>
+    </div>
+  </div>
+
+  <div class="doc-main-layout">
+    <div class="doc-list-panel">
+      <div class="card">
+        <div class="doc-list-header">
+          <h3>项目文档</h3>
+          <p>按项目维度管理设计任务书、总体方案、验证方案和评审材料</p>
+          <input
+            v-model="search"
+            type="text"
+            class="doc-search"
+            placeholder="🔍 搜索项目/型号/文档"
+            @input="loadDocs"
+          />
+        </div>
+        <div class="doc-category-tabs">
+          <button
+            v-for="tab in categoryTabs"
+            :key="tab"
+            class="cat-tab"
+            :class="{ active: currentTab === tab }"
+            @click="currentTab = tab"
+          >
+            {{ tab }}
+          </button>
+        </div>
+        <table class="doc-table">
+          <thead>
+            <tr>
+              <th>项目文档</th>
+              <th>项目</th>
+              <th>状态</th>
+              <th>更新时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="!loading && filteredDocs.length === 0">
+              <td colspan="4" style="text-align: center; color: #999; padding: 40px">暂无匹配文档</td>
+            </tr>
+            <tr v-for="doc in filteredDocs" :key="doc.id" @click="$router.push(`/doc/${doc.id}`)">
+              <td>
+                <div class="doc-name">{{ doc.title }}</div>
+                <div class="doc-meta">{{ doc.template_name }}</div>
+              </td>
+              <td><span class="doc-project">{{ doc.project_id }}</span></td>
+              <td><span class="status-tag" :class="doc.status">{{ statusLabel(doc.status) }}</span></td>
+              <td>{{ doc.updated_at?.slice(0, 10) }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <!-- Filters -->
-    <div style="display:flex;gap:8px;margin-bottom:12px">
-      <input
-        v-model="search"
-        placeholder="搜索文档..."
-        @input="loadDocs"
-        style="border:1px solid #ddd;border-radius:4px;padding:6px 12px;font-size:13px;width:240px"
-      />
-      <select
-        v-model="filterStatus"
-        @change="loadDocs"
-        style="border:1px solid #ddd;border-radius:4px;padding:6px 10px;font-size:13px"
-      >
-        <option value="">全部状态</option>
-        <option value="draft">草稿</option>
-        <option value="editing">编辑中</option>
-        <option value="reviewing">审核中</option>
-        <option value="archived">已归档</option>
-      </select>
-    </div>
-
-    <!-- Document table -->
-    <table
-      style="width:100%;border-collapse:collapse;background:#fff;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden"
-    >
-      <thead style="background:#f9fafb">
-        <tr>
-          <th
-            v-for="h in ['文档标题', '项目', '模板', '状态', '更新时间']"
-            :key="h"
-            style="text-align:left;padding:10px 16px;font-size:12px;color:#667;font-weight:600"
+    <div class="doc-side-panel">
+      <div class="card">
+        <h3 class="side-title">新建项目文档</h3>
+        <p class="side-desc">先选择项目，再从模板库选择文档类型，AI 自动匹配来源资料。</p>
+        <RouterLink to="/doc/new" class="btn btn-primary" style="width: 100%; text-align: center; display: block">
+          新建文档
+        </RouterLink>
+      </div>
+      <div class="card" style="margin-top: 16px">
+        <h4 class="side-subtitle">项目搜索</h4>
+        <input
+          type="text"
+          class="doc-search"
+          placeholder="项目编号、名称、产品型号"
+          style="margin-bottom: 12px"
+        />
+        <div v-if="recommendedProject" class="recommend-card">
+          <div class="recommend-label">推荐项目</div>
+          <div class="recommend-title">{{ recommendedProject.name }}</div>
+          <div class="recommend-meta">{{ recommendedProject.code }} · {{ recommendedProject.phase }}</div>
+        </div>
+      </div>
+      <div class="card" style="margin-top: 16px">
+        <h4 class="side-subtitle">常用模板</h4>
+        <div class="template-list">
+          <div
+            v-for="tpl in commonTemplates"
+            :key="tpl.id"
+            class="tpl-item"
+            @click="$router.push('/doc/new')"
           >
-            {{ h }}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-if="!loading && docs.length === 0">
-          <td colspan="5" style="text-align:center;padding:40px;color:#999;font-size:13px">
-            暂无文档
-          </td>
-        </tr>
-        <tr
-          v-for="doc in docs"
-          :key="doc.id"
-          @click="$router.push(`/doc/${doc.id}`)"
-          style="border-top:1px solid #f0f0f0;cursor:pointer"
-        >
-          <td style="padding:12px 16px;font-size:13px;color:#1a2a4a;font-weight:500">
-            {{ doc.title }}
-          </td>
-          <td style="padding:12px 16px;font-size:12px;color:#555">{{ doc.project_id }}</td>
-          <td style="padding:12px 16px;font-size:12px;color:#555">{{ doc.template_name }}</td>
-          <td style="padding:12px 16px">
-            <span :style="statusStyle(doc.status)">{{ statusLabel(doc.status) }}</span>
-          </td>
-          <td style="padding:12px 16px;font-size:12px;color:#999">
-            {{ doc.updated_at?.slice(0, 10) }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            {{ tpl.name }}
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { listDocuments } from '../api/documents'
+import { listProjects } from '../api/projects'
+import { listTemplates } from '../api/templates'
 
 const docs = ref<any[]>([])
 const search = ref('')
-const filterStatus = ref('')
 const loading = ref(false)
 
-const stats = computed(() => [
-  { label: '总文档', value: docs.value.length },
-  { label: '编辑中', value: docs.value.filter((d) => d.status === 'editing').length },
-  { label: '草稿', value: docs.value.filter((d) => d.status === 'draft').length },
-  { label: '已归档', value: docs.value.filter((d) => d.status === 'archived').length },
-])
+const categoryTabs = ['全部', '设计类', '分析类', '评审类']
+const currentTab = ref('全部')
+
+const recommendedProject = ref<any | null>(null)
+const commonTemplates = ref<any[]>([])
+
+const draftCount = computed(() => docs.value.filter((d) => d.status === 'draft').length)
+const editingCount = computed(() => docs.value.filter((d) => d.status === 'editing').length)
+const archivedCount = computed(() => docs.value.filter((d) => d.status === 'archived').length)
+
+const categoryKeyword: Record<string, string> = {
+  设计类: '设计',
+  分析类: '分析',
+  评审类: '评审',
+}
+
+const filteredDocs = computed(() => {
+  if (currentTab.value === '全部') return docs.value
+  const keyword = categoryKeyword[currentTab.value]
+  return docs.value.filter((d) => (d.template_name || '').includes(keyword))
+})
 
 async function loadDocs() {
   loading.value = true
   try {
-    docs.value = await listDocuments({
-      search: search.value || undefined,
-      status: filterStatus.value || undefined,
-    })
+    docs.value = await listDocuments({ search: search.value || undefined })
   } finally {
     loading.value = false
   }
@@ -127,18 +177,19 @@ function statusLabel(s: string) {
   return map[s] || s
 }
 
-function statusStyle(s: string) {
-  const colors: Record<string, string> = {
-    draft: '#667',
-    editing: '#1a5ccc',
-    reviewing: '#7c3aed',
-    archived: '#16a34a',
-    generating: '#d97706',
-    failed: '#dc2626',
+onMounted(async () => {
+  await loadDocs()
+  try {
+    const projects = await listProjects()
+    recommendedProject.value = projects[0] || null
+  } catch {
+    recommendedProject.value = null
   }
-  const c = colors[s] || '#667'
-  return `font-size:11px;padding:2px 8px;border-radius:10px;background:${c}22;color:${c}`
-}
-
-onMounted(loadDocs)
+  try {
+    const templates = await listTemplates()
+    commonTemplates.value = templates.slice(0, 3)
+  } catch {
+    commonTemplates.value = []
+  }
+})
 </script>

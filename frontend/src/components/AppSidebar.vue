@@ -1,44 +1,62 @@
 <template>
-  <aside
-    style="width:220px;background:#1a2a4a;color:#fff;display:flex;flex-direction:column;flex-shrink:0"
-  >
-    <div style="padding:18px 20px;font-size:14px;font-weight:600;border-bottom:1px solid #2a3a5a;letter-spacing:0.5px">
-      项目文档工作台
-    </div>
-    <nav style="flex:1;padding-top:8px">
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        style="display:block;padding:11px 20px;color:#aab;text-decoration:none;font-size:13px;transition:background 0.15s"
-        :style="isActive(item.path) ? { background: '#2a4a7a', color: '#fff' } : {}"
-      >
-        {{ item.label }}
-      </RouterLink>
+  <aside class="sidebar">
+    <div class="sidebar-header"><h1>项目文档工作台</h1></div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">
+        <div class="nav-label">功能导航</div>
+        <a href="#" class="nav-item" @click.prevent="showPlaceholder">
+          <span class="nav-icon">🧪</span><span>AI 测试用例生成</span>
+        </a>
+        <RouterLink to="/" class="nav-item" :class="{ active: isDocModuleActive }">
+          <span class="nav-icon">📄</span><span>AI 文档助手</span>
+        </RouterLink>
+        <RouterLink to="/" class="nav-item sub" :class="{ active: route.path === '/' }">
+          <span class="nav-icon">•</span><span>文档列表</span>
+        </RouterLink>
+        <RouterLink to="/doc/new" class="nav-item sub" :class="{ active: route.path.startsWith('/doc/new') }">
+          <span class="nav-icon">•</span><span>新建文档</span>
+        </RouterLink>
+        <a href="#" class="nav-item" @click.prevent="showPlaceholder">
+          <span class="nav-icon">⚙️</span><span>产品模块智能选配</span>
+        </a>
+      </div>
+      <div class="nav-section">
+        <div class="nav-label">系统配置</div>
+        <a href="#" class="nav-item sub" @click.prevent="showPlaceholder">
+          <span class="nav-icon">•</span><span>转换规则</span>
+        </a>
+        <RouterLink to="/audit" class="nav-item sub" :class="{ active: route.path.startsWith('/audit') }">
+          <span class="nav-icon">•</span><span>日志审计</span>
+        </RouterLink>
+        <RouterLink to="/config" class="nav-item sub" :class="{ active: route.path.startsWith('/config') }">
+          <span class="nav-icon">•</span><span>文档助手配置</span>
+        </RouterLink>
+        <a href="#" class="nav-item sub" @click.prevent="showPlaceholder">
+          <span class="nav-icon">•</span><span>模块配置规则库</span>
+        </a>
+      </div>
     </nav>
-    <div style="padding:12px 20px;font-size:11px;color:#556;border-top:1px solid #2a3a5a">
+    <div style="padding:10px 16px;font-size:11px;color:rgba(255,255,255,0.4);border-top:1px solid rgba(255,255,255,0.1)">
       AI: {{ aiProvider }}
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
 
 const route = useRoute()
 const aiProvider = ref('...')
 
-const navItems = [
-  { path: '/', label: '📄 文档列表' },
-  { path: '/doc/new', label: '+ 新建文档' },
-  { path: '/config', label: '⚙ 模板配置' },
-  { path: '/audit', label: '📋 操作日志' },
-]
+const isDocModuleActive = computed(
+  () => route.path === '/' || route.path.startsWith('/doc')
+)
 
-const isActive = (path: string) =>
-  path === '/' ? route.path === '/' : route.path.startsWith(path)
+function showPlaceholder() {
+  alert('该模块为演示占位，暂未接入真实后端')
+}
 
 onMounted(async () => {
   try {
