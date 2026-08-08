@@ -152,38 +152,17 @@ def _table_to_prosemirror(table) -> list[dict]:
 
 
 def _result_to_prosemirror(result) -> dict:
-    """Convert AI result (text content + structured tables) to ProseMirror JSON."""
-    nodes = []
-    for line in result.content.split("\n"):
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("# "):
-            nodes.append({
-                "type": "heading",
-                "attrs": {"level": 1},
-                "content": [{"type": "text", "text": line[2:]}],
-            })
-        elif line.startswith("## "):
-            nodes.append({
-                "type": "heading",
-                "attrs": {"level": 2},
-                "content": [{"type": "text", "text": line[3:]}],
-            })
-        elif line.startswith("【") and ("待补充" in line or "资料缺失" in line or "Mock" in line):
-            nodes.append({
-                "type": "paragraph",
-                "content": [{
-                    "type": "text",
-                    "marks": [{"type": "highlight", "attrs": {"color": "#fef3c7"}}],
-                    "text": line,
-                }],
-            })
-        else:
-            nodes.append({
-                "type": "paragraph",
-                "content": [{"type": "text", "text": line}],
-            })
+    """Convert AI result (markdown content + structured tables field) to ProseMirror JSON.
+
+    The AI's `content` field may itself contain markdown tables/headings/bold text
+    (some models emit tables inline even when also asked for a structured `tables`
+    field), so markdown parsing runs first and any structured TableData objects are
+    appended after — this can occasionally double up a table, which is preferable to
+    losing structured data.
+    """
+    from app.services.markdown_to_prosemirror import parse_markdown_to_prosemirror
+
+    nodes = parse_markdown_to_prosemirror(result.content)
 
     for table in result.tables:
         nodes.extend(_table_to_prosemirror(table))

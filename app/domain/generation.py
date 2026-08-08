@@ -1,8 +1,10 @@
 import json
+import threading
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from app.db.session import SessionLocal
 from app.db.models import (
     GenerationTask, GeneratedDocument, DocumentChapter, TemplateChapter, Project
 )
@@ -91,8 +93,29 @@ def start_task(db: Session, task_id: str) -> GenerationTask:
     task.status = "generating"
     db.commit()
 
-    _run_generation(db, task, doc)
+    # Run generation in a background thread with its own DB session so the HTTP
+    # request returns immediately with the document_id. The frontend navigates to
+    # the editor right away and polls per-chapter status instead of blocking on a
+    # single request for up to 22 sequential AI calls (which was exceeding the
+    # frontend's axios timeout and leaving the wizard stuck with no navigation).
+    doc_id = doc.id
+    task_id_local = task.id
+    thread = threading.Thread(
+        target=_run_generation_in_background, args=(task_id_local, doc_id), daemon=True
+    )
+    thread.start()
+
     return task
+
+
+def _run_generation_in_background(task_id: str, doc_id: str) -> None:
+    db = SessionLocal()
+    try:
+        task = db.get(GenerationTask, task_id)
+        doc = db.get(GeneratedDocument, doc_id)
+        _run_generation(db, task, doc)
+    finally:
+        db.close()
 
 
 def _run_generation(db: Session, task: GenerationTask, doc: GeneratedDocument):

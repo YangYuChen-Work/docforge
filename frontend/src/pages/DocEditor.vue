@@ -5,6 +5,7 @@
       <div class="editor-topbar-left">
         <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
         <span class="editor-breadcrumb">AI 文档助手 / 在线编辑</span>
+        <span v-if="generating" class="badge badge-blue" style="margin-left:12px">章节生成中...</span>
       </div>
     </div>
 
@@ -84,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import OutlinePanel from '../components/OutlinePanel.vue'
 import ContentPanel from '../components/ContentPanel.vue'
@@ -115,11 +116,41 @@ const showRegenModal = ref(false)
 const regenInstruction = ref('')
 const aiPanelRef = ref()
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let genPollTimer: ReturnType<typeof setInterval> | null = null
+const generating = ref(false)
 
 onMounted(async () => {
   doc.value = await getDocument(docId)
   if (doc.value.chapters.length > 0) selectChapter(doc.value.chapters[0])
+  // Generation now runs in a background thread on the backend (see
+  // app/domain/generation.py _run_generation_in_background), so when the
+  // wizard navigates here right after creating the task, chapters may
+  // still be "pending"/"generating". Poll until every chapter reaches a
+  // terminal state instead of showing a permanently stale outline.
+  if (isStillGenerating(doc.value)) {
+    generating.value = true
+    genPollTimer = setInterval(async () => {
+      doc.value = await getDocument(docId)
+      if (currentChapterId.value) {
+        currentChapter.value = await getChapter(docId, currentChapterId.value)
+      }
+      if (!isStillGenerating(doc.value)) {
+        generating.value = false
+        if (genPollTimer) clearInterval(genPollTimer)
+        genPollTimer = null
+      }
+    }, 3000)
+  }
 })
+
+onUnmounted(() => {
+  if (genPollTimer) clearInterval(genPollTimer)
+})
+
+function isStillGenerating(d: any) {
+  if (!d) return false
+  return d.chapters.some((c: any) => c.status === 'pending' || c.status === 'generating')
+}
 
 async function selectChapter(ch: any) {
   currentChapterId.value = ch.id

@@ -20,6 +20,7 @@ the real DeepSeek API.
 """
 import hashlib
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,22 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: f.read(8192), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def _poll_task_until_terminal(client: TestClient, task_id: str, timeout: float = 30.0) -> dict:
+    """Generation now runs in a background thread (see app/domain/generation.py
+    _run_generation_in_background) so /start returns immediately with the
+    document_id while chapters are still generating. Poll GET /generation-tasks
+    until the task leaves the 'generating' state."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        r = client.get(f"/api/generation-tasks/{task_id}")
+        assert r.status_code == 200, r.text
+        data = r.json()
+        if data["status"] in ("awaiting_confirmation", "completed", "failed"):
+            return data
+        time.sleep(0.2)
+    raise AssertionError(f"生成任务在 {timeout}s 内未完成，仍处于 generating 状态")
 
 
 # Shared state across the ordered test functions in this module.
@@ -144,15 +161,22 @@ def test_02_create_generation_task():
 
 
 def test_03_start_task_generates_all_chapters():
+    """Generation now runs in a background thread so /start returns as soon as
+    the document + chapter skeleton exists (fixing the wizard's "no navigation
+    after clicking generate" bug: the old synchronous 22-chapter call could
+    exceed the frontend's axios timeout). Poll the task until it reaches a
+    terminal state instead of asserting on the immediate response."""
     task_id = STATE["task_id"]
     r = client.post(f"/api/generation-tasks/{task_id}/start")
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["status"] == "awaiting_confirmation", (
-        f"生成任务未进入 awaiting_confirmation，实际状态: {data['status']}"
-    )
-    assert data["document_id"]
+    assert data["document_id"], "文档应在 /start 返回时已创建（用于前端立即跳转）"
     STATE["document_id"] = data["document_id"]
+
+    task = _poll_task_until_terminal(client, task_id)
+    assert task["status"] == "awaiting_confirmation", (
+        f"生成任务未进入 awaiting_confirmation，实际状态: {task['status']}"
+    )
 
     r = client.get(f"/api/documents/{STATE['document_id']}")
     assert r.status_code == 200
