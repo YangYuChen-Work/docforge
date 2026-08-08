@@ -51,6 +51,14 @@
 
     <!-- AI assistant tab -->
     <div v-if="activeTab === 'AI助手'" class="ai-tab-content" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+      <div v-if="selectionText" class="selection-banner">
+        <div class="selection-banner-label">当前选区（{{ selectionText.length }} 字）</div>
+        <div class="selection-banner-text">{{ truncatedSelection }}</div>
+      </div>
+      <div v-else class="selection-banner selection-banner-empty">
+        未选中文字 — 快捷操作将作用于整段正文
+      </div>
+
       <div class="ai-section-title">快捷操作</div>
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
         <button
@@ -76,8 +84,15 @@
           </div>
           <div style="line-height:1.6;white-space:pre-wrap">{{ m.content }}</div>
           <div v-if="m.role === 'ai'" class="ai-bubble-actions">
-            <button class="ai-bubble-btn apply-btn" @click="$emit('applyAiSuggestion', m.content)">
-              <span class="ai-bubble-btn-icon">✓</span>应用到正文
+            <button
+              v-if="m.hadSelection"
+              class="ai-bubble-btn apply-btn"
+              @click="$emit('replaceSelection', m.content)"
+            >
+              <span class="ai-bubble-btn-icon">⇄</span>替换选中文字
+            </button>
+            <button class="ai-bubble-btn apply-btn" @click="$emit('insertAtCursor', m.content)">
+              <span class="ai-bubble-btn-icon">✓</span>插入到光标处
             </button>
             <button class="ai-bubble-btn comment-btn" @click="$emit('insertAnnotation', m.content)">
               <span class="ai-bubble-btn-icon">💬</span>插入批注
@@ -103,13 +118,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
-defineProps<{ annotations: any[]; chapterId: string; docId: string }>()
+const props = defineProps<{
+  annotations: any[]
+  chapterId: string
+  docId: string
+  selectionText: string
+}>()
 const emit = defineEmits<{
   updateAnnotation: [annotationId: string, status: string]
   applyAiSuggestion: [content: string]
   insertAnnotation: [content: string]
+  replaceSelection: [content: string]
+  insertAtCursor: [content: string]
   aiAction: [action: string, selection: string, instruction: string]
 }>()
 const activeTab = ref('批注')
@@ -118,6 +140,10 @@ const busy = ref(false)
 const messages = ref<any[]>([])
 let msgId = 0
 
+const truncatedSelection = computed(() =>
+  props.selectionText.length > 80 ? props.selectionText.slice(0, 80) + '…' : props.selectionText
+)
+
 const quickActions = [
   { key: 'polish', label: '润色本段' },
   { key: 'expand', label: '扩写本节' },
@@ -125,21 +151,30 @@ const quickActions = [
   { key: 'generate_diagram', label: '生成架构图' },
 ]
 
+// Quick actions and free-form instructions both operate on the current Tiptap
+// selection when one exists (props.selectionText, kept in sync by
+// ContentPanel's onSelectionUpdate via DocEditor). Falling back to '' selects
+// the whole chapter body server-side (see ai-action endpoint's `context`).
 function doAction(action: string) {
-  messages.value.push({ id: msgId++, role: 'user', content: `执行：${action}` })
-  emit('aiAction', action, '', instruction.value)
+  const label = quickActions.find((a) => a.key === action)?.label || action
+  messages.value.push({
+    id: msgId++,
+    role: 'user',
+    content: props.selectionText ? `${label}（选中 ${props.selectionText.length} 字）` : label,
+  })
+  emit('aiAction', action, props.selectionText, instruction.value)
 }
 
 function sendInstruction() {
   if (!instruction.value.trim()) return
   messages.value.push({ id: msgId++, role: 'user', content: instruction.value })
-  emit('aiAction', 'address_comments', '', instruction.value)
+  emit('aiAction', 'address_comments', props.selectionText, instruction.value)
   instruction.value = ''
 }
 
 defineExpose({
-  addAiMessage(content: string) {
-    messages.value.push({ id: msgId++, role: 'ai', content })
+  addAiMessage(content: string, hadSelection = false) {
+    messages.value.push({ id: msgId++, role: 'ai', content, hadSelection })
   },
   setBusy(v: boolean) {
     busy.value = v

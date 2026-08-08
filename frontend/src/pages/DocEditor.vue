@@ -40,19 +40,24 @@
         @addChapter="addChapter"
       />
       <ContentPanel
+        ref="contentPanelRef"
         :chapter="currentChapter"
         @confirm="confirmChapter"
         @regenerate="showRegenModal = true"
         @export="doExport"
         @edit="onEdit"
+        @selectionChange="selectionText = $event"
       />
       <AiPanel
         ref="aiPanelRef"
         :annotations="annotations"
         :chapterId="currentChapterId"
         :docId="docId"
+        :selectionText="selectionText"
         @updateAnnotation="updateAnnotation"
         @applyAiSuggestion="applyAiSuggestion"
+        @replaceSelection="replaceSelection"
+        @insertAtCursor="insertAtCursor"
         @insertAnnotation="insertAnnotation"
         @aiAction="doAiAction"
       />
@@ -115,6 +120,8 @@ const savedAt = ref('')
 const showRegenModal = ref(false)
 const regenInstruction = ref('')
 const aiPanelRef = ref()
+const contentPanelRef = ref()
+const selectionText = ref('')
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let genPollTimer: ReturnType<typeof setInterval> | null = null
 const generating = ref(false)
@@ -207,9 +214,27 @@ async function doAiAction(action: string, selection: string, instruction: string
 }
 
 async function applyAiSuggestion(content: string) {
-  const newText = (currentChapter.value?.plain_text || '') + '\n\n' + content
-  await editChapter(docId, currentChapterId.value, { plain_text: newText, content_json: null })
-  currentChapter.value = await getChapter(docId, currentChapterId.value)
+  // Kept for the annotation flow's own "apply" button (appends at the end).
+  // Selection-based edits go through replaceSelection/insertAtCursor below,
+  // which edit the live Tiptap document directly so content_json stays in
+  // sync with what's on screen (this function used to null out content_json,
+  // which made the editor silently drop the appended text since ContentPanel
+  // only ever renders content_json, never plain_text, once it's set).
+  insertAtCursor(content)
+}
+
+/** User picked "替换选中文字" on an AI suggestion: replace the selection that
+ * was active when the AI call was made with the AI's result, directly in the
+ * live Tiptap document (not just plain_text) so it's visible immediately and
+ * exported correctly. */
+function replaceSelection(content: string) {
+  contentPanelRef.value?.replaceSelection(content)
+  selectionText.value = ''
+}
+
+/** User picked "插入到光标处": insert without removing the current selection. */
+function insertAtCursor(content: string) {
+  contentPanelRef.value?.insertAtCursor(content)
 }
 
 async function insertAnnotation(content: string) {

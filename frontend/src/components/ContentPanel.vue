@@ -104,6 +104,7 @@ const emit = defineEmits<{
   regenerate: []
   export: [format: string]
   edit: [text: string, contentJson: string]
+  selectionChange: [text: string]
 }>()
 const showExport = ref(false)
 const mermaidContainer = ref<HTMLElement>()
@@ -134,7 +135,34 @@ const editor = useEditor({
   onUpdate({ editor }) {
     emit('edit', editor.getText(), JSON.stringify(editor.getJSON()))
   },
+  onSelectionUpdate({ editor }) {
+    const { from, to } = editor.state.selection
+    const text = from === to ? '' : editor.state.doc.textBetween(from, to, ' ')
+    emit('selectionChange', text)
+  },
 })
+
+/** Replace the currently selected range with plain text (used when the user
+ * picks "replace selection" for an AI suggestion). Falls back to inserting
+ * at the cursor if the selection collapsed in the meantime (e.g. user clicked
+ * elsewhere before the AI response came back). */
+function replaceSelection(text: string) {
+  if (!editor.value) return
+  const { from, to } = editor.value.state.selection
+  editor.value.chain().focus().insertContentAt({ from, to }, text).run()
+  emit('edit', editor.value.getText(), JSON.stringify(editor.value.getJSON()))
+}
+
+/** Insert text at the current cursor position without removing anything
+ * (used when the user picks "insert" instead of "replace"). */
+function insertAtCursor(text: string) {
+  if (!editor.value) return
+  const pos = editor.value.state.selection.to
+  editor.value.chain().focus().insertContentAt(pos, text).run()
+  emit('edit', editor.value.getText(), JSON.stringify(editor.value.getJSON()))
+}
+
+defineExpose({ replaceSelection, insertAtCursor })
 
 watch(
   () => props.chapter?.id,

@@ -205,6 +205,14 @@
 .ai-tab-content {}
 .ai-section-title { font-size: 12px; font-weight: 600; color: #888; margin-bottom: 8px; }
 
+/* Selection banner: reuses .doc-selection-hint's blue as the "has selection"
+   state, with a muted gray variant for "nothing selected". */
+.selection-banner { border-radius: 4px; padding: 8px 12px; margin-bottom: 12px; font-size: 12px; }
+.selection-banner:not(.selection-banner-empty) { background: #1677ff; color: #fff; }
+.selection-banner-label { font-weight: 600; margin-bottom: 2px; }
+.selection-banner-text { opacity: .9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.selection-banner-empty { background: #f0f0f0; color: #888; }
+
 /* Annotation Cards */
 .annotation-card { border-radius: 8px; padding: 12px; margin-bottom: 10px; border: 1px solid #e8e8e8; background: #fff; }
 .annotation-card.ref1 { border-left: 3px solid #fa8c16; }
