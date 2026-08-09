@@ -61,7 +61,15 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
             path = convert_to_pdf(docx_path)
         elif fmt == "xlsx":
             from app.services.xlsx_exporter import export_tables_to_xlsx
-            path = export_tables_to_xlsx(doc_id, chapters)
+            document_meta = {
+                "title": doc.title,
+                "project_id": doc.project_id,
+                "template_name": tpl.name if tpl else "",
+                "status": doc.status,
+                "missing_items": _collect_issue_summary(chapters, "missing_information_json"),
+                "conflicts": _collect_issue_summary(chapters, "conflict_json"),
+            }
+            path = export_tables_to_xlsx(doc_id, chapters, document_meta)
         else:
             raise ValueError(f"不支持的导出格式: {fmt}")
 
@@ -83,3 +91,41 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
         error_message=export.error_message,
     )
     return export
+
+
+def _collect_issue_summary(chapters: list, field_name: str) -> list[str]:
+    items: list[str] = []
+    for chapter in chapters:
+        raw = getattr(chapter, field_name, None)
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if not isinstance(data, list):
+            continue
+        for entry in data:
+            text = _to_concise_text(entry)
+            if text and text not in items:
+                items.append(text)
+            if len(items) >= 5:
+                return items
+    return items
+
+
+def _to_concise_text(entry) -> str:
+    if isinstance(entry, str):
+        text = entry.strip()
+    elif isinstance(entry, dict):
+        text = (
+            entry.get("description")
+            or entry.get("title")
+            or entry.get("name")
+            or json.dumps(entry, ensure_ascii=False)
+        )
+    else:
+        text = str(entry).strip()
+    if len(text) > 80:
+        return text[:77] + "..."
+    return text
