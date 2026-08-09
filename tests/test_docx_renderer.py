@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from unittest.mock import MagicMock
 from docx import Document
 from docx.enum.section import WD_SECTION
@@ -8,6 +9,11 @@ from docx.shared import Mm
 from app.services.docx_renderer import render_to_docx
 from app.services.export_fonts import get_export_font_config
 from app.services.validator import validate_document
+
+
+REAL_TEMPLATE_PATH = Path(
+    "场景1文档生成/要生成的文档/XX产品开发立项暨设计和开发输入报告.docx"
+)
 
 
 def _ch(chapter_id, title, content_json, missing=None, conflicts=None):
@@ -53,6 +59,32 @@ def _make_placeholder_template(tmp_path):
     doc.add_paragraph("模板末尾说明")
 
     path = tmp_path / "placeholder-template.docx"
+    doc.save(str(path))
+    return str(path)
+
+
+def _make_mixed_structure_template(tmp_path):
+    doc = Document()
+    doc.add_heading("第一章", level=1)
+    doc.add_paragraph("模板占位内容")
+    stale_table = doc.add_table(rows=1, cols=1)
+    stale_table.cell(0, 0).text = "模板占位表格"
+    doc.add_heading("未锚定结构标题", level=2)
+    structure_table = doc.add_table(rows=1, cols=1)
+    structure_table.cell(0, 0).text = "保留的结构表格"
+    doc.add_heading("第二章", level=1)
+    doc.add_paragraph("模板占位内容")
+
+    path = tmp_path / "mixed-structure-template.docx"
+    doc.save(str(path))
+    return str(path)
+
+
+def _make_literal_page_template(tmp_path):
+    doc = Document()
+    doc.add_heading("产品概述", level=1)
+    doc.sections[0].footer.paragraphs[0].text = "PAGE"
+    path = tmp_path / "literal-page-template.docx"
     doc.save(str(path))
     return str(path)
 
@@ -138,6 +170,123 @@ def test_ordered_list_becomes_numbered_paragraphs(tmp_path):
 
     numbered_paras = [p.text for p in doc.paragraphs if "项" in p.text]
     assert numbered_paras == ["1. 第一项", "2. 第二项"]
+
+
+def test_nested_mixed_lists_render_recursively_with_indentation(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "bulletList", "content": [
+            {"type": "listItem", "content": [
+                {"type": "paragraph", "content": [{"type": "text", "text": "一级项目"}]},
+                {"type": "orderedList", "content": [
+                    {"type": "listItem", "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "二级一"}]},
+                    ]},
+                    {"type": "listItem", "content": [
+                        {"type": "paragraph", "content": [{"type": "text", "text": "二级二"}]},
+                        {"type": "bulletList", "content": [
+                            {"type": "listItem", "content": [
+                                {"type": "paragraph", "content": [{"type": "text", "text": "三级"}]},
+                            ]},
+                        ]},
+                    ]},
+                ]},
+            ]},
+        ]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+
+    list_paragraphs = [p for p in doc.paragraphs if any(label in p.text for label in ("一级", "二级", "三级"))]
+    assert [p.text for p in list_paragraphs] == [
+        "• 一级项目",
+        "1. 二级一",
+        "2. 二级二",
+        "▪ 三级",
+    ]
+    assert list_paragraphs[1].paragraph_format.left_indent > list_paragraphs[0].paragraph_format.left_indent
+    assert list_paragraphs[3].paragraph_format.left_indent > list_paragraphs[1].paragraph_format.left_indent
+
+
+def test_near_match_heading_uses_normalized_punctuation(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "功能性能定位生成内容"}]},
+    ]}
+    template = _make_template(tmp_path, ["功能/性能定位（来自技术可行性分析报告）"])
+
+    out = render_to_docx("doc1", [_ch("c1", "功能性能定位", content)], template)
+    doc = Document(out)
+
+    assert any(p.text == "功能性能定位生成内容" for p in doc.paragraphs)
+
+
+def test_mixed_template_cleanup_preserves_unanchored_structure(tmp_path):
+    content = lambda text: {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+    ]}
+    chapters = [
+        _ch("c1", "第一章", content("生成第一章")),
+        _ch("c2", "第二章", content("生成第二章")),
+    ]
+    template = _make_mixed_structure_template(tmp_path)
+
+    out = render_to_docx("doc1", chapters, template)
+    doc = Document(out)
+    body_text = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "生成第一章" in body_text
+    assert "生成第二章" in body_text
+    assert "模板占位内容" not in body_text
+    assert any(p.text == "未锚定结构标题" for p in doc.paragraphs)
+    assert any(cell.text == "保留的结构表格" for table in doc.tables for row in table.rows for cell in row.cells)
+    assert not any(cell.text == "模板占位表格" for table in doc.tables for row in table.rows for cell in row.cells)
+
+
+def test_real_template_preserves_structure_assets_and_removes_sample_body(tmp_path):
+    assert REAL_TEMPLATE_PATH.exists()
+    content = lambda text: {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+    ]}
+    chapters = [
+        _ch("c1", "产品概述", content("真实模板生成内容")),
+        _ch("c2", "功能性能定位", content("功能性能定位生成内容")),
+    ]
+
+    out = render_to_docx("real-template-test", chapters, str(REAL_TEMPLATE_PATH))
+    doc = Document(out)
+    body_text = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "真实模板生成内容" in body_text
+    assert "功能性能定位生成内容" in body_text
+    assert any(p.text == "产品开发的必要性" for p in doc.paragraphs)
+    assert any(p.text == "产品初步方案及可行性" for p in doc.paragraphs)
+    assert "本产品是**规格的**产品" not in body_text
+    assert "文件内容填写要求如下：" not in body_text
+    assert "XXXXXXX" not in body_text
+    assert len(doc.tables) == 14
+    assert len(doc.sections) == 2
+    assert len(doc.inline_shapes) == 3
+    assert all(
+        any("PAGE" in (instr.text or "").upper() for instr in section.footer._element.iter(qn("w:instrText")))
+        for section in doc.sections
+    )
+
+
+def test_literal_page_text_does_not_count_as_page_field(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "正文"}]},
+    ]}
+    template = _make_literal_page_template(tmp_path)
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+    footer = doc.sections[0].footer
+    instructions = [instr.text or "" for instr in footer._element.iter(qn("w:instrText"))]
+
+    assert "PAGE" in footer.paragraphs[0].text
+    assert any("PAGE" in instruction.upper() for instruction in instructions)
+    assert any(fld.get(qn("w:fldCharType")) == "begin" for fld in footer._element.iter(qn("w:fldChar")))
 
 
 def test_template_cleanup_preserves_structure_and_footer_page_fields(tmp_path):

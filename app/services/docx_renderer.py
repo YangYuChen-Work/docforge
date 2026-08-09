@@ -8,7 +8,9 @@ dumping `chapter.plain_text` (raw markdown-ish text with literal "##",
 "**bold**", "| a | b |" that was never parsed) as flat unstyled paragraphs.
 """
 import json
+import re
 import shutil
+import unicodedata
 from pathlib import Path
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
@@ -173,30 +175,64 @@ def _render_node_elements(doc: Document, node: dict) -> list:
 
 
 def _render_list(doc: Document, node: dict, ordered: bool) -> list:
+    return _render_list_level(doc, node, ordered=ordered, level=0, number_prefix=())
+
+
+def _render_list_level(
+    doc: Document,
+    node: dict,
+    ordered: bool,
+    level: int,
+    number_prefix: tuple[int, ...],
+) -> list:
     elements = []
     attrs = node.get("attrs", {}) or {}
     start = _list_start(attrs) if ordered else 1
 
     for item_index, item in enumerate(node.get("content", [])):
-        paragraph_nodes = [
-            inner for inner in item.get("content", [])
-            if inner.get("type") == "paragraph"
-        ]
-        for paragraph_index, inner in enumerate(paragraph_nodes):
-            para = doc.add_paragraph()
-            if ordered and paragraph_index == 0:
-                prefix = f"{start + item_index}. "
-            elif ordered:
-                prefix = "   "
-            else:
-                prefix = "• "
-            list_run = para.add_run(prefix)
-            _style_run_font(list_run)
-            _add_runs(para, inner.get("content", []))
-            if ordered:
-                _style_paragraph(para)
-            elements.append(para._element)
+        item_number = start + item_index
+        paragraph_index = 0
+        for inner in item.get("content", []):
+            inner_type = inner.get("type")
+            if inner_type == "paragraph":
+                para = doc.add_paragraph()
+                if ordered and paragraph_index == 0:
+                    full_number = (*number_prefix, item_number)
+                    prefix = f"{'.'.join(str(number) for number in full_number)}. "
+                elif ordered:
+                    prefix = "   "
+                elif paragraph_index == 0:
+                    prefix = f"{_bullet_marker(level)} "
+                else:
+                    prefix = "  "
+                list_run = para.add_run(prefix)
+                _style_run_font(list_run)
+                _add_runs(para, inner.get("content", []))
+                _style_list_paragraph(para, level)
+                elements.append(para._element)
+                paragraph_index += 1
+            elif inner_type in ("bulletList", "orderedList"):
+                nested_prefix = (*number_prefix, item_number) if ordered else ()
+                elements.extend(
+                    _render_list_level(
+                        doc,
+                        inner,
+                        ordered=inner_type == "orderedList",
+                        level=level + 1,
+                        number_prefix=nested_prefix,
+                    )
+                )
     return elements
+
+
+def _bullet_marker(level: int) -> str:
+    return ("•", "◦", "▪", "▫")[min(level, 3)]
+
+
+def _style_list_paragraph(paragraph, level: int):
+    _style_paragraph(paragraph)
+    paragraph.paragraph_format.left_indent = Mm(6 * level)
+    paragraph.paragraph_format.first_line_indent = Mm(-4)
 
 
 def _list_start(attrs: dict) -> int:
@@ -293,8 +329,9 @@ def _set_table_borders(table):
 def _nodes_for_template(chapter) -> list[dict]:
     nodes = _chapter_nodes(chapter)
     while nodes and nodes[0].get("type") == "heading":
-        heading_text = _node_text(nodes[0]).strip()
-        if heading_text and heading_text == getattr(chapter, "title", "").strip():
+        heading_text = _normalized_heading_text(_node_text(nodes[0]))
+        chapter_title = _normalized_heading_text(getattr(chapter, "title", ""))
+        if heading_text and heading_text == chapter_title:
             nodes = nodes[1:]
             continue
         break
@@ -310,11 +347,16 @@ def _template_chapter_anchors(doc: Document, chapters: list) -> list[tuple[objec
         title = str(getattr(chapter, "title", "") or "").strip()
         if not title:
             continue
+        normalized_title = _normalized_heading_text(title)
         for para in paragraphs:
             paragraph_key = id(para._element)
             if paragraph_key in used_paragraphs:
                 continue
-            if title in para.text and para.style.name.startswith("Heading"):
+            if (
+                normalized_title
+                and normalized_title in _normalized_heading_text(para.text)
+                and para.style.name.startswith("Heading")
+            ):
                 used_paragraphs.add(paragraph_key)
                 anchors.append((chapter, para))
                 break
@@ -324,23 +366,51 @@ def _template_chapter_anchors(doc: Document, chapters: list) -> list[tuple[objec
 
 
 def _remove_template_placeholders(doc: Document, anchors: list[tuple[object, object]]):
-    """Remove sample body content between chapter anchors before injection.
+    """Remove replaceable template body while retaining document structure.
 
-    Cover content before the first anchor and section-boundary paragraphs are
-    retained. Header/footer parts are outside the document body and are never
-    touched here.
+    Only body regions after matched chapter anchors are cleaned. Heading
+    paragraphs, captions, tables, section boundaries, and drawing paragraphs
+    remain structural unless a table/caption carries an explicit sample marker
+    or is a proven duplicate of a generated chapter table. Cover content before
+    the first anchor and header/footer parts are never touched here.
     """
-    for index, (_, heading_para) in enumerate(anchors):
+    paragraphs_by_element = {id(para._element): para for para in doc.paragraphs}
+    for index, (chapter, heading_para) in enumerate(anchors):
         next_heading = (
             anchors[index + 1][1]._element
             if index + 1 < len(anchors)
             else None
         )
+        remove_next_table = False
         current = heading_para._element.getnext()
         while current is not None and current != next_heading:
             next_element = current.getnext()
             if not _is_template_structure_element(current):
-                current.getparent().remove(current)
+                paragraph = paragraphs_by_element.get(id(current))
+                if paragraph is not None:
+                    if _paragraph_has_drawing(paragraph):
+                        pass
+                    elif _is_heading_paragraph(paragraph):
+                        if _is_sample_heading(paragraph.text):
+                            current.getparent().remove(current)
+                    elif _is_caption_paragraph(paragraph):
+                        if _is_sample_placeholder_text(paragraph.text):
+                            remove_next_table = True
+                            current.getparent().remove(current)
+                    else:
+                        current.getparent().remove(current)
+                elif current.tag == qn("w:tbl") and (
+                    _should_remove_template_table(
+                        current,
+                        chapter,
+                        current.getprevious(),
+                    )
+                    or remove_next_table
+                ):
+                    current.getparent().remove(current)
+                    remove_next_table = False
+                elif current.tag == qn("w:tbl"):
+                    remove_next_table = False
             current = next_element
 
 
@@ -348,6 +418,124 @@ def _is_template_structure_element(element) -> bool:
     if element.tag == qn("w:sectPr"):
         return True
     return element.find(".//" + qn("w:sectPr")) is not None
+
+
+def _normalized_heading_text(value) -> str:
+    normalized = unicodedata.normalize("NFKC", str(value or ""))
+    return "".join(
+        character
+        for character in normalized
+        if not character.isspace() and not unicodedata.category(character).startswith("P")
+    )
+
+
+def _is_heading_paragraph(paragraph) -> bool:
+    return paragraph.style.name.startswith("Heading")
+
+
+def _is_sample_heading(text: str) -> bool:
+    return bool(re.match(r"^\s*[一二三四五六七八九十]+级标题[（(]", text or ""))
+
+
+def _is_caption_paragraph(paragraph) -> bool:
+    return paragraph.style.name == "Caption" or bool(
+        re.match(r"^\s*[表图]\s*\d", paragraph.text or "")
+    )
+
+
+def _is_sample_placeholder_text(text: str) -> bool:
+    compact = re.sub(r"\s+", "", text or "")
+    if not compact:
+        return False
+    if any(marker in compact for marker in ("占位", "示例", "样例", "XXXX", "例：", "例:")):
+        return True
+    if any(
+        marker in compact
+        for marker in (
+            "填写说明",
+            "来自附件",
+            "待用户填写",
+            "本章节要明确",
+            "必要性总结",
+            "满足需求、打压对手、呈现价值",
+            "此表是贯穿",
+            "文件内容填写要求",
+            "附件中出现",
+            "表题：",
+            "表格框线：",
+            "表格中内容：",
+            "图题：",
+            "图片居中",
+            "图片与上方文字",
+            "封面页的",
+            "运输形式：",
+            "运输方式：",
+            "包装方式：",
+        )
+    ):
+        return True
+    return "模板" in compact and any(marker in compact for marker in ("说明", "末尾", "占位"))
+
+
+def _paragraph_has_drawing(paragraph) -> bool:
+    return paragraph._element.find(".//" + qn("w:drawing")) is not None
+
+
+def _should_remove_template_table(element, chapter, preceding_element) -> bool:
+    if _is_sample_placeholder_text(_element_text(element)):
+        return True
+    if preceding_element is not None and preceding_element.tag == qn("w:p"):
+        if _is_sample_placeholder_text(_element_text(preceding_element)):
+            return True
+
+    generated_tables = [
+        node for node in _chapter_nodes(chapter) if node.get("type") == "table"
+    ]
+    if not generated_tables:
+        return False
+
+    caption_text = _element_text(preceding_element)
+    normalized_caption = _normalized_heading_text(caption_text)
+    normalized_title = _normalized_heading_text(getattr(chapter, "title", ""))
+    if normalized_title and normalized_title in normalized_caption:
+        return True
+
+    template_rows = _table_element_rows(element)
+    if not template_rows:
+        return False
+    template_header = {
+        _normalized_heading_text(cell_text)
+        for cell_text in template_rows[0]
+        if _normalized_heading_text(cell_text)
+    }
+    for generated_table in generated_tables:
+        generated_rows = [
+            [_node_text(cell) for cell in row.get("content", [])]
+            for row in generated_table.get("content", [])
+        ]
+        if not generated_rows or len(template_rows[0]) != len(generated_rows[0]):
+            continue
+        generated_header = {
+            _normalized_heading_text(cell_text)
+            for cell_text in generated_rows[0]
+            if _normalized_heading_text(cell_text)
+        }
+        if template_header and len(template_header & generated_header) >= min(2, len(template_header)):
+            return True
+    return False
+
+
+def _element_text(element) -> str:
+    if element is None:
+        return ""
+    return "".join(text.text or "" for text in element.iter(qn("w:t")))
+
+
+def _table_element_rows(element) -> list[list[str]]:
+    return [
+        [_element_text(cell) for cell in row.findall("./" + qn("w:tc"))]
+        for row in element.findall("./" + qn("w:tr"))
+    ]
 
 
 def _configure_generated_document(doc: Document, chapters: list):
@@ -489,7 +677,7 @@ def _safe_json_list(raw_value) -> list:
 
 def _ensure_footer_page_field(section):
     footer = section.footer
-    if "PAGE" in footer._element.xml:
+    if _footer_has_page_field(footer):
         return
 
     paragraph = next(
@@ -517,6 +705,18 @@ def _ensure_footer_page_field(section):
     run._r.append(instr)
     run._r.append(fld_sep)
     run._r.append(fld_end)
+
+
+def _footer_has_page_field(footer) -> bool:
+    instructions = [
+        (element.text or "")
+        for element in footer._element.iter(qn("w:instrText"))
+    ]
+    instructions.extend(
+        element.get(qn("w:instr"), "")
+        for element in footer._element.iter(qn("w:fldSimple"))
+    )
+    return any(re.search(r"\bPAGE\b", instruction, re.IGNORECASE) for instruction in instructions)
 
 
 def _ensure_template_footer_page_fields(doc: Document):
