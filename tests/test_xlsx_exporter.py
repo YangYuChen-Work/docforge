@@ -252,15 +252,22 @@ def test_create_export_passes_xlsx_metadata_and_issue_summary(tmp_path, monkeypa
             order_index=2,
             status="confirmed",
             missing_information_json=json.dumps(
-                ["缺失1", "缺失2", "缺失3", "缺失4", "缺失5", "缺失6"],
+                [
+                    "缺失1",
+                    {"description": ["缺失2", {"source": "S1"}]},
+                    {"title": {"label": "缺失3"}},
+                    {"name": 42},
+                    "缺失5",
+                    "缺失6",
+                ],
                 ensure_ascii=False,
             ),
             conflict_json=json.dumps(
                 [
                     {"description": "冲突1"},
-                    {"description": "冲突2"},
-                    {"description": "冲突3"},
-                    {"description": "冲突4"},
+                    {"description": ["冲突2"]},
+                    {"title": {"label": "冲突3"}},
+                    {"name": 42},
                     {"description": "冲突5"},
                     {"description": "冲突6"},
                 ],
@@ -309,9 +316,57 @@ def test_create_export_passes_xlsx_metadata_and_issue_summary(tmp_path, monkeypa
     assert meta["project_id"] == "P001"
     assert meta["template_name"] == "模板A"
     assert meta["status"] == "confirmed"
-    assert meta["missing_items"] == ["缺失1", "缺失2", "缺失3", "缺失4", "缺失5"]
-    assert meta["conflicts"] == ["冲突1", "冲突2", "冲突3", "冲突4", "冲突5"]
+    assert meta["missing_items"] == [
+        "缺失1",
+        '["缺失2", {"source": "S1"}]',
+        '{"label": "缺失3"}',
+        "42",
+        "缺失5",
+    ]
+    assert meta["conflicts"] == [
+        "冲突1",
+        '["冲突2"]',
+        '{"label": "冲突3"}',
+        "42",
+        "冲突5",
+    ]
     db.close()
+
+
+def test_exporter_normalizes_issue_metadata_before_overview_truncation(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    issue_items = [
+        {"description": ["列表描述"]},
+        {"title": {"label": "字典标题"}},
+        {"name": 42},
+        {"description": "x" * 70},
+    ]
+
+    out = export_tables_to_xlsx(
+        "doc-metadata-values",
+        [],
+        document_meta={
+            "title": {"label": "演示文档"},
+            "project_id": ["P001"],
+            "template_name": 7,
+            "status": False,
+            "missing_items": issue_items,
+            "conflicts": issue_items,
+        },
+    )
+
+    overview = _load(out)["项目概览"]
+    assert overview["B3"].value == '{"label": "演示文档"}'
+    assert overview["B4"].value == '["P001"]'
+    assert overview["B5"].value == "7"
+    assert overview["B6"].value == "False"
+    assert overview["B7"].value.startswith(
+        '["列表描述"]；{"label": "字典标题"}；42；'
+    )
+    assert overview["B7"].value.endswith("...")
+    assert overview["B8"].value == overview["B7"].value
 
 
 def test_exporter_falls_back_when_no_valid_tables_exist(tmp_path, monkeypatch):

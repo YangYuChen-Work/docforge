@@ -124,10 +124,10 @@ def _build_overview_sheet(ws, document_meta: dict, export_time: str) -> None:
     title.border = NEUTRAL_BORDER
 
     rows = [
-        ("文档标题", document_meta.get("title", "")),
-        ("项目编号", document_meta.get("project_id", "")),
-        ("模板名称", document_meta.get("template_name", "")),
-        ("状态", document_meta.get("status", "")),
+        ("文档标题", _normalize_metadata_text(document_meta.get("title", ""))),
+        ("项目编号", _normalize_metadata_text(document_meta.get("project_id", ""))),
+        ("模板名称", _normalize_metadata_text(document_meta.get("template_name", ""))),
+        ("状态", _normalize_metadata_text(document_meta.get("status", ""))),
         ("待补充项", _summarize_items(document_meta.get("missing_items"))),
         ("冲突项", _summarize_items(document_meta.get("conflicts"))),
         ("导出时间", export_time),
@@ -474,28 +474,41 @@ def _set_column_widths(ws, max_cols: int, headers: list, rows: list[list]) -> No
 def _summarize_items(value) -> str:
     if not value:
         return "无"
-    if isinstance(value, str):
+    if isinstance(value, (str, bytes, dict)) or not isinstance(value, Iterable):
         items = [value]
-    elif isinstance(value, Iterable):
-        items = []
-        for item in value:
-            if isinstance(item, str):
-                text = item.strip()
-            elif isinstance(item, dict):
-                text = (
-                    item.get("description")
-                    or item.get("title")
-                    or item.get("name")
-                    or json.dumps(item, ensure_ascii=False)
-                )
-            else:
-                text = str(item)
-            if text:
-                items.append(text)
     else:
-        items = [str(value)]
+        items = value
 
-    compact = [item if len(item) <= 60 else item[:57] + "..." for item in items[:5]]
-    if len(items) > 5:
-        compact.append(f"等{len(items) - 5}项")
+    normalized_items = []
+    for item in items:
+        if isinstance(item, dict):
+            item = (
+                item.get("description")
+                or item.get("title")
+                or item.get("name")
+                or item
+            )
+        text = _normalize_metadata_text(item)
+        if text:
+            normalized_items.append(text)
+
+    compact = [
+        item if len(item) <= 60 else item[:57] + "..."
+        for item in normalized_items[:5]
+    ]
+    if len(normalized_items) > 5:
+        compact.append(f"等{len(normalized_items) - 5}项")
     return "；".join(compact) or "无"
+
+
+def _normalize_metadata_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple, set, dict)):
+        try:
+            return json.dumps(value, ensure_ascii=False, default=str).strip()
+        except (TypeError, ValueError, RecursionError):
+            pass
+    return str(value).strip()

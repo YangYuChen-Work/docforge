@@ -115,17 +115,29 @@ def _collect_issue_summary(chapters: list, field_name: str) -> list[str]:
 
 
 def _to_concise_text(entry) -> str:
-    if isinstance(entry, str):
-        text = entry.strip()
-    elif isinstance(entry, dict):
-        text = (
+    if isinstance(entry, dict):
+        value = (
             entry.get("description")
             or entry.get("title")
             or entry.get("name")
-            or json.dumps(entry, ensure_ascii=False)
+            or entry
         )
     else:
-        text = str(entry).strip()
+        value = entry
+    text = _normalize_metadata_text(value)
     if len(text) > 80:
         return text[:77] + "..."
     return text
+
+
+def _normalize_metadata_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, tuple, set, dict)):
+        try:
+            return json.dumps(value, ensure_ascii=False, default=str).strip()
+        except (TypeError, ValueError, RecursionError):
+            pass
+    return str(value).strip()

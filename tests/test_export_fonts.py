@@ -1,5 +1,3 @@
-from pathlib import Path
-
 from app.services import export_fonts
 from app.services.export_fonts import get_export_font_config
 
