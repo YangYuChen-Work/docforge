@@ -47,14 +47,13 @@ def render_to_docx(doc_id: str, chapters: list, template_source_path: str | None
 def _inject_into_template(doc: Document, chapters: list):
     """Find each chapter's heading paragraph in the template and insert the
     chapter's rendered content (headings/paragraphs/lists/tables) after it."""
-    for chapter in chapters:
-        nodes = _nodes_for_template(chapter)
-        if not nodes:
-            continue
-        for para in doc.paragraphs:
-            if chapter.title in para.text and para.style.name.startswith("Heading"):
-                _insert_nodes_after(doc, para, nodes)
-                break
+    anchors = _template_chapter_anchors(doc, chapters)
+    if anchors:
+        _remove_template_placeholders(doc, anchors)
+        for chapter, heading_para in anchors:
+            _insert_nodes_after(doc, heading_para, _nodes_for_template(chapter))
+
+    _ensure_template_footer_page_fields(doc)
 
 
 def _build_from_scratch(doc: Document, chapters: list):
@@ -162,16 +161,8 @@ def _render_node_elements(doc: Document, node: dict) -> list:
             _style_notice(para, node["attrs"]["notice_kind"])
         return [para._element]
 
-    if node_type == "bulletList":
-        elements = []
-        for item in node.get("content", []):
-            for inner in item.get("content", []):
-                para = doc.add_paragraph()
-                bullet_run = para.add_run("• ")
-                _style_run_font(bullet_run)
-                _add_runs(para, inner.get("content", []))
-                elements.append(para._element)
-        return elements
+    if node_type in ("bulletList", "orderedList"):
+        return _render_list(doc, node, ordered=node_type == "orderedList")
 
     if node_type == "table":
         return [_render_table(doc, node)]
@@ -179,6 +170,40 @@ def _render_node_elements(doc: Document, node: dict) -> list:
     # Unsupported node types (e.g. horizontalRule) fall back to an empty
     # paragraph rather than raising, so one odd node never breaks the export.
     return [doc.add_paragraph()._element]
+
+
+def _render_list(doc: Document, node: dict, ordered: bool) -> list:
+    elements = []
+    attrs = node.get("attrs", {}) or {}
+    start = _list_start(attrs) if ordered else 1
+
+    for item_index, item in enumerate(node.get("content", [])):
+        paragraph_nodes = [
+            inner for inner in item.get("content", [])
+            if inner.get("type") == "paragraph"
+        ]
+        for paragraph_index, inner in enumerate(paragraph_nodes):
+            para = doc.add_paragraph()
+            if ordered and paragraph_index == 0:
+                prefix = f"{start + item_index}. "
+            elif ordered:
+                prefix = "   "
+            else:
+                prefix = "• "
+            list_run = para.add_run(prefix)
+            _style_run_font(list_run)
+            _add_runs(para, inner.get("content", []))
+            if ordered:
+                _style_paragraph(para)
+            elements.append(para._element)
+    return elements
+
+
+def _list_start(attrs: dict) -> int:
+    try:
+        return int(attrs.get("start", attrs.get("order", 1)))
+    except (TypeError, ValueError):
+        return 1
 
 
 def _add_runs(paragraph, inline_content: list[dict]):
@@ -274,6 +299,55 @@ def _nodes_for_template(chapter) -> list[dict]:
             continue
         break
     return nodes
+
+
+def _template_chapter_anchors(doc: Document, chapters: list) -> list[tuple[object, object]]:
+    paragraphs = list(doc.paragraphs)
+    used_paragraphs = set()
+    anchors = []
+
+    for chapter in chapters:
+        title = str(getattr(chapter, "title", "") or "").strip()
+        if not title:
+            continue
+        for para in paragraphs:
+            paragraph_key = id(para._element)
+            if paragraph_key in used_paragraphs:
+                continue
+            if title in para.text and para.style.name.startswith("Heading"):
+                used_paragraphs.add(paragraph_key)
+                anchors.append((chapter, para))
+                break
+
+    body = doc.element.body
+    return sorted(anchors, key=lambda item: list(body).index(item[1]._element))
+
+
+def _remove_template_placeholders(doc: Document, anchors: list[tuple[object, object]]):
+    """Remove sample body content between chapter anchors before injection.
+
+    Cover content before the first anchor and section-boundary paragraphs are
+    retained. Header/footer parts are outside the document body and are never
+    touched here.
+    """
+    for index, (_, heading_para) in enumerate(anchors):
+        next_heading = (
+            anchors[index + 1][1]._element
+            if index + 1 < len(anchors)
+            else None
+        )
+        current = heading_para._element.getnext()
+        while current is not None and current != next_heading:
+            next_element = current.getnext()
+            if not _is_template_structure_element(current):
+                current.getparent().remove(current)
+            current = next_element
+
+
+def _is_template_structure_element(element) -> bool:
+    if element.tag == qn("w:sectPr"):
+        return True
+    return element.find(".//" + qn("w:sectPr")) is not None
 
 
 def _configure_generated_document(doc: Document, chapters: list):
@@ -415,10 +489,17 @@ def _safe_json_list(raw_value) -> list:
 
 def _ensure_footer_page_field(section):
     footer = section.footer
-    paragraph = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
-    paragraph.alignment = 1
-    if "PAGE" in paragraph._element.xml:
+    if "PAGE" in footer._element.xml:
         return
+
+    paragraph = next(
+        (candidate for candidate in footer.paragraphs if not _paragraph_has_content(candidate)),
+        None,
+    )
+    if paragraph is None:
+        style_name = footer.paragraphs[0].style.name if footer.paragraphs else None
+        paragraph = footer.add_paragraph(style=style_name)
+    paragraph.alignment = 1
 
     fld_begin = OxmlElement("w:fldChar")
     fld_begin.set(qn("w:fldCharType"), "begin")
@@ -436,6 +517,15 @@ def _ensure_footer_page_field(section):
     run._r.append(instr)
     run._r.append(fld_sep)
     run._r.append(fld_end)
+
+
+def _ensure_template_footer_page_fields(doc: Document):
+    for section in doc.sections:
+        _ensure_footer_page_field(section)
+
+
+def _paragraph_has_content(paragraph) -> bool:
+    return any(child.tag != qn("w:pPr") for child in paragraph._element)
 
 
 def _append_border_block(parent, tag_name: str, color: str):

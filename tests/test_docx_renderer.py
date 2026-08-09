@@ -1,6 +1,8 @@
 import json
 from unittest.mock import MagicMock
 from docx import Document
+from docx.enum.section import WD_SECTION
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
 from docx.shared import Mm
 from app.services.docx_renderer import render_to_docx
@@ -26,6 +28,31 @@ def _make_template(tmp_path, headings):
     for h in headings:
         doc.add_heading(h, level=1)
     path = tmp_path / "template.docx"
+    doc.save(str(path))
+    return str(path)
+
+
+def _make_placeholder_template(tmp_path):
+    doc = Document()
+    doc.add_paragraph("模板封面标题")
+    first_footer = doc.sections[0].footer
+    first_footer.paragraphs[0].text = "模板首页页脚"
+    first_footer.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.RIGHT
+
+    doc.add_section(WD_SECTION.NEW_PAGE)
+    second_footer = doc.sections[1].footer
+    second_footer.is_linked_to_previous = False
+    second_footer.paragraphs[0].text = "模板正文页脚"
+    second_footer.paragraphs[0].alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+    for title in ("第一章", "第二章"):
+        doc.add_heading(title, level=1)
+        doc.add_paragraph(f"模板占位内容：{title}")
+        table = doc.add_table(rows=1, cols=1)
+        table.cell(0, 0).text = f"模板占位表格：{title}"
+    doc.add_paragraph("模板末尾说明")
+
+    path = tmp_path / "placeholder-template.docx"
     doc.save(str(path))
     return str(path)
 
@@ -91,6 +118,63 @@ def test_bullet_list_becomes_list_bullet_paragraphs(tmp_path):
     bullet_paras = [p for p in doc.paragraphs if "卖点" in p.text]
     assert len(bullet_paras) == 1
     assert "主臂采用五节U型截面" in bullet_paras[0].text
+
+
+def test_ordered_list_becomes_numbered_paragraphs(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "orderedList", "content": [
+            {"type": "listItem", "content": [{"type": "paragraph", "content": [
+                {"type": "text", "text": "第一项"},
+            ]}]},
+            {"type": "listItem", "content": [{"type": "paragraph", "content": [
+                {"type": "text", "text": "第二项"},
+            ]}]},
+        ]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+
+    numbered_paras = [p.text for p in doc.paragraphs if "项" in p.text]
+    assert numbered_paras == ["1. 第一项", "2. 第二项"]
+
+
+def test_template_cleanup_preserves_structure_and_footer_page_fields(tmp_path):
+    content = lambda text: {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+    ]}
+    chapters = [
+        _ch("c1", "第一章", content("生成第一章")),
+        _ch("c2", "第二章", content("生成第二章")),
+    ]
+    template = _make_placeholder_template(tmp_path)
+
+    out = render_to_docx("doc1", chapters, template)
+    doc = Document(out)
+    body_text = "\n".join(p.text for p in doc.paragraphs)
+
+    assert "模板封面标题" in body_text
+    assert "生成第一章" in body_text
+    assert "生成第二章" in body_text
+    assert "模板占位内容" not in body_text
+    assert "模板末尾说明" not in body_text
+    assert all(
+        any(p.text == title and p.style.name == "Heading 1" for p in doc.paragraphs)
+        for title in ("第一章", "第二章")
+    )
+    assert len(doc.tables) == 0
+
+    first_footer = doc.sections[0].footer
+    second_footer = doc.sections[1].footer
+    first_footer_text = "\n".join(p.text for p in first_footer.paragraphs)
+    second_footer_text = "\n".join(p.text for p in second_footer.paragraphs)
+    assert "模板首页页脚" in first_footer_text
+    assert "模板正文页脚" in second_footer_text
+    assert first_footer.paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.RIGHT
+    assert second_footer.paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.LEFT
+    assert "PAGE" in first_footer._element.xml
+    assert "PAGE" in second_footer._element.xml
 
 
 def test_missing_information_appended_as_highlighted_paragraph(tmp_path):
