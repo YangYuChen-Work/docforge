@@ -167,8 +167,10 @@ def _build_directory_header(ws) -> None:
 
 
 def _write_table_sheet(ws, chapter, table: dict) -> None:
-    headers = _normalize_row(table.get("headers", []))
-    rows = [_normalize_row(row) for row in table.get("rows", [])]
+    raw_headers = table.get("headers")
+    raw_rows = table.get("rows")
+    headers = _normalize_row(raw_headers) if isinstance(raw_headers, list) else []
+    rows = [_normalize_row(row) for row in raw_rows] if isinstance(raw_rows, list) else []
     max_cols = max([len(headers)] + [len(row) for row in rows] if rows else [len(headers), 1])
     headers = _pad_row(headers, max_cols)
     rows = [_pad_row(row, max_cols) for row in rows]
@@ -226,7 +228,14 @@ def _load_tables(content_json: str | None) -> list[dict]:
     legacy_tables = data.get("tables", [])
     if isinstance(legacy_tables, list):
         valid_legacy_tables = [
-            table for table in legacy_tables if isinstance(table, dict) and table.get("headers")
+            table
+            for table in legacy_tables
+            if (
+                isinstance(table, dict)
+                and isinstance(table.get("headers"), list)
+                and table.get("headers")
+                and isinstance(table.get("rows", []), list)
+            )
         ]
         if valid_legacy_tables:
             return valid_legacy_tables
@@ -250,10 +259,25 @@ def _prosemirror_table_to_dict(table_node: dict, title: str | None) -> dict:
     rows: list[list] = []
     header_found = False
 
-    for row_node in table_node.get("content", []):
+    table_content = table_node.get("content", [])
+    if not isinstance(table_content, list):
+        return {"title": title or "", "headers": headers, "rows": rows}
+
+    for row_node in table_content:
         if not isinstance(row_node, dict) or row_node.get("type") != "tableRow":
             continue
-        cell_nodes = [cell for cell in row_node.get("content", []) if isinstance(cell, dict)]
+        row_content = row_node.get("content", [])
+        if not isinstance(row_content, list):
+            continue
+        cell_nodes = [
+            cell
+            for cell in row_content
+            if (
+                isinstance(cell, dict)
+                and cell.get("type") in {"tableCell", "tableHeader"}
+                and isinstance(cell.get("content", []), list)
+            )
+        ]
         if not cell_nodes:
             continue
 
@@ -297,7 +321,11 @@ def _prosemirror_table_title(content: list, table_index: int) -> str | None:
 
 def _prosemirror_cell_value(cell_node: dict) -> str:
     paragraphs = []
-    for child in cell_node.get("content", []):
+    cell_content = cell_node.get("content", [])
+    if not isinstance(cell_content, list):
+        return ""
+
+    for child in cell_content:
         if not isinstance(child, dict):
             continue
         text = _prosemirror_node_text(child)
@@ -307,13 +335,18 @@ def _prosemirror_cell_value(cell_node: dict) -> str:
 
 
 def _prosemirror_node_text(node: dict) -> str:
+    if not isinstance(node, dict):
+        return ""
     if node.get("type") == "text":
         return str(node.get("text", ""))
     if node.get("type") == "hardBreak":
         return "\n"
+    content = node.get("content", [])
+    if not isinstance(content, list):
+        return ""
     return "".join(
         _prosemirror_node_text(child)
-        for child in node.get("content", [])
+        for child in content
         if isinstance(child, dict)
     )
 

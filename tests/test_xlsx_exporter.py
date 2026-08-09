@@ -307,6 +307,54 @@ def test_exporter_falls_back_when_no_valid_tables_exist(tmp_path, monkeypatch):
     assert fallback["A2"].value == "请检查章节内容是否包含 tables 节点，或等待章节重新生成。"
 
 
+def test_exporter_ignores_legacy_tables_with_null_optional_fields(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    content = {
+        "tables": [
+            {"title": "行为空", "headers": ["名称"], "rows": None},
+            {"title": "表头为空", "headers": None, "rows": [["产品"]]},
+        ]
+    }
+
+    out = export_tables_to_xlsx(
+        "doc-null-legacy-fields",
+        [_chapter("异常表格", json.dumps(content, ensure_ascii=False))],
+    )
+
+    wb = _load(out)
+    assert wb.sheetnames == ["项目概览", "文档目录", "无表格数据"]
+
+
+def test_exporter_ignores_prosemirror_tables_with_null_content(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    content = {
+        "type": "doc",
+        "content": [
+            {"type": "table", "content": None},
+            {
+                "type": "table",
+                "content": [
+                    {"type": "tableRow", "content": None},
+                    {
+                        "type": "tableRow",
+                        "content": [
+                            {"type": "tableHeader", "content": None},
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+
+    out = export_tables_to_xlsx(
+        "doc-null-prosemirror-content",
+        [_chapter("异常表格", json.dumps(content, ensure_ascii=False))],
+    )
+
+    wb = _load(out)
+    assert wb.sheetnames == ["项目概览", "文档目录", "无表格数据"]
+
+
 def test_xlsx_cells_use_explicit_cjk_font(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "storage_root", str(tmp_path))
     content = json.dumps(
