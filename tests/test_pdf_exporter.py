@@ -200,6 +200,7 @@ def test_convert_to_pdf_preserves_native_environment_off_macos(monkeypatch, tmp_
 
 def _extract_pdf_text_candidates(pdf_path):
     candidates = []
+    extractor_available = False
     try:
         from pypdf import PdfReader
     except ImportError:
@@ -208,6 +209,7 @@ def _extract_pdf_text_candidates(pdf_path):
         except ImportError:
             PdfReader = None
     if PdfReader is not None:
+        extractor_available = True
         try:
             reader = PdfReader(str(pdf_path))
             candidates.append("\n".join(page.extract_text() or "" for page in reader.pages))
@@ -216,6 +218,7 @@ def _extract_pdf_text_candidates(pdf_path):
 
     pdftotext_bin = shutil.which("pdftotext")
     if pdftotext_bin:
+        extractor_available = True
         result = subprocess.run(
             [pdftotext_bin, str(pdf_path), "-"],
             capture_output=True,
@@ -224,7 +227,7 @@ def _extract_pdf_text_candidates(pdf_path):
         )
         if result.returncode == 0:
             candidates.append(result.stdout)
-    return candidates
+    return candidates, extractor_available
 
 
 def _rendered_pdf_has_ink(pdf_path, tmp_path):
@@ -267,6 +270,30 @@ def _rendered_pdf_has_ink(pdf_path, tmp_path):
         return False
 
 
+def _assert_pdf_smoke_result(
+    expected_text, text_candidates, rendered_ink, extractor_available
+):
+    normalized_expected = "".join(expected_text.split())
+    contains_expected_text = any(
+        normalized_expected in "".join(candidate.split())
+        for candidate in text_candidates
+    )
+    if extractor_available:
+        assert contains_expected_text
+    else:
+        assert rendered_ink is True
+
+
+def test_pdf_smoke_does_not_accept_rendered_ink_for_latin_only_output():
+    with pytest.raises(AssertionError):
+        _assert_pdf_smoke_result(
+            expected_text="中文转换验证",
+            text_candidates=["Latin-only output"],
+            rendered_ink=True,
+            extractor_available=True,
+        )
+
+
 @pytest.mark.skipif(platform.system() != "Darwin", reason="bundled CJK smoke test is macOS-specific")
 def test_bundled_soffice_real_conversion_contains_or_renders_chinese_text(tmp_path):
     lo_bin = pdf_exporter.settings.libreoffice_path or pdf_exporter._find_libreoffice()
@@ -275,7 +302,7 @@ def test_bundled_soffice_real_conversion_contains_or_renders_chinese_text(tmp_pa
 
     docx_path = tmp_path / "cjk.docx"
     doc = Document()
-    expected_text = "中文 PDF 转换验证：产品概述、设计输入、质量目标。"
+    expected_text = "中文转换验证：产品概述、设计输入、质量目标。"
     run = doc.add_paragraph().add_run(expected_text)
     fonts = get_export_font_config()
     r_fonts = OxmlElement("w:rFonts")
@@ -290,13 +317,14 @@ def test_bundled_soffice_real_conversion_contains_or_renders_chinese_text(tmp_pa
     doc.save(docx_path)
 
     pdf_path = Path(convert_to_pdf(str(docx_path)))
-    text_candidates = _extract_pdf_text_candidates(pdf_path)
+    text_candidates, extractor_available = _extract_pdf_text_candidates(pdf_path)
     rendered_ink = _rendered_pdf_has_ink(pdf_path, tmp_path)
-    if not text_candidates and rendered_ink is None:
+    if not extractor_available and rendered_ink is None:
         pytest.skip("pypdf/PyPDF2, pdftotext, or pdftoppm with Pillow is required")
 
-    normalized_expected = "".join(expected_text.split())
-    contains_chinese_text = any(
-        normalized_expected in "".join(candidate.split()) for candidate in text_candidates
+    _assert_pdf_smoke_result(
+        expected_text,
+        text_candidates,
+        rendered_ink,
+        extractor_available,
     )
-    assert contains_chinese_text or rendered_ink is True
