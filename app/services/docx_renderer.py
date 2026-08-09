@@ -353,7 +353,7 @@ def _template_chapter_anchors(doc: Document, chapters: list) -> list[tuple[objec
                 continue
             if (
                 normalized_title
-                and normalized_title in _normalized_heading_text(para.text)
+                and _heading_text_matches(title, para.text)
                 and para.style.name.startswith("Heading")
             ):
                 used_paragraphs.add(paragraph_key)
@@ -434,6 +434,45 @@ def _normalized_heading_text(value) -> str:
         for character in normalized
         if not character.isspace() and not unicodedata.category(character).startswith("P")
     )
+
+
+def _heading_text_matches(title: str, paragraph_text: str) -> bool:
+    normalized_title = _normalized_heading_text(title)
+    normalized_paragraph = _normalized_heading_text(paragraph_text)
+    if not normalized_title or not normalized_paragraph:
+        return False
+    if normalized_title == normalized_paragraph:
+        return True
+    if not normalized_paragraph.startswith(normalized_title):
+        return False
+
+    prefix_end = _normalized_prefix_end(paragraph_text, normalized_title)
+    if prefix_end is None:
+        return False
+    suffix = str(paragraph_text or "")[prefix_end:]
+    if not suffix:
+        return True
+    if suffix[0].isspace():
+        return True
+    first_suffix_character = next((character for character in suffix if not character.isspace()), "")
+    return bool(
+        first_suffix_character
+        and unicodedata.category(first_suffix_character).startswith("P")
+    )
+
+
+def _normalized_prefix_end(value: str, normalized_prefix: str) -> int | None:
+    normalized_so_far = ""
+    for index, character in enumerate(str(value or "")):
+        normalized_character = _normalized_heading_text(character)
+        if not normalized_character:
+            continue
+        normalized_so_far += normalized_character
+        if not normalized_prefix.startswith(normalized_so_far):
+            return None
+        if normalized_so_far == normalized_prefix:
+            return index + 1
+    return None
 
 
 def _is_heading_paragraph(paragraph) -> bool:
@@ -756,6 +795,7 @@ def _set_cell_width(cell, width: int):
 
 def _proportional_column_widths(table, total_width_twips: int):
     n_cols = max(len(row.cells) for row in table.rows) if table.rows else 1
+    total_width_twips = max(int(total_width_twips), n_cols)
     text_weights = [1] * n_cols
     for col_index in range(n_cols):
         col_text_length = max(
@@ -765,8 +805,8 @@ def _proportional_column_widths(table, total_width_twips: int):
         text_weights[col_index] = max(1, min(col_text_length, 8))
 
     total_weight = sum(text_weights) or n_cols
-    min_width = int(total_width_twips * 0.18)
-    remaining_width = max(total_width_twips - (min_width * n_cols), 0)
+    min_width = max(1, min(int(total_width_twips * 0.18), total_width_twips // n_cols))
+    remaining_width = total_width_twips - (min_width * n_cols)
     widths = []
     for weight in text_weights:
         proportional_extra = int(remaining_width * weight / total_weight) if remaining_width else 0

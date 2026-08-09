@@ -247,6 +247,34 @@ def test_near_match_heading_uses_normalized_punctuation(tmp_path):
     assert any(p.text == "功能性能定位生成内容" for p in doc.paragraphs)
 
 
+def test_chapter_anchor_requires_exact_or_delimited_suffix(tmp_path):
+    content = lambda text: {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+    ]}
+    template = _make_template(
+        tmp_path,
+        [
+            "产品概述设计",
+            "产品概述",
+            "功能/性能定位（来自技术可行性分析报告）",
+        ],
+    )
+    chapters = [
+        _ch("c-overview", "产品概述", content("产品概述生成内容")),
+        _ch("c-functional", "功能性能定位", content("功能性能定位生成内容")),
+    ]
+
+    out = render_to_docx("docx-anchor-boundary-regression", chapters, template)
+    doc = Document(out)
+    paragraph_text = [paragraph.text for paragraph in doc.paragraphs]
+
+    assert paragraph_text.index("产品概述") < paragraph_text.index("产品概述生成内容")
+    assert paragraph_text.index("产品概述设计") < paragraph_text.index("产品概述")
+    assert paragraph_text.index("功能/性能定位（来自技术可行性分析报告）") < paragraph_text.index(
+        "功能性能定位生成内容"
+    )
+
+
 def test_mixed_template_cleanup_preserves_unanchored_structure(tmp_path):
     content = lambda text: {"type": "doc", "content": [
         {"type": "paragraph", "content": [{"type": "text", "text": text}]},
@@ -638,6 +666,38 @@ def test_generated_table_width_xml_uses_word_dxa_twips(tmp_path):
     assert all(width.get(qn("w:type")) == "dxa" for width in row_widths)
     assert sum(int(width.get(qn("w:w"))) for width in row_widths) == Cm(16.5).twips
     assert all(0 < int(width.get(qn("w:w"))) < 10000 for width in row_widths)
+
+
+def test_wide_generated_table_keeps_all_cell_widths_positive(tmp_path):
+    def cell(cell_type, text):
+        return {
+            "type": cell_type,
+            "content": [{"type": "paragraph", "content": [{"type": "text", "text": text}]}],
+        }
+
+    content = {"type": "doc", "content": [
+        {"type": "table", "content": [
+            {"type": "tableRow", "content": [
+                cell("tableHeader", f"列{i + 1}") for i in range(7)
+            ]},
+            {"type": "tableRow", "content": [
+                cell("tableCell", f"值{i + 1}") for i in range(7)
+            ]},
+        ]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("docx-wide-table-regression", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+    widths = [
+        cell._tc.tcPr.find(qn("w:tcW"))
+        for row in doc.tables[0].rows
+        for cell in row.cells
+    ]
+
+    assert all(width.get(qn("w:type")) == "dxa" for width in widths)
+    assert all(0 < int(width.get(qn("w:w"))) < 10000 for width in widths)
+    assert sum(int(width.get(qn("w:w"))) for width in widths[:7]) == Cm(16.5).twips
 
 
 def test_template_cleanup_retains_ordinary_appendix_tail_content(tmp_path):
