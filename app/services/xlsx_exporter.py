@@ -175,7 +175,7 @@ def _write_table_sheet(ws, chapter, table: dict) -> None:
     headers = _pad_row(headers, max_cols)
     rows = [_pad_row(row, max_cols) for row in rows]
 
-    table_title = table.get("title") or table.get("caption") or f"{getattr(chapter, 'title', '章节')} 表格"
+    table_title = _legacy_table_title(table, chapter)
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=max_cols)
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=max_cols)
 
@@ -213,6 +213,37 @@ def _write_table_sheet(ws, chapter, table: dict) -> None:
     ws.print_title_rows = "1:3"
 
     _set_column_widths(ws, max_cols, headers, rows)
+
+
+def _legacy_table_title(table: dict, chapter) -> str:
+    for key in ("title", "caption"):
+        value = table.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+
+    for key in ("title", "caption"):
+        value = table.get(key)
+        text = _coerce_table_metadata_text(value)
+        if text:
+            return text
+
+    chapter_title = _coerce_table_metadata_text(getattr(chapter, "title", "章节"))
+    return f"{chapter_title or '章节'} 表格"
+
+
+def _coerce_table_metadata_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (list, dict)):
+        if not value:
+            return ""
+        try:
+            return json.dumps(value, ensure_ascii=False).strip()
+        except (TypeError, ValueError):
+            return str(value).strip()
+    return str(value).strip()
 
 
 def _load_tables(content_json: str | None) -> list[dict]:

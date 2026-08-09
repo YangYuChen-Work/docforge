@@ -349,6 +349,64 @@ def test_exporter_ignores_legacy_tables_with_null_optional_fields(tmp_path, monk
     assert wb.sheetnames == ["项目概览", "文档目录", "无表格数据"]
 
 
+def test_exporter_safely_writes_malformed_legacy_table_metadata(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    content = {
+        "tables": [
+            {
+                "title": ["错误标题"],
+                "caption": "可用标题",
+                "headers": ["名称"],
+                "rows": [["产品A"]],
+            },
+            {
+                "title": {"label": "字典标题"},
+                "headers": ["名称"],
+                "rows": [["产品B"]],
+            },
+            {
+                "caption": ["列表标题", 2],
+                "headers": ["名称"],
+                "rows": [["产品C"]],
+            },
+            {
+                "title": 42,
+                "headers": ["名称"],
+                "rows": [["产品D"]],
+            },
+            {
+                "title": [],
+                "caption": {},
+                "headers": ["名称"],
+                "rows": [["产品E"]],
+            },
+        ]
+    }
+
+    out = export_tables_to_xlsx(
+        "doc-malformed-legacy-metadata",
+        [_chapter("异常表格", json.dumps(content, ensure_ascii=False))],
+    )
+
+    wb = _load(out)
+    assert wb.sheetnames == [
+        "项目概览",
+        "文档目录",
+        "异常表格-1",
+        "异常表格-2",
+        "异常表格-3",
+        "异常表格-4",
+        "异常表格-5",
+    ]
+    assert wb["异常表格-1"]["A1"].value == "可用标题"
+    assert wb["异常表格-2"]["A1"].value == '{"label": "字典标题"}'
+    assert wb["异常表格-3"]["A1"].value == '["列表标题", 2]'
+    assert wb["异常表格-4"]["A1"].value == "42"
+    assert wb["异常表格-5"]["A1"].value == "异常表格 表格"
+
+
 def test_exporter_ignores_prosemirror_tables_with_null_content(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "storage_root", str(tmp_path))
     content = {
