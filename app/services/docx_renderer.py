@@ -18,6 +18,10 @@ from docx.oxml.ns import qn
 from docx.shared import Cm, Mm
 from app.config import get_storage_path
 
+DEFAULT_LATIN_FONT = "Arial"
+DEFAULT_EAST_ASIA_FONT = "Microsoft YaHei"
+DEFAULT_COMPLEX_SCRIPT_FONT = "Noto Sans CJK SC"
+
 
 def render_to_docx(doc_id: str, chapters: list, template_source_path: str | None) -> str:
     """Write confirmed chapter content into a copy of the Word template."""
@@ -75,27 +79,29 @@ def _chapter_nodes(chapter) -> list[dict]:
     if not nodes and chapter.plain_text:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": chapter.plain_text}]})
 
-    missing = json.loads(chapter.missing_information_json or "[]")
+    missing = _safe_json_list(getattr(chapter, "missing_information_json", None))
     if missing:
-        nodes.append(_highlighted_note(f"待补充：{'; '.join(missing[:5])}"))
+        nodes.append(_notice_node("待补充：", '; '.join(str(item) for item in missing[:5])))
 
-    conflicts = json.loads(getattr(chapter, "conflict_json", None) or "[]")
+    conflicts = _safe_json_list(getattr(chapter, "conflict_json", None))
     if conflicts:
         descriptions = [c.get("description", "") for c in conflicts if c.get("description")]
         if descriptions:
-            nodes.append(_highlighted_note(f"内容冲突：{'; '.join(descriptions[:5])}"))
+            nodes.append(_notice_node("内容冲突：", '; '.join(descriptions[:5]), kind="conflict"))
 
     if not nodes:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": "（内容待生成）"}]})
     return nodes
 
 
-def _highlighted_note(text: str) -> dict:
-    kind = "conflict" if "内容冲突" in text else "missing"
+def _notice_node(label: str, detail: str, kind: str = "missing") -> dict:
     return {
         "type": "paragraph",
         "attrs": {"notice_kind": kind},
-        "content": [{"type": "text", "marks": [{"type": "highlight"}], "text": f"【{text}】"}],
+        "content": [
+            {"type": "text", "marks": [{"type": "highlight"}, {"type": "bold"}], "text": f"【{label}"},
+            {"type": "text", "marks": [{"type": "highlight"}], "text": f"{detail}】"},
+        ],
     }
 
 
@@ -177,7 +183,7 @@ def _render_table(doc: Document, node: dict):
 
     n_cols = max(len(r.get("content", [])) for r in rows)
     table = doc.add_table(rows=len(rows), cols=n_cols)
-    _style_table(table)
+    _set_table_borders(table)
 
     for r, row_node in enumerate(rows):
         is_header_row = row_node.get("content", [{}])[0].get("type") == "tableHeader"
@@ -193,21 +199,28 @@ def _render_table(doc: Document, node: dict):
                     run.bold = True
                 _shade_cell(cell, "D9E2F3")
 
+    _style_table(table)
     return table._element
 
 
 def _style_table(table):
+    """Apply borders and bounded proportional widths.
+
+    Widths are distributed from a fixed printable width budget so narrow
+    identifier columns stay compact while longer text columns receive more
+    room without depending on renderer-specific autofit heuristics.
+    """
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = True
-    _set_table_borders(table)
+    table.autofit = False
 
     n_cols = max(len(row.cells) for row in table.rows) if table.rows else 1
     total_width = Cm(16.5)
-    col_width = int(total_width / max(n_cols, 1))
+    col_widths = _proportional_column_widths(table, total_width)
     for row in table.rows:
-        for cell in row.cells:
+        for index, cell in enumerate(row.cells):
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            cell.width = col_width
+            cell.width = col_widths[index]
+            _set_cell_width(cell, col_widths[index])
             _set_cell_margins(cell, top=90, start=100, bottom=90, end=100)
 
 
@@ -260,8 +273,13 @@ def _configure_generated_document(doc: Document, chapters: list):
 def _configure_styles(doc: Document):
     for style_name in ("Normal", "Heading 1", "Heading 2", "Heading 3"):
         style = doc.styles[style_name]
-        style.font.name = "Microsoft YaHei"
-        style._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+        style.font.name = DEFAULT_LATIN_FONT
+        r_pr = _ensure_child(style._element, "w:rPr")
+        r_fonts = _ensure_child(r_pr, "w:rFonts")
+        r_fonts.set(qn("w:ascii"), DEFAULT_LATIN_FONT)
+        r_fonts.set(qn("w:hAnsi"), DEFAULT_LATIN_FONT)
+        r_fonts.set(qn("w:eastAsia"), DEFAULT_EAST_ASIA_FONT)
+        r_fonts.set(qn("w:cs"), DEFAULT_COMPLEX_SCRIPT_FONT)
 
 
 def _style_generated_heading(paragraph):
@@ -290,8 +308,6 @@ def _style_notice(paragraph, kind: str):
     shd.set(qn("w:val"), "clear")
     shd.set(qn("w:color"), "auto")
     shd.set(qn("w:fill"), "FDE9D9" if kind == "conflict" else "FFF2CC")
-    if paragraph.runs:
-        paragraph.runs[0].bold = True
 
 
 def _shade_cell(cell, fill: str):
@@ -318,6 +334,50 @@ def _set_cell_margins(cell, top: int, start: int, bottom: int, end: int):
             tc_mar.append(el)
         el.set(qn("w:w"), str(value))
         el.set(qn("w:type"), "dxa")
+
+
+def _set_cell_width(cell, width: int):
+    tc_pr = _ensure_child(cell._tc, "w:tcPr")
+    tc_w = tc_pr.find(qn("w:tcW"))
+    if tc_w is None:
+        tc_w = OxmlElement("w:tcW")
+        tc_pr.append(tc_w)
+    tc_w.set(qn("w:w"), str(width))
+    tc_w.set(qn("w:type"), "dxa")
+
+
+def _proportional_column_widths(table, total_width):
+    n_cols = max(len(row.cells) for row in table.rows) if table.rows else 1
+    text_weights = [1] * n_cols
+    for col_index in range(n_cols):
+        col_text_length = max(
+            (len((row.cells[col_index].text or "").strip()) for row in table.rows if col_index < len(row.cells)),
+            default=1,
+        )
+        text_weights[col_index] = max(1, min(col_text_length, 8))
+
+    total_weight = sum(text_weights) or n_cols
+    min_width = int(total_width * 0.18)
+    remaining_width = max(int(total_width) - (min_width * n_cols), 0)
+    widths = []
+    for weight in text_weights:
+        proportional_extra = int(remaining_width * weight / total_weight) if remaining_width else 0
+        widths.append(min_width + proportional_extra)
+
+    width_delta = int(total_width) - sum(widths)
+    if widths and width_delta:
+        widths[-1] += width_delta
+    return widths
+
+
+def _safe_json_list(raw_value) -> list:
+    if not raw_value:
+        return []
+    try:
+        parsed = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    return parsed if isinstance(parsed, list) else []
 
 
 def _ensure_footer_page_field(section):

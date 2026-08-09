@@ -133,6 +133,27 @@ def test_missing_and_conflict_notes_are_rendered_as_highlighted_notices(tmp_path
         p._element.pPr is not None and p._element.pPr.find(qn("w:shd")) is not None
         for p in notice_paragraphs
     )
+    first_notice_runs = [run for run in notice_paragraphs[0].runs if run.text]
+    assert first_notice_runs[0].text == "【待补充："
+    assert first_notice_runs[0].bold is True
+    assert "下一年度销量预测" in first_notice_runs[1].text
+    assert first_notice_runs[1].bold is not True
+
+
+def test_malformed_issue_json_is_ignored_so_render_still_succeeds(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "正文内容"}]},
+    ]}
+    chapter = _ch("c1", "产品概述", content)
+    chapter.missing_information_json = "{not-json"
+    chapter.conflict_json = "["
+
+    template = _make_template(tmp_path, ["产品概述"])
+    out = render_to_docx("doc1", [chapter], template)
+    doc = Document(out)
+
+    assert any(p.text == "正文内容" for p in doc.paragraphs)
+    assert not any("待补充" in p.text or "内容冲突" in p.text for p in doc.paragraphs)
 
 
 def test_empty_content_falls_back_to_placeholder_text(tmp_path):
@@ -176,6 +197,11 @@ def test_no_template_sets_a4_margins_and_footer_page_field(tmp_path):
     footer_xml = section.footer._element.xml
     assert "PAGE" in footer_xml
     assert "产品概述" in core_title(doc)
+    normal_fonts = doc.styles["Normal"]._element.rPr.rFonts
+    assert normal_fonts.get(qn("w:ascii")) == "Arial"
+    assert normal_fonts.get(qn("w:hAnsi")) == "Arial"
+    assert normal_fonts.get(qn("w:eastAsia")) == "Microsoft YaHei"
+    assert normal_fonts.get(qn("w:cs")) == "Noto Sans CJK SC"
 
 
 def test_table_rendering_adds_borders_and_header_shading(tmp_path):
@@ -206,6 +232,9 @@ def test_table_rendering_adds_borders_and_header_shading(tmp_path):
     assert tc_pr is not None
     assert tc_pr.find(qn("w:shd")) is not None
     assert all(run.bold for run in header_cell.paragraphs[0].runs if run.text)
+    first_col_width = int(table.rows[1].cells[0]._tc.tcPr.find(qn("w:tcW")).get(qn("w:w")))
+    second_col_width = int(table.rows[1].cells[1]._tc.tcPr.find(qn("w:tcW")).get(qn("w:w")))
+    assert second_col_width > first_col_width
 
 
 def core_title(doc: Document) -> str:
