@@ -207,6 +207,12 @@ async function removeDocument(doc: any) {
     await deleteDocument(doc.id)
     docs.value = docs.value.filter((item) => item.id !== doc.id)
   } catch (err: any) {
+    if (err.status === 404) {
+      // The list can be stale if this document was already removed elsewhere.
+      // Treat that state as success so the user is not blocked by a ghost row.
+      docs.value = docs.value.filter((item) => item.id !== doc.id)
+      return
+    }
     deleteError.value = `删除失败：${err.message || '未知错误'}`
   } finally {
     deletingId.value = ''
