@@ -7,15 +7,23 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
 from app.config import get_storage_path
+from app.services.export_fonts import get_export_font_config
+
+
+EXPORT_FONTS = get_export_font_config()
+
+
+def _cell_font(**kwargs) -> Font:
+    return Font(name=EXPORT_FONTS.cjk, **kwargs)
 
 
 PROJECT_BLUE_FILL = PatternFill("solid", fgColor="1F4E78")
 PALE_BLUE_FILL = PatternFill("solid", fgColor="D9EAF7")
 NEUTRAL_FILL = PatternFill("solid", fgColor="F8FAFC")
 WARNING_FILL = PatternFill("solid", fgColor="FFF2CC")
-PROJECT_BLUE_FONT = Font(color="FFFFFF", bold=True)
-SECTION_FONT = Font(color="1F1F1F", bold=True)
-BODY_FONT = Font(color="1F1F1F")
+PROJECT_BLUE_FONT = _cell_font(color="FFFFFF", bold=True)
+SECTION_FONT = _cell_font(color="1F1F1F", bold=True)
+BODY_FONT = _cell_font(color="1F1F1F")
 NEUTRAL_BORDER = Border(
     left=Side(style="thin", color="B7C0CC"),
     right=Side(style="thin", color="B7C0CC"),
@@ -90,7 +98,7 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
             cell.border = NEUTRAL_BORDER
             cell.alignment = LEFT_WRAP if col != 4 else LINK_ALIGNMENT
             if col == 4 and first_sheet_name:
-                cell.font = Font(color="0563C1", underline="single")
+                cell.font = _cell_font(color="0563C1", underline="single")
 
     if not has_table:
         ws = wb.create_sheet(title="无表格数据")
@@ -109,7 +117,7 @@ def _build_overview_sheet(ws, document_meta: dict, export_time: str) -> None:
     title = ws["A1"]
     title.value = "导出概览"
     title.fill = PROJECT_BLUE_FILL
-    title.font = Font(color="FFFFFF", bold=True, size=14)
+    title.font = _cell_font(color="FFFFFF", bold=True, size=14)
     title.alignment = CENTER_WRAP
     title.border = NEUTRAL_BORDER
 
@@ -170,7 +178,7 @@ def _write_table_sheet(ws, chapter, table: dict) -> None:
     title_cell = ws.cell(row=1, column=1, value=table_title)
     source_cell = ws.cell(row=2, column=1, value=f"来源章节：{getattr(chapter, 'title', '')}")
     title_cell.fill = PROJECT_BLUE_FILL
-    title_cell.font = Font(color="FFFFFF", bold=True)
+    title_cell.font = _cell_font(color="FFFFFF", bold=True)
     title_cell.alignment = LEFT_WRAP
     title_cell.border = NEUTRAL_BORDER
     source_cell.fill = PALE_BLUE_FILL

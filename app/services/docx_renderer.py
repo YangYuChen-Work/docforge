@@ -17,10 +17,12 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Mm
 from app.config import get_storage_path
+from app.services.export_fonts import get_export_font_config
 
-DEFAULT_LATIN_FONT = "Arial"
-DEFAULT_EAST_ASIA_FONT = "Microsoft YaHei"
-DEFAULT_COMPLEX_SCRIPT_FONT = "Noto Sans CJK SC"
+EXPORT_FONTS = get_export_font_config()
+DEFAULT_LATIN_FONT = EXPORT_FONTS.latin
+DEFAULT_EAST_ASIA_FONT = EXPORT_FONTS.cjk
+DEFAULT_COMPLEX_SCRIPT_FONT = EXPORT_FONTS.cjk
 
 
 def render_to_docx(doc_id: str, chapters: list, template_source_path: str | None) -> str:
@@ -32,6 +34,7 @@ def render_to_docx(doc_id: str, chapters: list, template_source_path: str | None
     if template_source_path and Path(template_source_path).exists():
         shutil.copy2(template_source_path, out_path)
         doc = Document(str(out_path))
+        _configure_styles(doc)
         _inject_into_template(doc, chapters)
     else:
         doc = Document()
@@ -148,7 +151,8 @@ def _render_node_elements(doc: Document, node: dict) -> list:
         for item in node.get("content", []):
             for inner in item.get("content", []):
                 para = doc.add_paragraph()
-                para.add_run("• ")
+                bullet_run = para.add_run("• ")
+                _style_run_font(bullet_run)
                 _add_runs(para, inner.get("content", []))
                 elements.append(para._element)
         return elements
@@ -168,6 +172,7 @@ def _add_runs(paragraph, inline_content: list[dict]):
             continue
         marks = {m.get("type") for m in run_node.get("marks", [])}
         run = paragraph.add_run(text)
+        _style_run_font(run)
         if "bold" in marks:
             run.bold = True
         if "italic" in marks:
@@ -282,10 +287,22 @@ def _configure_styles(doc: Document):
         r_fonts.set(qn("w:cs"), DEFAULT_COMPLEX_SCRIPT_FONT)
 
 
+def _style_run_font(run):
+    run.font.name = DEFAULT_LATIN_FONT
+    r_pr = _ensure_child(run._r, "w:rPr")
+    r_fonts = _ensure_child(r_pr, "w:rFonts")
+    r_fonts.set(qn("w:ascii"), DEFAULT_LATIN_FONT)
+    r_fonts.set(qn("w:hAnsi"), DEFAULT_LATIN_FONT)
+    r_fonts.set(qn("w:eastAsia"), DEFAULT_EAST_ASIA_FONT)
+    r_fonts.set(qn("w:cs"), DEFAULT_COMPLEX_SCRIPT_FONT)
+
+
 def _style_generated_heading(paragraph):
     paragraph.paragraph_format.space_before = Mm(6)
     paragraph.paragraph_format.space_after = Mm(3)
     paragraph.paragraph_format.keep_with_next = True
+    for run in paragraph.runs:
+        _style_run_font(run)
 
 
 def _style_paragraph(paragraph):
@@ -398,6 +415,7 @@ def _ensure_footer_page_field(section):
     fld_end.set(qn("w:fldCharType"), "end")
 
     run = paragraph.add_run()
+    _style_run_font(run)
     run._r.append(fld_begin)
     run._r.append(instr)
     run._r.append(fld_sep)

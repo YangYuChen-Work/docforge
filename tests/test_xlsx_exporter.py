@@ -10,6 +10,7 @@ from app.config import settings
 from app.db.models import DocumentChapter, DocumentTemplate, GeneratedDocument
 from app.db.session import Base
 from app.domain import exports as domain_exports
+from app.services.export_fonts import get_export_font_config
 from app.services.xlsx_exporter import export_tables_to_xlsx
 
 
@@ -276,3 +277,21 @@ def test_exporter_falls_back_when_no_valid_tables_exist(tmp_path, monkeypatch):
     fallback = wb["无表格数据"]
     assert fallback["A1"].value == "本文档暂无可导出的表格数据"
     assert fallback["A2"].value == "请检查章节内容是否包含 tables 节点，或等待章节重新生成。"
+
+
+def test_xlsx_cells_use_explicit_cjk_font(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    content = json.dumps(
+        {"tables": [_table("中文表格", ["名称"], [["产品"]])]},
+        ensure_ascii=False,
+    )
+
+    out = export_tables_to_xlsx("doc-fonts", [_chapter("产品概述", content)])
+    wb = _load(out)
+    fonts = get_export_font_config()
+
+    sheet = wb["产品概述"]
+    assert sheet["A1"].font.name == fonts.cjk
+    assert sheet["A2"].font.name == fonts.cjk
+    assert sheet["A3"].font.name == fonts.cjk
+    assert sheet["A4"].font.name == fonts.cjk

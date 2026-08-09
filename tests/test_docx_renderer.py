@@ -4,6 +4,7 @@ from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Mm
 from app.services.docx_renderer import render_to_docx
+from app.services.export_fonts import get_export_font_config
 
 
 def _ch(chapter_id, title, content_json, missing=None, conflicts=None):
@@ -197,11 +198,49 @@ def test_no_template_sets_a4_margins_and_footer_page_field(tmp_path):
     footer_xml = section.footer._element.xml
     assert "PAGE" in footer_xml
     assert "产品概述" in core_title(doc)
+    fonts = get_export_font_config()
     normal_fonts = doc.styles["Normal"]._element.rPr.rFonts
-    assert normal_fonts.get(qn("w:ascii")) == "Arial"
-    assert normal_fonts.get(qn("w:hAnsi")) == "Arial"
-    assert normal_fonts.get(qn("w:eastAsia")) == "Microsoft YaHei"
-    assert normal_fonts.get(qn("w:cs")) == "Noto Sans CJK SC"
+    assert normal_fonts.get(qn("w:ascii")) == fonts.latin
+    assert normal_fonts.get(qn("w:hAnsi")) == fonts.latin
+    assert normal_fonts.get(qn("w:eastAsia")) == fonts.cjk
+    assert normal_fonts.get(qn("w:cs")) == fonts.cjk
+
+
+def test_generated_docx_styles_and_runs_use_explicit_cjk_font(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "中文正文 Latin"}]},
+    ]}
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], None)
+    doc = Document(out)
+    fonts = get_export_font_config()
+    normal_fonts = doc.styles["Normal"]._element.rPr.rFonts
+    body_run = next(run for paragraph in doc.paragraphs for run in paragraph.runs if run.text == "中文正文 Latin")
+    run_fonts = body_run._element.rPr.rFonts
+
+    for r_fonts in (normal_fonts, run_fonts):
+        assert r_fonts.get(qn("w:ascii")) == fonts.latin
+        assert r_fonts.get(qn("w:hAnsi")) == fonts.latin
+        assert r_fonts.get(qn("w:eastAsia")) == fonts.cjk
+        assert r_fonts.get(qn("w:cs")) == fonts.cjk
+
+
+def test_template_rendered_runs_use_explicit_cjk_font(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "模板中文正文"}]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+    fonts = get_export_font_config()
+    body_run = next(run for paragraph in doc.paragraphs for run in paragraph.runs if run.text == "模板中文正文")
+    run_fonts = body_run._element.rPr.rFonts
+
+    assert run_fonts.get(qn("w:ascii")) == fonts.latin
+    assert run_fonts.get(qn("w:hAnsi")) == fonts.latin
+    assert run_fonts.get(qn("w:eastAsia")) == fonts.cjk
+    assert run_fonts.get(qn("w:cs")) == fonts.cjk
 
 
 def test_table_rendering_adds_borders_and_header_shading(tmp_path):

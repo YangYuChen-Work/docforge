@@ -14,14 +14,16 @@ def validate_document(chapters: list, template_source_path: str | None) -> dict:
         elif ch.status not in ("confirmed", "needs_material"):
             errors.append(f'章节"{ch.title}"尚未确认（当前状态：{ch.status}）')
 
-        missing = json.loads(ch.missing_information_json or "[]")
+        missing = _safe_json_list(getattr(ch, "missing_information_json", None))
         if missing:
             has_missing_info = True
-            warnings.append(f'章节"{ch.title}"有待补充项：{", ".join(missing[:2])}')
+            warnings.append(
+                f'章节"{ch.title}"有待补充项：{", ".join(str(item) for item in missing[:2])}'
+            )
 
-        conflicts = json.loads(ch.conflict_json or "[]")
+        conflicts = _safe_json_list(getattr(ch, "conflict_json", None))
         if conflicts:
-            errors.append(f'章节"{ch.title}"存在未处理冲突')
+            warnings.append(f'章节"{ch.title}"存在未处理冲突')
 
     if template_source_path and not Path(template_source_path).exists():
         errors.append(f"模板文件不存在：{template_source_path}")
@@ -34,3 +36,13 @@ def validate_document(chapters: list, template_source_path: str | None) -> dict:
         "can_export": passed,
         "has_missing_info": has_missing_info,
     }
+
+
+def _safe_json_list(raw_value) -> list:
+    if not raw_value:
+        return []
+    try:
+        parsed = json.loads(raw_value)
+    except (TypeError, json.JSONDecodeError):
+        return []
+    return parsed if isinstance(parsed, list) else []
