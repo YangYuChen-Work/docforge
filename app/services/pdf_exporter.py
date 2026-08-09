@@ -35,7 +35,12 @@ def convert_to_pdf(docx_path: str) -> str:
         }
         if environment is not None:
             run_kwargs["env"] = environment
-        result = subprocess.run(command, **run_kwargs)
+        try:
+            result = subprocess.run(command, **run_kwargs)
+        except FileNotFoundError as error:
+            raise RuntimeError(
+                "LibreOffice 未找到。请安装 LibreOffice 或设置 LIBREOFFICE_PATH 环境变量。"
+            ) from error
         if result.returncode != 0:
             raise RuntimeError(f"LibreOffice 转换失败: {result.stderr[:300]}")
         if not pdf_path.exists():

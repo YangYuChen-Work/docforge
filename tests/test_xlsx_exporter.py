@@ -186,6 +186,30 @@ def test_exporter_uses_case_insensitive_unique_sheet_names_in_directory_links(tm
     assert directory["D3"].value == '=HYPERLINK("#\'report-2\'!A1","打开")'
 
 
+def test_exporter_escapes_double_quotes_in_directory_links(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+
+    out = export_tables_to_xlsx(
+        "doc-quoted-sheet",
+        [
+            _chapter(
+                '含"双引号"章节',
+                json.dumps(
+                    {"tables": [_table("表A", ["值"], [[1]])]},
+                    ensure_ascii=False,
+                ),
+            )
+        ],
+    )
+
+    wb = _load(out)
+    directory = wb["文档目录"]
+    assert wb.sheetnames[2] == '含"双引号"章节'
+    assert directory["D2"].value == '=HYPERLINK("#\'含""双引号""章节\'!A1","打开")'
+
+
 def test_create_export_passes_xlsx_metadata_and_issue_summary(tmp_path, monkeypatch):
     engine = create_engine(
         f"sqlite:///{tmp_path / 'export-meta.db'}",

@@ -24,6 +24,28 @@ def test_convert_to_pdf_raises_when_libreoffice_missing(monkeypatch, tmp_path):
         convert_to_pdf(str(docx_path))
 
 
+def test_convert_to_pdf_raises_clear_error_for_missing_configured_libreoffice(
+    monkeypatch, tmp_path
+):
+    docx_path = tmp_path / "sample.docx"
+    docx_path.write_bytes(b"fake-docx")
+    monkeypatch.setattr(
+        pdf_exporter.settings,
+        "libreoffice_path",
+        str(tmp_path / "missing" / "soffice"),
+    )
+    monkeypatch.setattr(
+        pdf_exporter.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            FileNotFoundError(2, "No such file or directory")
+        ),
+    )
+
+    with pytest.raises(RuntimeError, match="LibreOffice 未找到"):
+        convert_to_pdf(str(docx_path))
+
+
 def test_convert_to_pdf_gives_bundled_soffice_a_temporary_cjk_font_environment(
     monkeypatch, tmp_path
 ):

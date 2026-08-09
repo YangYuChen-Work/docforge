@@ -407,7 +407,7 @@ def _sanitize_sheet_name(name: str) -> str:
 
 
 def _excel_sheet_target(sheet_name: str) -> str:
-    escaped = sheet_name.replace("'", "''")
+    escaped = sheet_name.replace("'", "''").replace('"', '""')
     return f"#'{escaped}'!A1"
 
 
