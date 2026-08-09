@@ -88,13 +88,29 @@ def _chapter_nodes(chapter) -> list[dict]:
 
     conflicts = _safe_json_list(getattr(chapter, "conflict_json", None))
     if conflicts:
-        descriptions = [c.get("description", "") for c in conflicts if c.get("description")]
+        descriptions = [_conflict_detail(conflict) for conflict in conflicts]
+        descriptions = [description for description in descriptions if description]
         if descriptions:
             nodes.append(_notice_node("内容冲突：", '; '.join(descriptions[:5]), kind="conflict"))
 
     if not nodes:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": "（内容待生成）"}]})
     return nodes
+
+
+def _conflict_detail(entry) -> str:
+    if isinstance(entry, dict):
+        detail = (
+            entry.get("description")
+            or entry.get("title")
+            or entry.get("name")
+            or json.dumps(entry, ensure_ascii=False)
+        )
+    elif entry is None:
+        return ""
+    else:
+        detail = str(entry).strip()
+    return str(detail).strip()
 
 
 def _notice_node(label: str, detail: str, kind: str = "missing") -> dict:

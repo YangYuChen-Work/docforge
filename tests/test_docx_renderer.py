@@ -5,6 +5,7 @@ from docx.oxml.ns import qn
 from docx.shared import Mm
 from app.services.docx_renderer import render_to_docx
 from app.services.export_fonts import get_export_font_config
+from app.services.validator import validate_document
 
 
 def _ch(chapter_id, title, content_json, missing=None, conflicts=None):
@@ -139,6 +140,25 @@ def test_missing_and_conflict_notes_are_rendered_as_highlighted_notices(tmp_path
     assert first_notice_runs[0].bold is True
     assert "下一年度销量预测" in first_notice_runs[1].text
     assert first_notice_runs[1].bold is not True
+
+
+def test_scalar_conflict_warns_in_validation_and_renders_readable_notice(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "正文内容"}]},
+    ]}
+    chapter = _ch("c1", "产品概述", content, conflicts=["原始冲突"])
+    chapter.status = "confirmed"
+
+    validation = validate_document([chapter], None)
+
+    assert validation["can_export"] is True
+    assert validation["warnings"] == ['章节"产品概述"存在未处理冲突']
+
+    template = _make_template(tmp_path, ["产品概述"])
+    out = render_to_docx("doc1", [chapter], template)
+    doc = Document(out)
+
+    assert any("内容冲突" in p.text and "原始冲突" in p.text for p in doc.paragraphs)
 
 
 def test_malformed_issue_json_is_ignored_so_render_still_succeeds(tmp_path):
