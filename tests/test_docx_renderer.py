@@ -273,6 +273,64 @@ def test_real_template_preserves_structure_assets_and_removes_sample_body(tmp_pa
     )
 
 
+def test_real_template_replaces_market_sample_table_with_generated_table(tmp_path):
+    assert REAL_TEMPLATE_PATH.exists()
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [
+            {"type": "text", "marks": [{"type": "bold"}], "text": "表1 产品近年销量（台数）走势及预测表"},
+        ]},
+        {"type": "table", "content": [
+            {"type": "tableRow", "content": [
+                {"type": "tableHeader", "content": [{"type": "paragraph", "content": [
+                    {"type": "text", "text": "序号"},
+                ]}]},
+                {"type": "tableHeader", "content": [{"type": "paragraph", "content": [
+                    {"type": "text", "text": "年度总销量"},
+                ]}]},
+            ]},
+            {"type": "tableRow", "content": [
+                {"type": "tableCell", "content": [{"type": "paragraph", "content": [
+                    {"type": "text", "text": "1"},
+                ]}]},
+                {"type": "tableCell", "content": [{"type": "paragraph", "content": [
+                    {"type": "text", "text": "100"},
+                ]}]},
+            ]},
+        ]},
+    ]}
+
+    functional_content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [
+            {"type": "text", "text": "功能性能定位正文"},
+        ]},
+    ]}
+    chapters = [
+        _ch("c-market", "市场需求分析", content),
+        _ch("c-functional", "功能性能定位", functional_content),
+    ]
+
+    out = render_to_docx("real-template-market-table", chapters, str(REAL_TEMPLATE_PATH))
+    doc = Document(out)
+    table_texts = [
+        "\n".join(cell.text for row in table.rows for cell in row.cells)
+        for table in doc.tables
+    ]
+
+    assert any("年度总销量" in text and "100" in text for text in table_texts)
+    assert not any("本年度-3年" in text or "品牌/型号1" in text for text in table_texts)
+    assert sum("表1 产品近年销量（台数）走势及预测表" in p.text for p in doc.paragraphs) == 1
+    assert any("客户群A" in text for text in table_texts)
+    assert any("指标项次" in text for text in table_texts)
+    assert any("实际解决时间" in text for text in table_texts)
+    assert len(doc.tables) == 14
+    assert len(doc.inline_shapes) == 3
+    assert len(doc.sections) == 2
+    assert all(
+        any("PAGE" in (instr.text or "").upper() for instr in section.footer._element.iter(qn("w:instrText")))
+        for section in doc.sections
+    )
+
+
 def test_literal_page_text_does_not_count_as_page_field(tmp_path):
     content = {"type": "doc", "content": [
         {"type": "paragraph", "content": [{"type": "text", "text": "正文"}]},

@@ -374,40 +374,48 @@ def _remove_template_placeholders(doc: Document, anchors: list[tuple[object, obj
     or is a proven duplicate of a generated chapter table. Cover content before
     the first anchor and header/footer parts are never touched here.
     """
-    paragraphs_by_element = {id(para._element): para for para in doc.paragraphs}
+    paragraphs_by_element = {para._element: para for para in doc.paragraphs}
     for index, (chapter, heading_para) in enumerate(anchors):
         next_heading = (
             anchors[index + 1][1]._element
             if index + 1 < len(anchors)
             else None
         )
+        replacement_elements = _template_table_replacement_elements(
+            chapter,
+            heading_para,
+            next_heading,
+            paragraphs_by_element,
+        )
         remove_next_table = False
         current = heading_para._element.getnext()
         while current is not None and current != next_heading:
             next_element = current.getnext()
             if not _is_template_structure_element(current):
-                paragraph = paragraphs_by_element.get(id(current))
+                paragraph = paragraphs_by_element.get(current)
                 if paragraph is not None:
-                    if _paragraph_has_drawing(paragraph):
+                    if current in replacement_elements:
+                        current.getparent().remove(current)
+                    elif _paragraph_has_drawing(paragraph):
                         pass
                     elif _is_heading_paragraph(paragraph):
                         if _is_sample_heading(paragraph.text):
                             current.getparent().remove(current)
                     elif _is_caption_paragraph(paragraph):
                         if _is_sample_placeholder_text(paragraph.text):
-                            remove_next_table = True
+                            remove_next_table = (
+                                next_element is not None
+                                and next_element.tag == qn("w:tbl")
+                            )
                             current.getparent().remove(current)
                     else:
                         current.getparent().remove(current)
                 elif current.tag == qn("w:tbl") and (
-                    _should_remove_template_table(
-                        current,
-                        chapter,
-                        current.getprevious(),
-                    )
+                    current in replacement_elements
+                    or _should_remove_template_table(current, current.getprevious())
                     or remove_next_table
                 ):
-                    current.getparent().remove(current)
+                    _remove_template_table_element(current)
                     remove_next_table = False
                 elif current.tag == qn("w:tbl"):
                     remove_next_table = False
@@ -481,46 +489,157 @@ def _paragraph_has_drawing(paragraph) -> bool:
     return paragraph._element.find(".//" + qn("w:drawing")) is not None
 
 
-def _should_remove_template_table(element, chapter, preceding_element) -> bool:
+def _remove_template_table_element(element):
+    """Remove a stale table without dropping drawings embedded in its cells."""
+    drawing_paragraphs = [
+        paragraph
+        for paragraph in element.iter(qn("w:p"))
+        if paragraph.find(".//" + qn("w:drawing")) is not None
+    ]
+    insertion_anchor = element
+    for paragraph in drawing_paragraphs:
+        paragraph.getparent().remove(paragraph)
+        insertion_anchor.addprevious(paragraph)
+        insertion_anchor = paragraph
+    element.getparent().remove(element)
+
+
+def _template_table_replacement_elements(
+    chapter,
+    heading_para,
+    next_heading,
+    paragraphs_by_element: dict[object, object],
+) -> set[object]:
+    """Select bounded table slots that generated tables replace.
+
+    A generated table can replace a captioned table only inside the current
+    heading's structural region, and at most one template table per generated
+    table. Explicit placeholder/sample markers remain independently removable.
+    Uncaptioned tables and tables in other heading regions are not candidates.
+    """
+    generated_table_count = sum(
+        node.get("type") == "table" for node in _chapter_nodes(chapter)
+    )
+    region_end = _template_table_region_end(
+        heading_para,
+        next_heading,
+        paragraphs_by_element,
+    )
+    candidates = []
+    explicit_tables = set()
+    current = heading_para._element.getnext()
+    while current is not None and current != region_end:
+        if current.tag == qn("w:tbl"):
+            preceding = current.getprevious()
+            preceding_para = paragraphs_by_element.get(preceding)
+            explicit = _is_sample_placeholder_text(_element_text(current)) or (
+                preceding is not None
+                and _is_sample_placeholder_text(_element_text(preceding))
+            )
+            if explicit:
+                explicit_tables.add(current)
+            if preceding_para is not None and _is_caption_paragraph(preceding_para):
+                candidates.append((current, preceding_para, explicit))
+        current = current.getnext()
+
+    replacement_elements = {
+        table
+        for table, _, _ in candidates
+        if table in explicit_tables
+    }
+    for table, caption, explicit in candidates:
+        if explicit:
+            replacement_elements.add(caption._element)
+
+    remaining = max(generated_table_count - len(explicit_tables), 0)
+    if remaining == 0:
+        return replacement_elements
+
+    generated_captions = _generated_table_captions(chapter)
+    available = [candidate for candidate in candidates if not candidate[2]]
+    selected = []
+    for generated_caption in generated_captions:
+        if not generated_caption:
+            continue
+        match = next(
+            (
+                candidate
+                for candidate in available
+                if _captions_match(generated_caption, _element_text(candidate[1]._element))
+            ),
+            None,
+        )
+        if match is None:
+            continue
+        selected.append(match)
+        available.remove(match)
+        if len(selected) == remaining:
+            break
+
+    selected.extend(available[: max(remaining - len(selected), 0)])
+    for table, caption, _ in selected:
+        replacement_elements.add(table)
+        replacement_elements.add(caption._element)
+    return replacement_elements
+
+
+def _template_table_region_end(
+    heading_para,
+    next_heading,
+    paragraphs_by_element: dict[object, object],
+):
+    heading_level = _heading_level(heading_para)
+    current = heading_para._element.getnext()
+    while current is not None and current != next_heading:
+        paragraph = paragraphs_by_element.get(current)
+        if paragraph is not None and _is_heading_paragraph(paragraph):
+            if _heading_level(paragraph) <= heading_level:
+                return current
+        if current.tag == qn("w:sectPr"):
+            return current
+        current = current.getnext()
+    return next_heading
+
+
+def _heading_level(paragraph) -> int:
+    match = re.match(r"^Heading\s+(\d+)$", paragraph.style.name or "")
+    return int(match.group(1)) if match else 99
+
+
+def _generated_table_captions(chapter) -> list[str]:
+    nodes = _chapter_nodes(chapter)
+    captions = []
+    for index, node in enumerate(nodes):
+        if node.get("type") != "table":
+            continue
+        preceding = nodes[index - 1] if index else None
+        captions.append(
+            _node_text(preceding)
+            if preceding is not None and preceding.get("type") == "paragraph"
+            else ""
+        )
+    return captions
+
+
+def _captions_match(left: str, right: str) -> bool:
+    normalized_left = _normalized_heading_text(left)
+    normalized_right = _normalized_heading_text(right)
+    return bool(
+        normalized_left
+        and normalized_right
+        and (
+            normalized_left == normalized_right
+            or normalized_left in normalized_right
+            or normalized_right in normalized_left
+        )
+    )
+
+
+def _should_remove_template_table(element, preceding_element) -> bool:
     if _is_sample_placeholder_text(_element_text(element)):
         return True
     if preceding_element is not None and preceding_element.tag == qn("w:p"):
         if _is_sample_placeholder_text(_element_text(preceding_element)):
-            return True
-
-    generated_tables = [
-        node for node in _chapter_nodes(chapter) if node.get("type") == "table"
-    ]
-    if not generated_tables:
-        return False
-
-    caption_text = _element_text(preceding_element)
-    normalized_caption = _normalized_heading_text(caption_text)
-    normalized_title = _normalized_heading_text(getattr(chapter, "title", ""))
-    if normalized_title and normalized_title in normalized_caption:
-        return True
-
-    template_rows = _table_element_rows(element)
-    if not template_rows:
-        return False
-    template_header = {
-        _normalized_heading_text(cell_text)
-        for cell_text in template_rows[0]
-        if _normalized_heading_text(cell_text)
-    }
-    for generated_table in generated_tables:
-        generated_rows = [
-            [_node_text(cell) for cell in row.get("content", [])]
-            for row in generated_table.get("content", [])
-        ]
-        if not generated_rows or len(template_rows[0]) != len(generated_rows[0]):
-            continue
-        generated_header = {
-            _normalized_heading_text(cell_text)
-            for cell_text in generated_rows[0]
-            if _normalized_heading_text(cell_text)
-        }
-        if template_header and len(template_header & generated_header) >= min(2, len(template_header)):
             return True
     return False
 
@@ -529,13 +648,6 @@ def _element_text(element) -> str:
     if element is None:
         return ""
     return "".join(text.text or "" for text in element.iter(qn("w:t")))
-
-
-def _table_element_rows(element) -> list[list[str]]:
-    return [
-        [_element_text(cell) for cell in row.findall("./" + qn("w:tc"))]
-        for row in element.findall("./" + qn("w:tr"))
-    ]
 
 
 def _configure_generated_document(doc: Document, chapters: list):
