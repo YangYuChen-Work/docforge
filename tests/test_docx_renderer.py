@@ -1,6 +1,8 @@
 import json
 from unittest.mock import MagicMock
 from docx import Document
+from docx.oxml.ns import qn
+from docx.shared import Mm
 from app.services.docx_renderer import render_to_docx
 
 
@@ -101,6 +103,38 @@ def test_missing_information_appended_as_highlighted_paragraph(tmp_path):
     assert any("待补充" in p.text and "下一年度销量预测" in p.text for p in doc.paragraphs)
 
 
+def test_missing_and_conflict_notes_are_rendered_as_highlighted_notices(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "正文内容"}]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+    out = render_to_docx(
+        "doc1",
+        [_ch(
+            "c1",
+            "产品概述",
+            content,
+            missing=["下一年度销量预测"],
+            conflicts=[{"description": "销售目标与产能规划不一致"}],
+        )],
+        template,
+    )
+
+    doc = Document(out)
+    notice_paragraphs = [
+        p
+        for p in doc.paragraphs
+        if "待补充" in p.text or "内容冲突" in p.text
+    ]
+
+    assert len(notice_paragraphs) == 2
+    assert all(any(run.font.highlight_color is not None for run in p.runs) for p in notice_paragraphs)
+    assert all(
+        p._element.pPr is not None and p._element.pPr.find(qn("w:shd")) is not None
+        for p in notice_paragraphs
+    )
+
+
 def test_empty_content_falls_back_to_placeholder_text(tmp_path):
     content = {"type": "doc", "content": []}
     template = _make_template(tmp_path, ["产品概述"])
@@ -121,3 +155,58 @@ def test_no_template_builds_from_scratch_with_same_structure(tmp_path):
     assert any(p.text == "产品概述" and p.style.name == "Heading 1" for p in doc.paragraphs)
     assert any(p.text == "子标题" and p.style.name == "Heading 2" for p in doc.paragraphs)
     assert any(p.text == "正文" for p in doc.paragraphs)
+
+
+def test_no_template_sets_a4_margins_and_footer_page_field(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "正文"}]},
+    ]}
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], None)
+    doc = Document(out)
+    section = doc.sections[0]
+
+    assert abs(section.page_width - Mm(210)) <= Mm(1)
+    assert abs(section.page_height - Mm(297)) <= Mm(1)
+    assert section.top_margin > 0
+    assert section.bottom_margin > 0
+    assert section.left_margin > 0
+    assert section.right_margin > 0
+
+    footer_xml = section.footer._element.xml
+    assert "PAGE" in footer_xml
+    assert "产品概述" in core_title(doc)
+
+
+def test_table_rendering_adds_borders_and_header_shading(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "table", "content": [
+            {"type": "tableRow", "content": [
+                {"type": "tableHeader", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "序号"}]}]},
+                {"type": "tableHeader", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "类别"}]}]},
+            ]},
+            {"type": "tableRow", "content": [
+                {"type": "tableCell", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "1"}]}]},
+                {"type": "tableCell", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "臂架系统"}]}]},
+            ]},
+        ]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("doc1", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+    table = doc.tables[0]
+
+    borders = table._tbl.tblPr.find(qn("w:tblBorders"))
+    assert borders is not None
+    assert all(borders.find(qn(f"w:{edge}")) is not None for edge in ("top", "left", "bottom", "right", "insideH", "insideV"))
+
+    header_cell = table.rows[0].cells[0]
+    tc_pr = header_cell._tc.tcPr
+    assert tc_pr is not None
+    assert tc_pr.find(qn("w:shd")) is not None
+    assert all(run.bold for run in header_cell.paragraphs[0].runs if run.text)
+
+
+def core_title(doc: Document) -> str:
+    return doc.core_properties.title or ""
