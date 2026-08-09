@@ -6,6 +6,7 @@ for mixed-language content.
 """
 from dataclasses import dataclass
 import platform
+from pathlib import Path
 
 
 DEFAULT_LATIN_FONT = "Arial"
@@ -27,3 +28,44 @@ def get_export_font_config(system_name: str | None = None) -> ExportFontConfig:
         "Linux": DEFAULT_CJK_FALLBACK,
     }.get(system_name, DEFAULT_CJK_FALLBACK)
     return ExportFontConfig(latin=DEFAULT_LATIN_FONT, cjk=cjk_font)
+
+
+def find_export_font_file(font_name: str, system_name: str | None = None) -> Path | None:
+    """Find an installed font file that matches the export CJK family.
+
+    The bundled macOS LibreOffice build uses its own Fontconfig search path,
+    which can miss fonts stored in newer macOS ``AssetsV2`` directories.
+    Return only a local installed file; exporters never download or install
+    fonts.  Other platforms keep their normal LibreOffice font discovery and
+    use the existing named-font fallback.
+    """
+    system_name = system_name or platform.system()
+    if system_name != "Darwin":
+        return None
+
+    known_names = {
+        "PingFang SC": "PingFang.ttc",
+        "Heiti SC": "STHeiti Medium.ttc",
+        "Songti SC": "Songti.ttc",
+    }
+    filename = known_names.get(font_name)
+    if not filename:
+        return None
+
+    for root in (
+        Path("/System/Library/Fonts"),
+        Path("/Library/Fonts"),
+        Path("/System/Library/AssetsV2"),
+        Path("/System/Library/Assets"),
+    ):
+        candidate = root / filename
+        if candidate.is_file():
+            return candidate
+        if root.is_dir() and root.name in {"AssetsV2", "Assets"}:
+            try:
+                candidate = next(root.rglob(filename), None)
+            except OSError:
+                candidate = None
+            if candidate and candidate.is_file():
+                return candidate
+    return None
