@@ -5,6 +5,9 @@ export const getDocument = (id: string) =>
   client.get(`/documents/${id}`).then((r) => r.data)
 export const renameDocument = (id: string, title: string) =>
   client.patch(`/documents/${id}`, { title }).then((r) => r.data)
+
+export const deleteDocument = (id: string) =>
+  client.delete(`/documents/${id}`).then((r) => r.data)
 export const getChapter = (docId: string, chapId: string) =>
   client.get(`/documents/${docId}/chapters/${chapId}`).then((r) => r.data)
 export const createChapter = (docId: string, title: string) =>

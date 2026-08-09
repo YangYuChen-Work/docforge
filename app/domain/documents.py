@@ -1,10 +1,12 @@
 import json
+import shutil
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from app.config import get_storage_path
 from app.db.models import (
-    GeneratedDocument, DocumentChapter, Citation, DocumentVersion, Annotation
+    GeneratedDocument, DocumentChapter, Citation, DocumentVersion, Annotation, Export
 )
 from app.services import audit_service
 
@@ -48,6 +50,48 @@ def rename_document(db: Session, doc_id: str, title: str) -> GeneratedDocument:
         result="success", payload_summary=title,
     )
     return doc
+
+
+def delete_document(db: Session, doc_id: str) -> dict:
+    doc = get_document(db, doc_id)
+    title = doc.title
+    chapter_ids = [
+        chapter_id
+        for (chapter_id,) in db.query(DocumentChapter.id)
+        .filter(DocumentChapter.document_id == doc_id)
+        .all()
+    ]
+
+    if chapter_ids:
+        db.query(Citation).filter(Citation.chapter_id.in_(chapter_ids)).delete(
+            synchronize_session=False
+        )
+        db.query(Annotation).filter(Annotation.chapter_id.in_(chapter_ids)).delete(
+            synchronize_session=False
+        )
+
+    db.query(DocumentVersion).filter(DocumentVersion.document_id == doc_id).delete(
+        synchronize_session=False
+    )
+    db.query(Export).filter(Export.document_id == doc_id).delete(
+        synchronize_session=False
+    )
+    db.query(DocumentChapter).filter(DocumentChapter.document_id == doc_id).delete(
+        synchronize_session=False
+    )
+    db.delete(doc)
+    db.commit()
+
+    generated_root = get_storage_path("generated").resolve()
+    output_dir = (generated_root / doc_id).resolve()
+    if generated_root in output_dir.parents and output_dir.is_dir():
+        shutil.rmtree(output_dir)
+
+    audit_service.log(
+        db, "delete_document", "generated_document", doc_id,
+        result="success", payload_summary=title,
+    )
+    return {"id": doc_id, "deleted": True}
 
 
 def get_chapter(db: Session, doc_id: str, chapter_id: str) -> DocumentChapter:

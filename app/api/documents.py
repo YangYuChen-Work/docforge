@@ -65,6 +65,11 @@ def rename_document(doc_id: str, body: dict, db: Session = Depends(get_db)):
     }
 
 
+@router.delete("/documents/{doc_id}")
+def delete_document(doc_id: str, db: Session = Depends(get_db)):
+    return domain.delete_document(db, doc_id)
+
+
 @router.post("/documents/{doc_id}/chapters")
 def create_chapter(doc_id: str, body: dict, db: Session = Depends(get_db)):
     title = (body or {}).get("title", "").strip()

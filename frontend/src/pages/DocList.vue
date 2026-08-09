@@ -58,6 +58,7 @@
             {{ tab }}
           </button>
         </div>
+        <div v-if="deleteError" class="doc-action-error" role="alert">{{ deleteError }}</div>
         <table class="doc-table">
           <thead>
             <tr>
@@ -65,11 +66,12 @@
               <th>项目</th>
               <th>状态</th>
               <th>更新时间</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-if="!loading && filteredDocs.length === 0">
-              <td colspan="4" style="text-align: center; color: #999; padding: 40px">暂无匹配文档</td>
+              <td colspan="5" style="text-align: center; color: #999; padding: 40px">暂无匹配文档</td>
             </tr>
             <tr v-for="doc in filteredDocs" :key="doc.id" @click="$router.push(`/doc/${doc.id}`)">
               <td>
@@ -78,7 +80,17 @@
               </td>
               <td><span class="doc-project">{{ doc.project_id }}</span></td>
               <td><span class="status-tag" :class="doc.status">{{ statusLabel(doc.status) }}</span></td>
-              <td>{{ doc.updated_at?.slice(0, 10) }}</td>
+              <td class="doc-updated-at">{{ formatUpdatedAt(doc.updated_at) }}</td>
+              <td class="doc-actions-cell">
+                <button
+                  class="doc-delete-btn"
+                  :disabled="deletingId === doc.id"
+                  title="删除项目文档"
+                  @click.stop="removeDocument(doc)"
+                >
+                  {{ deletingId === doc.id ? '删除中…' : '删除' }}
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -126,13 +138,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { listDocuments } from '../api/documents'
+import { deleteDocument, listDocuments } from '../api/documents'
 import { listProjects } from '../api/projects'
 import { listTemplates } from '../api/templates'
 
 const docs = ref<any[]>([])
 const search = ref('')
 const loading = ref(false)
+const deletingId = ref('')
+const deleteError = ref('')
 
 const categoryTabs = ['全部', '设计类', '分析类', '评审类']
 const currentTab = ref('全部')
@@ -175,6 +189,28 @@ function statusLabel(s: string) {
     failed: '失败',
   }
   return map[s] || s
+}
+
+function formatUpdatedAt(value?: string) {
+  if (!value) return '—'
+  const [date, time = ''] = value.split('T')
+  const seconds = time.slice(0, 8)
+  return seconds ? `${date} ${seconds}` : date
+}
+
+async function removeDocument(doc: any) {
+  if (!window.confirm(`确定删除项目文档“${doc.title}”吗？\n文档章节、版本和导出记录都会一并删除。`)) return
+
+  deletingId.value = doc.id
+  deleteError.value = ''
+  try {
+    await deleteDocument(doc.id)
+    docs.value = docs.value.filter((item) => item.id !== doc.id)
+  } catch (err: any) {
+    deleteError.value = `删除失败：${err.message || '未知错误'}`
+  } finally {
+    deletingId.value = ''
+  }
 }
 
 onMounted(async () => {
