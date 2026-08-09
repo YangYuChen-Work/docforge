@@ -68,9 +68,10 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
             if len(tables) > 1:
                 base_name = _sanitize_sheet_name(f"{base_name}-{table_index}")
             sheet_name = _unique_sheet_name(base_name, used_sheet_names)
-            chapter_sheet_names.append(sheet_name)
 
             ws = wb.create_sheet(title=sheet_name)
+            actual_sheet_name = ws.title
+            chapter_sheet_names.append(actual_sheet_name)
             _write_table_sheet(ws, chapter, table)
             has_table = True
 
@@ -379,7 +380,8 @@ def _excel_sheet_target(sheet_name: str) -> str:
 
 def _unique_sheet_name(base_name: str, used_names: set[str]) -> str:
     candidate = base_name[:31] or "Sheet"
-    if candidate not in used_names:
+    used_names_casefolded = {name.casefold() for name in used_names}
+    if candidate.casefold() not in used_names_casefolded:
         used_names.add(candidate)
         return candidate
 
@@ -388,7 +390,7 @@ def _unique_sheet_name(base_name: str, used_names: set[str]) -> str:
         suffix = f"-{suffix_number}"
         trimmed = base_name[: max(1, 31 - len(suffix))].rstrip("-")
         candidate = f"{trimmed}{suffix}"[:31]
-        if candidate not in used_names:
+        if candidate.casefold() not in used_names_casefolded:
             used_names.add(candidate)
             return candidate
         suffix_number += 1

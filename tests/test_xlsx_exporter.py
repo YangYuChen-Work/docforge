@@ -158,6 +158,34 @@ def test_exporter_builds_overview_directory_and_table_sheets(tmp_path, monkeypat
     assert "]" not in long_name.title
 
 
+def test_exporter_uses_case_insensitive_unique_sheet_names_in_directory_links(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+
+    chapters = [
+        _chapter(
+            "Report",
+            json.dumps({"tables": [_table("Upper", ["Value"], [[1]])]}, ensure_ascii=False),
+        ),
+        _chapter(
+            "report",
+            json.dumps({"tables": [_table("Lower", ["Value"], [[2]])]}, ensure_ascii=False),
+        ),
+    ]
+
+    out = export_tables_to_xlsx("doc-case-collision", chapters)
+    wb = _load(out)
+
+    actual_sheet_names = wb.sheetnames[2:]
+    assert actual_sheet_names == ["Report", "report-2"]
+    assert len({name.casefold() for name in actual_sheet_names}) == len(actual_sheet_names)
+
+    directory = wb["文档目录"]
+    assert directory["C2"].value == actual_sheet_names[0]
+    assert directory["D2"].value == '=HYPERLINK("#\'Report\'!A1","打开")'
+    assert directory["C3"].value == actual_sheet_names[1]
+    assert directory["D3"].value == '=HYPERLINK("#\'report-2\'!A1","打开")'
+
+
 def test_create_export_passes_xlsx_metadata_and_issue_summary(tmp_path, monkeypatch):
     engine = create_engine(
         f"sqlite:///{tmp_path / 'export-meta.db'}",
