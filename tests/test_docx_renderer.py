@@ -532,6 +532,67 @@ def test_empty_content_falls_back_to_placeholder_text(tmp_path):
     assert any("内容待生成" in p.text for p in doc.paragraphs)
 
 
+def test_non_dict_json_roots_fall_back_to_plain_text(tmp_path):
+    template = _make_template(tmp_path, ["产品概述"])
+
+    for index, root in enumerate((None, "not-a-document", [], 7)):
+        chapter = _ch(f"c{index}", "产品概述", root)
+        chapter.plain_text = f"根节点回退内容 {index}"
+
+        out = render_to_docx(f"docx-root-boundary-{index}", [chapter], template)
+        doc = Document(out)
+
+        assert any(p.text == chapter.plain_text for p in doc.paragraphs)
+
+
+def test_invalid_content_shapes_fall_back_to_plain_text(tmp_path):
+    template = _make_template(tmp_path, ["产品概述"])
+
+    for index, content in enumerate((None, "not-a-node-list", [None, "not-a-node", 7])):
+        chapter = _ch(
+            f"c{index}",
+            "产品概述",
+            {"type": "doc", "content": content},
+        )
+        chapter.plain_text = f"内容回退文本 {index}"
+
+        out = render_to_docx(f"docx-content-boundary-{index}", [chapter], template)
+        doc = Document(out)
+
+        assert any(p.text == chapter.plain_text for p in doc.paragraphs)
+
+
+def test_invalid_content_nodes_are_filtered_without_losing_valid_nodes(tmp_path):
+    content = {
+        "type": "doc",
+        "content": [
+            None,
+            {"type": "paragraph", "content": [{"type": "text", "text": "有效正文"}]},
+            "not-a-node",
+            7,
+        ],
+    }
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("docx-node-filter-boundary", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+
+    assert any(p.text == "有效正文" for p in doc.paragraphs)
+    assert not any(p.text == "(unused fallback)" for p in doc.paragraphs)
+
+
+def test_all_invalid_content_nodes_use_empty_placeholder(tmp_path):
+    content = {"type": "doc", "content": [None, "not-a-node", 7]}
+    template = _make_template(tmp_path, ["产品概述"])
+    chapter = _ch("c1", "产品概述", content)
+    chapter.plain_text = ""
+
+    out = render_to_docx("docx-invalid-node-placeholder", [chapter], template)
+    doc = Document(out)
+
+    assert any(p.text == "（内容待生成）" for p in doc.paragraphs)
+
+
 def test_no_template_builds_from_scratch_with_same_structure(tmp_path):
     content = {"type": "doc", "content": [
         {"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "子标题"}]},

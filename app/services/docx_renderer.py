@@ -76,9 +76,12 @@ def _chapter_nodes(chapter) -> list[dict]:
     if chapter.content_json:
         try:
             parsed = json.loads(chapter.content_json)
-            nodes.extend(parsed.get("content", []))
         except (json.JSONDecodeError, AttributeError):
             pass
+        else:
+            content = parsed.get("content") if isinstance(parsed, dict) else None
+            if isinstance(content, list):
+                nodes.extend(node for node in content if isinstance(node, dict))
     if not nodes and chapter.plain_text:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": chapter.plain_text}]})
 
