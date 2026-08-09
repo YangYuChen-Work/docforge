@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, datetime
 from types import SimpleNamespace
 
 from openpyxl import load_workbook
@@ -295,3 +295,112 @@ def test_xlsx_cells_use_explicit_cjk_font(tmp_path, monkeypatch):
     assert sheet["A2"].font.name == fonts.cjk
     assert sheet["A3"].font.name == fonts.cjk
     assert sheet["A4"].font.name == fonts.cjk
+
+
+def test_exporter_reads_production_prosemirror_tables_and_preserves_types(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "storage_root", str(tmp_path))
+    content = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "paragraph",
+                "content": [{"type": "text", "text": "核心性能参数表"}],
+            },
+            {
+                "type": "table",
+                "content": [
+                    {
+                        "type": "tableRow",
+                        "content": [
+                            {
+                                "type": "tableHeader",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "数量"}]}],
+                            },
+                            {
+                                "type": "tableHeader",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "启用"}]}],
+                            },
+                            {
+                                "type": "tableHeader",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "更新时间"}]}],
+                            },
+                            {
+                                "type": "tableHeader",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "说明"}]}],
+                            },
+                        ],
+                    },
+                    {
+                        "type": "tableRow",
+                        "content": [
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "80"}]}],
+                            },
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "true"}]}],
+                            },
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "2026-08-09T20:15:00+08:00"}]}],
+                            },
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "主臂系统"}]}],
+                            },
+                        ],
+                    },
+                    {
+                        "type": "tableRow",
+                        "content": [
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "81"}]}],
+                            },
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "false"}]}],
+                            },
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "2026-08-10T01:02:03Z"}]}],
+                            },
+                            {
+                                "type": "tableCell",
+                                "content": [{"type": "paragraph", "content": [{"type": "text", "text": "副臂系统"}]}],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+
+    out = export_tables_to_xlsx(
+        "doc-prosemirror",
+        [_chapter("产品参数", json.dumps(content, ensure_ascii=False))],
+    )
+
+    wb = _load(out)
+    assert wb.sheetnames == ["项目概览", "文档目录", "产品参数"]
+    sheet = wb["产品参数"]
+    assert sheet["A1"].value == "核心性能参数表"
+    assert sheet["A2"].value == "来源章节：产品参数"
+    assert [sheet.cell(row=3, column=column).value for column in range(1, 5)] == [
+        "数量",
+        "启用",
+        "更新时间",
+        "说明",
+    ]
+    assert sheet["A4"].value == 80
+    assert sheet["A4"].data_type == "n"
+    assert sheet["B4"].value is True
+    assert sheet["B4"].data_type == "b"
+    assert sheet["C4"].value == datetime(2026, 8, 9, 12, 15)
+    assert sheet["C4"].value.tzinfo is None
+    assert sheet["C4"].is_date
+    assert sheet["D4"].value == "主臂系统"
+    assert sheet["C5"].value == datetime(2026, 8, 10, 1, 2, 3)
+    assert sheet["C5"].value.tzinfo is None
+    assert sheet.sheet_properties.pageSetUpPr.fitToPage is True

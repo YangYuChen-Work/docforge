@@ -1,6 +1,7 @@
 import json
+import re
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
@@ -205,6 +206,7 @@ def _write_table_sheet(ws, chapter, table: dict) -> None:
     ws.page_setup.orientation = "landscape"
     ws.page_setup.fitToWidth = 1
     ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
     ws.print_title_rows = "1:3"
 
     _set_column_widths(ws, max_cols, headers, rows)
@@ -220,10 +222,99 @@ def _load_tables(content_json: str | None) -> list[dict]:
     if not isinstance(data, dict):
         return []
 
-    tables = data.get("tables", [])
-    if not isinstance(tables, list):
+    legacy_tables = data.get("tables", [])
+    if isinstance(legacy_tables, list):
+        valid_legacy_tables = [
+            table for table in legacy_tables if isinstance(table, dict) and table.get("headers")
+        ]
+        if valid_legacy_tables:
+            return valid_legacy_tables
+
+    content = data.get("content", [])
+    if not isinstance(content, list):
         return []
-    return [table for table in tables if isinstance(table, dict) and table.get("headers")]
+
+    tables = []
+    for index, node in enumerate(content):
+        if not isinstance(node, dict) or node.get("type") != "table":
+            continue
+        table = _prosemirror_table_to_dict(node, _prosemirror_table_title(content, index))
+        if table["headers"]:
+            tables.append(table)
+    return tables
+
+
+def _prosemirror_table_to_dict(table_node: dict, title: str | None) -> dict:
+    headers: list = []
+    rows: list[list] = []
+    header_found = False
+
+    for row_node in table_node.get("content", []):
+        if not isinstance(row_node, dict) or row_node.get("type") != "tableRow":
+            continue
+        cell_nodes = [cell for cell in row_node.get("content", []) if isinstance(cell, dict)]
+        if not cell_nodes:
+            continue
+
+        header_cells = [cell for cell in cell_nodes if cell.get("type") == "tableHeader"]
+        if header_cells and not header_found:
+            headers = [_prosemirror_cell_value(cell) for cell in header_cells]
+            header_found = True
+            continue
+
+        rows.append(
+            [
+                _prosemirror_cell_value(cell)
+                for cell in cell_nodes
+                if cell.get("type") in {"tableCell", "tableHeader"}
+            ]
+        )
+
+    if not headers and rows:
+        headers, rows = rows[0], rows[1:]
+
+    return {"title": title or "", "headers": headers, "rows": rows}
+
+
+def _prosemirror_table_title(content: list, table_index: int) -> str | None:
+    table_node = content[table_index]
+    attrs = table_node.get("attrs", {}) if isinstance(table_node, dict) else {}
+    if isinstance(attrs, dict):
+        for key in ("title", "caption"):
+            value = attrs.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+
+    if table_index == 0:
+        return None
+    previous = content[table_index - 1]
+    if isinstance(previous, dict) and previous.get("type") == "paragraph":
+        text = _prosemirror_node_text(previous).strip()
+        return text or None
+    return None
+
+
+def _prosemirror_cell_value(cell_node: dict) -> str:
+    paragraphs = []
+    for child in cell_node.get("content", []):
+        if not isinstance(child, dict):
+            continue
+        text = _prosemirror_node_text(child)
+        if child.get("type") == "paragraph" or text:
+            paragraphs.append(text)
+    return "\n".join(paragraphs)
+
+
+def _prosemirror_node_text(node: dict) -> str:
+    if node.get("type") == "text":
+        return str(node.get("text", ""))
+    if node.get("type") == "hardBreak":
+        return "\n"
+    return "".join(
+        _prosemirror_node_text(child)
+        for child in node.get("content", [])
+        if isinstance(child, dict)
+    )
 
 
 def _normalize_row(row: Iterable) -> list:
@@ -236,10 +327,19 @@ def _normalize_cell_value(value):
     if value is None or isinstance(value, (bool, int, float)):
         return value
     if isinstance(value, (datetime, date)):
-        return value
+        return _normalize_datetime(value) if isinstance(value, datetime) else value
     if isinstance(value, str):
         parsed = _parse_iso_date(value)
-        return parsed if parsed is not None else value
+        if parsed is not None:
+            return parsed
+        stripped = value.strip()
+        if stripped.lower() in {"true", "false"}:
+            return stripped.lower() == "true"
+        if re.fullmatch(r"[+-]?\d+", stripped):
+            return int(stripped)
+        if re.fullmatch(r"[+-]?(?:(?:\d+\.\d*|\.\d+)(?:[eE][+-]?\d+)?|\d+[eE][+-]?\d+)", stripped):
+            return float(stripped)
+        return value
     if isinstance(value, (list, tuple, set, dict)):
         return json.dumps(value, ensure_ascii=False)
     return str(value)
@@ -250,10 +350,16 @@ def _parse_iso_date(value: str):
         if len(value) == 10 and value[4] == "-" and value[7] == "-":
             return date.fromisoformat(value)
         if "T" in value or " " in value:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return _normalize_datetime(datetime.fromisoformat(value.replace("Z", "+00:00")))
     except ValueError:
         return None
     return None
+
+
+def _normalize_datetime(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _pad_row(row: list, size: int) -> list:
