@@ -3,29 +3,66 @@
     <!-- Editor Top Bar -->
     <div class="editor-topbar">
       <div class="editor-topbar-left">
-        <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
+        <div v-if="!renaming" class="editor-title-view">
+          <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
+          <button class="title-edit-btn" title="重命名文档" @click="startRename">✎</button>
+        </div>
+        <form v-else class="editor-title-form" @submit.prevent="saveRename">
+          <input
+            ref="titleInputRef"
+            v-model="titleDraft"
+            class="editor-title-input"
+            aria-label="文档名称"
+            maxlength="300"
+            @keydown.esc="cancelRename"
+          />
+          <button class="title-save-btn" type="submit" :disabled="renameSaving">保存</button>
+          <button class="title-cancel-btn" type="button" @click="cancelRename">取消</button>
+        </form>
         <span class="editor-breadcrumb">AI 文档助手 / 在线编辑</span>
         <span v-if="generating" class="badge badge-blue" style="margin-left:12px">章节生成中...</span>
+        <span v-if="renameError" class="title-error">{{ renameError }}</span>
       </div>
     </div>
 
-    <!-- Editor Toolbar (visual formatting bar, decorative like demo) -->
+    <!-- Editor Toolbar -->
     <div class="editor-toolbar">
-      <button class="tb-btn">↩</button>
-      <button class="tb-btn">↪</button>
+      <button class="tb-btn" title="撤销" @mousedown.prevent @click="runEditorCommand('undo')">↩</button>
+      <button class="tb-btn" title="重做" @mousedown.prevent @click="runEditorCommand('redo')">↪</button>
       <span class="tb-sep"></span>
-      <select class="tb-select"><option>正文</option><option>标题1</option><option>标题2</option></select>
-      <select class="tb-select" style="width:60px"><option>标题 1</option></select>
-      <select class="tb-select" style="width:50px"><option>11</option><option>14</option><option>16</option></select>
+      <select class="tb-select" aria-label="段落样式" :value="editorState.block" @change="changeBlockStyle">
+        <option value="paragraph">正文</option>
+        <option value="heading-1">标题 1</option>
+        <option value="heading-2">标题 2</option>
+        <option value="heading-3">标题 3</option>
+      </select>
+      <select class="tb-select tb-size-select" aria-label="字号" @change="changeFontSize">
+        <option value="12px">12</option>
+        <option value="14px" selected>14</option>
+        <option value="16px">16</option>
+        <option value="18px">18</option>
+        <option value="22px">22</option>
+      </select>
       <span class="tb-sep"></span>
-      <button class="tb-btn"><b>B</b></button>
-      <button class="tb-btn"><i>I</i></button>
-      <button class="tb-btn"><u>U</u></button>
+      <button class="tb-btn" :class="{ active: editorState.bold }" title="加粗" @mousedown.prevent @click="runEditorCommand('bold')"><b>B</b></button>
+      <button class="tb-btn" :class="{ active: editorState.italic }" title="斜体" @mousedown.prevent @click="runEditorCommand('italic')"><i>I</i></button>
+      <button class="tb-btn" :class="{ active: editorState.underline }" title="下划线" @mousedown.prevent @click="runEditorCommand('underline')"><u>U</u></button>
+      <button class="tb-btn" :class="{ active: editorState.highlight }" title="高亮" @mousedown.prevent @click="runEditorCommand('highlight')">▰</button>
       <span class="tb-sep"></span>
-      <button class="tb-btn">≡</button>
-      <button class="tb-btn">☰</button>
-      <button class="tb-btn">🔗</button>
-      <button class="tb-btn">⋯</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'left' }" title="左对齐" @mousedown.prevent @click="runEditorCommand('align', 'left')">≡</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'center' }" title="居中" @mousedown.prevent @click="runEditorCommand('align', 'center')">≡</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'right' }" title="右对齐" @mousedown.prevent @click="runEditorCommand('align', 'right')">≡</button>
+      <button class="tb-btn" :class="{ active: editorState.bulletList }" title="项目符号" @mousedown.prevent @click="runEditorCommand('bulletList')">•≡</button>
+      <button class="tb-btn" :class="{ active: editorState.orderedList }" title="编号列表" @mousedown.prevent @click="runEditorCommand('orderedList')">1≡</button>
+      <span class="tb-sep"></span>
+      <button class="tb-btn" :class="{ active: editorState.blockquote }" title="引用" @mousedown.prevent @click="runEditorCommand('blockquote')">❝</button>
+      <button class="tb-btn" title="插入链接" @mousedown.prevent @click="contentPanelRef?.setLink()">🔗</button>
+      <button class="tb-btn" title="清除格式" @mousedown.prevent @click="runEditorCommand('clear')">Tx</button>
+      <button class="tb-btn" title="更多格式" @mousedown.prevent @click="showMoreTools = !showMoreTools">⋯</button>
+      <div v-if="showMoreTools" class="toolbar-more-menu">
+        <button @mousedown.prevent @click="runEditorCommand('codeBlock'); showMoreTools = false">代码块</button>
+        <button @mousedown.prevent @click="runEditorCommand('horizontalRule'); showMoreTools = false">分隔线</button>
+      </div>
     </div>
 
     <!-- Editor Body: 3-column layout -->
@@ -47,6 +84,7 @@
         @export="doExport"
         @edit="onEdit"
         @selectionChange="selectionText = $event"
+        @editorStateChange="editorState = $event"
       />
       <AiPanel
         ref="aiPanelRef"
@@ -55,10 +93,8 @@
         :docId="docId"
         :selectionText="selectionText"
         @updateAnnotation="updateAnnotation"
-        @applyAiSuggestion="applyAiSuggestion"
         @replaceSelection="replaceSelection"
         @insertAtCursor="insertAtCursor"
-        @insertAnnotation="insertAnnotation"
         @aiAction="doAiAction"
       />
     </div>
@@ -90,11 +126,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import OutlinePanel from '../components/OutlinePanel.vue'
 import ContentPanel from '../components/ContentPanel.vue'
 import AiPanel from '../components/AiPanel.vue'
+import type { EditorToolbarState } from '../components/ContentPanel.vue'
 import {
   getDocument,
   getChapter,
@@ -103,9 +140,9 @@ import {
   regenerateChapter,
   aiAction as apiAiAction,
   listAnnotations,
-  createAnnotation,
   updateAnnotation as apiUpdateAnnotation,
   createChapter,
+  renameDocument,
 } from '../api/documents'
 import { createExport } from '../api/exports'
 
@@ -122,12 +159,30 @@ const regenInstruction = ref('')
 const aiPanelRef = ref()
 const contentPanelRef = ref()
 const selectionText = ref('')
+const editorState = ref<EditorToolbarState>({
+  block: 'paragraph',
+  bold: false,
+  italic: false,
+  underline: false,
+  highlight: false,
+  bulletList: false,
+  orderedList: false,
+  blockquote: false,
+  textAlign: 'left',
+})
+const renaming = ref(false)
+const renameSaving = ref(false)
+const renameError = ref('')
+const titleDraft = ref('')
+const titleInputRef = ref<HTMLInputElement | null>(null)
+const showMoreTools = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let genPollTimer: ReturnType<typeof setInterval> | null = null
 const generating = ref(false)
 
 onMounted(async () => {
   doc.value = await getDocument(docId)
+  titleDraft.value = doc.value.title || ''
   if (doc.value.chapters.length > 0) selectChapter(doc.value.chapters[0])
   // Generation now runs in a background thread on the backend (see
   // app/domain/generation.py _run_generation_in_background), so when the
@@ -159,7 +214,55 @@ function isStillGenerating(d: any) {
   return d.chapters.some((c: any) => c.status === 'pending' || c.status === 'generating')
 }
 
+function startRename() {
+  titleDraft.value = doc.value?.title || ''
+  renameError.value = ''
+  renaming.value = true
+  nextTick(() => titleInputRef.value?.select())
+}
+
+function cancelRename() {
+  renaming.value = false
+  renameError.value = ''
+  titleDraft.value = doc.value?.title || ''
+}
+
+async function saveRename() {
+  const title = titleDraft.value.trim()
+  if (!title) {
+    renameError.value = '文档名称不能为空'
+    return
+  }
+  renameSaving.value = true
+  renameError.value = ''
+  try {
+    const updated = await renameDocument(docId, title)
+    doc.value = { ...doc.value, title: updated.title }
+    titleDraft.value = updated.title
+    renaming.value = false
+  } catch (err: any) {
+    renameError.value = err.message || '保存文档名称失败'
+  } finally {
+    renameSaving.value = false
+  }
+}
+
+function runEditorCommand(command: string, value?: string) {
+  contentPanelRef.value?.runCommand(command, value)
+}
+
+function changeBlockStyle(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  runEditorCommand('block', value)
+}
+
+function changeFontSize(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  runEditorCommand('fontSize', value)
+}
+
 async function selectChapter(ch: any) {
+  selectionText.value = ''
   currentChapterId.value = ch.id
   currentChapter.value = await getChapter(docId, ch.id)
   annotations.value = await listAnnotations(docId, ch.id)
@@ -198,11 +301,12 @@ async function doRegenerate() {
 }
 
 async function doAiAction(action: string, selection: string, instruction: string) {
+  const hadSelection = Boolean(selection.trim())
   aiPanelRef.value?.setBusy(true)
   try {
     const result = await apiAiAction(docId, currentChapterId.value, { action, selection, instruction })
     const text = result.suggestion || (result.diagram_mermaid ? '架构图已生成，请查看正文下方' : '')
-    aiPanelRef.value?.addAiMessage(text || '(无返回内容)')
+    aiPanelRef.value?.addAiMessage(text || '(无返回内容)', hadSelection)
     if (action === 'generate_diagram' && result.diagram_mermaid) {
       currentChapter.value = await getChapter(docId, currentChapterId.value)
     }
@@ -211,16 +315,6 @@ async function doAiAction(action: string, selection: string, instruction: string
   } finally {
     aiPanelRef.value?.setBusy(false)
   }
-}
-
-async function applyAiSuggestion(content: string) {
-  // Kept for the annotation flow's own "apply" button (appends at the end).
-  // Selection-based edits go through replaceSelection/insertAtCursor below,
-  // which edit the live Tiptap document directly so content_json stays in
-  // sync with what's on screen (this function used to null out content_json,
-  // which made the editor silently drop the appended text since ContentPanel
-  // only ever renders content_json, never plain_text, once it's set).
-  insertAtCursor(content)
 }
 
 /** User picked "替换选中文字" on an AI suggestion: replace the selection that
@@ -235,16 +329,6 @@ function replaceSelection(content: string) {
 /** User picked "插入到光标处": insert without removing the current selection. */
 function insertAtCursor(content: string) {
   contentPanelRef.value?.insertAtCursor(content)
-}
-
-async function insertAnnotation(content: string) {
-  await createAnnotation(docId, currentChapterId.value, {
-    type: 'ai_suggestion',
-    label: 'AI 建议',
-    content,
-    status: 'pending',
-  })
-  annotations.value = await listAnnotations(docId, currentChapterId.value)
 }
 
 async function updateAnnotation(annotationId: string, status: string) {

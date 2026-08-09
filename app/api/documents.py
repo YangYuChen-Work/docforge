@@ -54,6 +54,17 @@ def get_document(doc_id: str, db: Session = Depends(get_db)):
     }
 
 
+@router.patch("/documents/{doc_id}")
+def rename_document(doc_id: str, body: dict, db: Session = Depends(get_db)):
+    title = (body or {}).get("title", "")
+    document = domain.rename_document(db, doc_id, title)
+    return {
+        "id": document.id,
+        "title": document.title,
+        "updated_at": document.updated_at.isoformat(),
+    }
+
+
 @router.post("/documents/{doc_id}/chapters")
 def create_chapter(doc_id: str, body: dict, db: Session = Depends(get_db)):
     title = (body or {}).get("title", "").strip()

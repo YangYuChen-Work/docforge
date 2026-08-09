@@ -58,6 +58,9 @@ class MockAIProvider:
         action_map = {
             "polish": f"【润色结果】{selection[:50]}（Mock 润色内容）",
             "expand": f"【扩写结果】{selection[:50]}\n\nMock 扩写补充段落。",
+            "summarize": f"【摘要结果】{selection[:80]}\n\nMock 已提炼本段核心信息。",
+            "shorten": f"【精简结果】{selection[:80]}（Mock 精简内容）",
+            "extract_points": "【要点结果】\n• 核心目标与适用范围\n• 关键约束与待确认信息\n• 后续执行建议",
             "review": "【审核结果】内容基本符合要求，建议补充具体数据来源。",
             "address_comments": f"【修改结果】已根据批注调整：{instruction[:50]}",
             "generate_diagram": (

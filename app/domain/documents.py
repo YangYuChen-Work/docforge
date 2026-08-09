@@ -32,6 +32,24 @@ def get_document(db: Session, doc_id: str) -> GeneratedDocument:
     return doc
 
 
+def rename_document(db: Session, doc_id: str, title: str) -> GeneratedDocument:
+    title = (title or "").strip()
+    if not title:
+        raise HTTPException(422, {"error_code": "TITLE_REQUIRED"})
+    if len(title) > 300:
+        raise HTTPException(422, {"error_code": "TITLE_TOO_LONG"})
+
+    doc = get_document(db, doc_id)
+    doc.title = title
+    db.commit()
+    db.refresh(doc)
+    audit_service.log(
+        db, "rename_document", "generated_document", doc.id,
+        result="success", payload_summary=title,
+    )
+    return doc
+
+
 def get_chapter(db: Session, doc_id: str, chapter_id: str) -> DocumentChapter:
     ch = (
         db.query(DocumentChapter)

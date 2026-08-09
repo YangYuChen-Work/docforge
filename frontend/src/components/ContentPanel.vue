@@ -97,6 +97,20 @@ import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { Highlight } from '@tiptap/extension-highlight'
+import { TextAlign } from '@tiptap/extension-text-align'
+import { FontSize, TextStyle } from '@tiptap/extension-text-style'
+
+export type EditorToolbarState = {
+  block: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  highlight: boolean
+  bulletList: boolean
+  orderedList: boolean
+  blockquote: boolean
+  textAlign: string
+}
 
 const props = defineProps<{ chapter: any }>()
 const emit = defineEmits<{
@@ -105,6 +119,7 @@ const emit = defineEmits<{
   export: [format: string]
   edit: [text: string, contentJson: string]
   selectionChange: [text: string]
+  editorStateChange: [state: EditorToolbarState]
 }>()
 const showExport = ref(false)
 const mermaidContainer = ref<HTMLElement>()
@@ -124,23 +139,136 @@ function parseContent(chapter: any) {
 const editor = useEditor({
   content: parseContent(props.chapter),
   extensions: [
-    StarterKit,
+    StarterKit.configure({
+      link: { openOnClick: false, autolink: true },
+      underline: {},
+    }),
     Table.configure({ resizable: false }),
     TableRow,
     TableHeader,
     TableCell,
     Highlight.configure({ multicolor: true }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    TextStyle,
+    FontSize,
   ],
-  editable: props.chapter?.status !== 'confirmed',
+  // Confirmation is a workflow state, not a formatting lock. A confirmed
+  // chapter can still receive deliberate manual edits.
+  editable: true,
+  onCreate({ editor }) {
+    emit('editorStateChange', getToolbarState(editor))
+  },
   onUpdate({ editor }) {
     emit('edit', editor.getText(), JSON.stringify(editor.getJSON()))
+    emit('editorStateChange', getToolbarState(editor))
   },
   onSelectionUpdate({ editor }) {
     const { from, to } = editor.state.selection
     const text = from === to ? '' : editor.state.doc.textBetween(from, to, ' ')
     emit('selectionChange', text)
+    emit('editorStateChange', getToolbarState(editor))
   },
 })
+
+function getToolbarState(instance: any): EditorToolbarState {
+  return {
+    block: instance.isActive('heading', { level: 1 })
+      ? 'heading-1'
+      : instance.isActive('heading', { level: 2 })
+        ? 'heading-2'
+        : instance.isActive('heading', { level: 3 })
+          ? 'heading-3'
+          : 'paragraph',
+    bold: instance.isActive('bold'),
+    italic: instance.isActive('italic'),
+    underline: instance.isActive('underline'),
+    highlight: instance.isActive('highlight'),
+    bulletList: instance.isActive('bulletList'),
+    orderedList: instance.isActive('orderedList'),
+    blockquote: instance.isActive('blockquote'),
+    textAlign: instance.isActive({ textAlign: 'center' })
+      ? 'center'
+      : instance.isActive({ textAlign: 'right' })
+        ? 'right'
+        : instance.isActive({ textAlign: 'justify' })
+          ? 'justify'
+          : 'left',
+  }
+}
+
+/** Commands used by DocEditor's shared toolbar. Keeping them here means
+ * toolbar actions operate on the live Tiptap document and use the same
+ * edit/save path as keyboard input. */
+function runCommand(command: string, value?: string) {
+  const instance = editor.value
+  if (!instance) return
+
+  const chain = instance.chain().focus()
+  switch (command) {
+    case 'undo':
+      chain.undo().run()
+      break
+    case 'redo':
+      chain.redo().run()
+      break
+    case 'block':
+      if (value === 'paragraph') chain.setParagraph().run()
+      else {
+        const level = Number(value?.replace('heading-', '') || 1) as 1 | 2 | 3
+        chain.toggleHeading({ level }).run()
+      }
+      break
+    case 'fontSize':
+      chain.setFontSize(value || '14px').run()
+      break
+    case 'bold':
+      chain.toggleBold().run()
+      break
+    case 'italic':
+      chain.toggleItalic().run()
+      break
+    case 'underline':
+      chain.toggleUnderline().run()
+      break
+    case 'highlight':
+      chain.toggleHighlight({ color: '#fff1a8' }).run()
+      break
+    case 'align':
+      chain.setTextAlign(value || 'left').run()
+      break
+    case 'bulletList':
+      chain.toggleBulletList().run()
+      break
+    case 'orderedList':
+      chain.toggleOrderedList().run()
+      break
+    case 'blockquote':
+      chain.toggleBlockquote().run()
+      break
+    case 'codeBlock':
+      chain.toggleCodeBlock().run()
+      break
+    case 'horizontalRule':
+      chain.setHorizontalRule().run()
+      break
+    case 'clear':
+      chain.clearNodes().unsetAllMarks().run()
+      break
+  }
+}
+
+function setLink() {
+  const instance = editor.value
+  if (!instance) return
+  const current = instance.getAttributes('link').href || ''
+  const url = window.prompt('输入链接地址', current || 'https://')
+  if (url === null) return
+  if (!url.trim()) {
+    instance.chain().focus().unsetLink().run()
+    return
+  }
+  instance.chain().focus().setLink({ href: url.trim() }).run()
+}
 
 /** Replace the currently selected range with plain text (used when the user
  * picks "replace selection" for an AI suggestion). Falls back to inserting
@@ -162,21 +290,22 @@ function insertAtCursor(text: string) {
   emit('edit', editor.value.getText(), JSON.stringify(editor.value.getJSON()))
 }
 
-defineExpose({ replaceSelection, insertAtCursor })
+defineExpose({ replaceSelection, insertAtCursor, runCommand, setLink })
 
 watch(
   () => props.chapter?.id,
   () => {
     if (!editor.value) return
-    editor.value.commands.setContent(parseContent(props.chapter))
-    editor.value.setEditable(props.chapter?.status !== 'confirmed')
+    editor.value.commands.setContent(parseContent(props.chapter), { emitUpdate: false })
+    editor.value.setEditable(true)
+    emit('editorStateChange', getToolbarState(editor.value))
   }
 )
 
 watch(
   () => props.chapter?.status,
   () => {
-    editor.value?.setEditable(props.chapter?.status !== 'confirmed')
+    editor.value?.setEditable(true)
   }
 )
 
@@ -290,6 +419,57 @@ onBeforeUnmount(() => {
 
 .word-body :deep(.ProseMirror) {
   outline: none;
+  min-height: 480px;
+  caret-color: #1677ff;
+}
+
+.word-body :deep(.ProseMirror:focus) {
+  outline: none;
+}
+
+.word-body :deep(ul),
+.word-body :deep(ol) {
+  padding-left: 2em;
+  margin: 10px 0;
+}
+
+.word-body :deep(li p) {
+  margin: 2px 0;
+  text-indent: 0;
+}
+
+.word-body :deep(blockquote) {
+  margin: 12px 0;
+  padding: 8px 14px;
+  border-left: 3px solid #91caff;
+  background: #f0f7ff;
+  color: #555;
+}
+
+.word-body :deep(pre) {
+  margin: 12px 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border-radius: 5px;
+  background: #1f2937;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+.word-body :deep(a) {
+  color: #1677ff;
+  text-decoration: underline;
+}
+
+.word-body :deep(hr) {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid #d9d9d9;
+}
+
+.word-body :deep(.selectedCell) {
+  background: #e6f4ff;
 }
 
 .alert-error {

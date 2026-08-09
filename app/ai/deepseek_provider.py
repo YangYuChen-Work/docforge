@@ -131,6 +131,9 @@ class DeepSeekProvider:
         action_prompts = {
             "polish": f"请润色以下文字，保持原意，改善表达流畅度：\n\n{selection}",
             "expand": f"请扩写以下内容，补充细节和背景：\n\n{selection}",
+            "summarize": f"请将以下内容提炼为一段简洁、准确的摘要，保留关键事实和数字：\n\n{selection}",
+            "shorten": f"请精简以下内容，删除重复和冗余表达，保留所有关键事实：\n\n{selection}",
+            "extract_points": f"请从以下内容中提取 3-6 条结构化要点，使用中文项目符号列表输出：\n\n{selection}",
             "review": f"请审阅以下内容，指出问题并给出修改建议：\n\n{selection}",
             "address_comments": (
                 f"请根据以下批注修改文字：\n批注：{instruction}\n\n原文：{selection}"
