@@ -3,8 +3,13 @@ from datetime import date
 from types import SimpleNamespace
 
 from openpyxl import load_workbook
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 from app.config import settings
+from app.db.models import DocumentChapter, DocumentTemplate, GeneratedDocument
+from app.db.session import Base
+from app.domain import exports as domain_exports
 from app.services.xlsx_exporter import export_tables_to_xlsx
 
 
@@ -55,6 +60,13 @@ def test_exporter_builds_overview_directory_and_table_sheets(tmp_path, monkeypat
                 ensure_ascii=False,
             ),
         ),
+        _chapter(
+            "含有、逗号'章节",
+            json.dumps(
+                {"tables": [_table("表D", ["名称"], [["X"]])]},
+                ensure_ascii=False,
+            ),
+        ),
         _chapter("坏JSON", "{not json"),
         _chapter("无表章", json.dumps({"paragraphs": []}, ensure_ascii=False)),
     ]
@@ -74,7 +86,12 @@ def test_exporter_builds_overview_directory_and_table_sheets(tmp_path, monkeypat
 
     wb = _load(out)
     assert wb.sheetnames[:2] == ["项目概览", "文档目录"]
-    assert wb.sheetnames[2:] == ["重复名称", "重复名称-2", "非法名称超长超长超长超长",]
+    assert wb.sheetnames[2:] == [
+        "重复名称",
+        "重复名称-2",
+        "非法名称超长超长超长超长",
+        "含有、逗号'章节",
+    ]
 
     overview = wb["项目概览"]
     assert overview["A1"].value == "导出概览"
@@ -95,13 +112,15 @@ def test_exporter_builds_overview_directory_and_table_sheets(tmp_path, monkeypat
     assert directory["C1"].value == "Sheet 名称"
     assert directory["D1"].value == "打开"
 
-    rows = list(directory.iter_rows(min_row=2, max_row=4, values_only=True))
+    rows = list(directory.iter_rows(min_row=2, max_row=5, values_only=True))
     assert rows[0][:3] == ("重复名称", 1, "重复名称")
     assert rows[0][3].startswith("=HYPERLINK(")
     assert rows[1][:3] == ("重复名称", 1, "重复名称-2")
     assert rows[1][3].startswith("=HYPERLINK(")
     assert rows[2][:3] == ("非法/名称:*?[]超长超长超长超长", 1, "非法名称超长超长超长超长")
     assert rows[2][3].startswith("=HYPERLINK(")
+    assert rows[3][:3] == ("含有、逗号'章节", 1, "含有、逗号'章节")
+    assert rows[3][3] == '=HYPERLINK("#\'含有、逗号\'\'章节\'!A1","打开")'
 
     sheet = wb["重复名称"]
     assert sheet.freeze_panes == "A4"
@@ -136,6 +155,110 @@ def test_exporter_builds_overview_directory_and_table_sheets(tmp_path, monkeypat
     assert "?" not in long_name.title
     assert "[" not in long_name.title
     assert "]" not in long_name.title
+
+
+def test_create_export_passes_xlsx_metadata_and_issue_summary(tmp_path, monkeypatch):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'export-meta.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    db = Session()
+
+    tpl = DocumentTemplate(
+        id="TPL1",
+        name="模板A",
+        phase="phase1",
+        category="cat1",
+        source_path=None,
+        export_format="xlsx",
+    )
+    doc = GeneratedDocument(
+        id="DOC1",
+        project_id="P001",
+        generation_task_id="TASK1",
+        template_id="TPL1",
+        title="演示文档",
+        status="confirmed",
+    )
+    chapters = [
+        DocumentChapter(
+            id="CH1",
+            document_id="DOC1",
+            title="章节1",
+            order_index=1,
+            status="confirmed",
+            missing_information_json="{bad json",
+            conflict_json="{bad json",
+        ),
+        DocumentChapter(
+            id="CH2",
+            document_id="DOC1",
+            title="章节2",
+            order_index=2,
+            status="confirmed",
+            missing_information_json=json.dumps(
+                ["缺失1", "缺失2", "缺失3", "缺失4", "缺失5", "缺失6"],
+                ensure_ascii=False,
+            ),
+            conflict_json=json.dumps(
+                [
+                    {"description": "冲突1"},
+                    {"description": "冲突2"},
+                    {"description": "冲突3"},
+                    {"description": "冲突4"},
+                    {"description": "冲突5"},
+                    {"description": "冲突6"},
+                ],
+                ensure_ascii=False,
+            ),
+        ),
+    ]
+    db.add_all([tpl, doc, *chapters])
+    db.commit()
+
+    captured = {}
+
+    monkeypatch.setattr(
+        domain_exports,
+        "validate_document",
+        lambda chapters, template_path: {
+            "passed": True,
+            "warnings": [],
+            "errors": [],
+            "can_export": True,
+            "has_missing_info": True,
+        },
+    )
+
+    def fake_export_tables_to_xlsx(doc_id, chapters, document_meta=None):
+        captured["doc_id"] = doc_id
+        captured["chapters"] = chapters
+        captured["document_meta"] = document_meta
+        fake_path = tmp_path / "fake.xlsx"
+        fake_path.write_bytes(b"fake")
+        return str(fake_path)
+
+    monkeypatch.setattr(
+        "app.services.xlsx_exporter.export_tables_to_xlsx",
+        fake_export_tables_to_xlsx,
+    )
+
+    export = domain_exports.create_export(db, "DOC1", "xlsx")
+
+    assert export.status == "completed"
+    assert export.output_path == str(tmp_path / "fake.xlsx")
+    assert captured["doc_id"] == "DOC1"
+    assert [ch.id for ch in captured["chapters"]] == ["CH1", "CH2"]
+    meta = captured["document_meta"]
+    assert meta["title"] == "演示文档"
+    assert meta["project_id"] == "P001"
+    assert meta["template_name"] == "模板A"
+    assert meta["status"] == "confirmed"
+    assert meta["missing_items"] == ["缺失1", "缺失2", "缺失3", "缺失4", "缺失5"]
+    assert meta["conflicts"] == ["冲突1", "冲突2", "冲突3", "冲突4", "冲突5"]
+    db.close()
 
 
 def test_exporter_falls_back_when_no_valid_tables_exist(tmp_path, monkeypatch):

@@ -45,7 +45,7 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
     _build_directory_header(directory)
 
     used_sheet_names: set[str] = set(overview.title for overview in wb.worksheets)
-    directory_rows: list[tuple[str, int, str]] = []
+    directory_rows: list[dict[str, object]] = []
     has_table = False
 
     for chapter in chapters:
@@ -66,26 +66,30 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
             has_table = True
 
         directory_rows.append(
-            (
-                getattr(chapter, "title", "") or "未命名章节",
-                len(chapter_sheet_names),
-                "、".join(chapter_sheet_names),
-            )
+            {
+                "chapter_title": getattr(chapter, "title", "") or "未命名章节",
+                "table_count": len(chapter_sheet_names),
+                "sheet_names": chapter_sheet_names,
+            }
         )
 
-    for row_index, (chapter_title, table_count, sheet_names) in enumerate(directory_rows, start=2):
+    for row_index, entry in enumerate(directory_rows, start=2):
+        chapter_title = entry["chapter_title"]
+        table_count = entry["table_count"]
+        sheet_names = entry["sheet_names"]
+        first_sheet_name = sheet_names[0] if sheet_names else ""
         directory.cell(row=row_index, column=1, value=chapter_title)
         directory.cell(row=row_index, column=2, value=table_count)
-        directory.cell(row=row_index, column=3, value=sheet_names)
-        open_cell = directory.cell(row=row_index, column=4, value=sheet_names.split("、")[0])
-        if sheet_names:
-            open_cell.value = f'=HYPERLINK("#\'{sheet_names.split("、")[0]}\'!A1","打开")'
+        directory.cell(row=row_index, column=3, value="、".join(sheet_names))
+        open_cell = directory.cell(row=row_index, column=4)
+        if first_sheet_name:
+            open_cell.value = f'=HYPERLINK("{_excel_sheet_target(first_sheet_name)}","打开")'
         for col in range(1, 5):
             cell = directory.cell(row=row_index, column=col)
             cell.font = BODY_FONT
             cell.border = NEUTRAL_BORDER
             cell.alignment = LEFT_WRAP if col != 4 else LINK_ALIGNMENT
-            if col == 4 and sheet_names:
+            if col == 4 and first_sheet_name:
                 cell.font = Font(color="0563C1", underline="single")
 
     if not has_table:
@@ -96,9 +100,6 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
             ws[cell].font = BODY_FONT
             ws[cell].alignment = LEFT_WRAP
         ws.column_dimensions["A"].width = 72
-    else:
-        _fit_directory_columns(directory)
-
     wb.save(str(out_path))
     return str(out_path)
 
@@ -153,10 +154,6 @@ def _build_directory_header(ws) -> None:
     ws.column_dimensions["B"].width = 12
     ws.column_dimensions["C"].width = 34
     ws.column_dimensions["D"].width = 12
-
-
-def _fit_directory_columns(ws) -> None:
-    ws.freeze_panes = "A2"
 
 
 def _write_table_sheet(ws, chapter, table: dict) -> None:
@@ -259,6 +256,11 @@ def _sanitize_sheet_name(name: str) -> str:
     cleaned = "".join(ch for ch in name if ch not in "\\/:*?[]")
     cleaned = cleaned.strip() or "Sheet"
     return cleaned[:31]
+
+
+def _excel_sheet_target(sheet_name: str) -> str:
+    escaped = sheet_name.replace("'", "''")
+    return f"#'{escaped}'!A1"
 
 
 def _unique_sheet_name(base_name: str, used_names: set[str]) -> str:
