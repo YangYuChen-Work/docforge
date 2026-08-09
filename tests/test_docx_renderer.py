@@ -248,9 +248,10 @@ def test_near_match_heading_uses_normalized_punctuation(tmp_path):
 
 
 def test_chapter_anchor_requires_exact_or_delimited_suffix(tmp_path):
-    content = lambda text: {"type": "doc", "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
-    ]}
+    def content(text):
+        return {"type": "doc", "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+        ]}
     template = _make_template(
         tmp_path,
         [
@@ -276,9 +277,10 @@ def test_chapter_anchor_requires_exact_or_delimited_suffix(tmp_path):
 
 
 def test_mixed_template_cleanup_preserves_unanchored_structure(tmp_path):
-    content = lambda text: {"type": "doc", "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
-    ]}
+    def content(text):
+        return {"type": "doc", "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+        ]}
     chapters = [
         _ch("c1", "第一章", content("生成第一章")),
         _ch("c2", "第二章", content("生成第二章")),
@@ -299,9 +301,10 @@ def test_mixed_template_cleanup_preserves_unanchored_structure(tmp_path):
 
 def test_real_template_preserves_structure_assets_and_removes_sample_body(tmp_path):
     assert REAL_TEMPLATE_PATH.exists()
-    content = lambda text: {"type": "doc", "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
-    ]}
+    def content(text):
+        return {"type": "doc", "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+        ]}
     chapters = [
         _ch("c1", "产品概述", content("真实模板生成内容")),
         _ch("c2", "功能性能定位", content("功能性能定位生成内容")),
@@ -402,9 +405,10 @@ def test_literal_page_text_does_not_count_as_page_field(tmp_path):
 
 
 def test_template_cleanup_preserves_structure_and_footer_page_fields(tmp_path):
-    content = lambda text: {"type": "doc", "content": [
-        {"type": "paragraph", "content": [{"type": "text", "text": text}]},
-    ]}
+    def content(text):
+        return {"type": "doc", "content": [
+            {"type": "paragraph", "content": [{"type": "text", "text": text}]},
+        ]}
     chapters = [
         _ch("c1", "第一章", content("生成第一章")),
         _ch("c2", "第二章", content("生成第二章")),
@@ -591,6 +595,145 @@ def test_all_invalid_content_nodes_use_empty_placeholder(tmp_path):
     doc = Document(out)
 
     assert any(p.text == "（内容待生成）" for p in doc.paragraphs)
+
+
+def test_malformed_nested_nodes_fall_back_to_plain_text(tmp_path):
+    content = {
+        "type": "doc",
+        "content": [
+            {"type": "paragraph", "attrs": None, "content": None},
+            {
+                "type": "bulletList",
+                "attrs": "wrong",
+                "content": [None, "not-a-list-item", {"type": "listItem", "content": None}],
+            },
+            {
+                "type": "table",
+                "attrs": [],
+                "content": [
+                    None,
+                    "not-a-row",
+                    {"type": "tableRow", "content": None},
+                    {
+                        "type": "tableRow",
+                        "content": [None, "not-a-cell", {"type": "tableCell", "content": None}],
+                    },
+                ],
+            },
+        ],
+    }
+    chapter = _ch("c1", "产品概述", content)
+    chapter.plain_text = "嵌套形状回退正文"
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("docx-nested-malformed-fallback", [chapter], template)
+    doc = Document(out)
+
+    assert any(p.text == chapter.plain_text for p in doc.paragraphs)
+    assert len(doc.tables) == 0
+
+
+def test_malformed_nested_nodes_are_filtered_while_valid_content_renders(tmp_path):
+    content = {
+        "type": "doc",
+        "content": [
+            {
+                "type": "heading",
+                "attrs": {"level": "wrong"},
+                "content": [None, "not-a-run", {"type": "text", "text": "有效标题"}],
+            },
+            {
+                "type": "paragraph",
+                "attrs": None,
+                "content": [
+                    None,
+                    "not-a-run",
+                    {"type": "text", "text": "有效正文", "marks": None},
+                    {"type": "text", "text": 7},
+                ],
+            },
+            {
+                "type": "bulletList",
+                "attrs": "wrong",
+                "content": [
+                    None,
+                    "not-a-list-item",
+                    {
+                        "type": "listItem",
+                        "attrs": None,
+                        "content": [
+                            None,
+                            {
+                                "type": "paragraph",
+                                "attrs": [],
+                                "content": [
+                                    None,
+                                    "not-a-run",
+                                    {
+                                        "type": "text",
+                                        "text": "有效列表",
+                                        "marks": [None, "wrong", {"type": "bold"}],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+            {
+                "type": "table",
+                "attrs": None,
+                "content": [
+                    None,
+                    "not-a-row",
+                    {
+                        "type": "tableRow",
+                        "content": [
+                            None,
+                            "not-a-cell",
+                            {
+                                "type": "tableHeader",
+                                "attrs": "wrong",
+                                "content": [
+                                    None,
+                                    {
+                                        "type": "paragraph",
+                                        "content": [None, {"type": "text", "text": "表头"}],
+                                    },
+                                ],
+                            },
+                            {
+                                "type": "tableCell",
+                                "attrs": [],
+                                "content": [
+                                    None,
+                                    "not-a-block",
+                                    {
+                                        "type": "paragraph",
+                                        "content": [
+                                            None,
+                                            {"type": "text", "text": "表格值", "marks": None},
+                                        ],
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+    }
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("docx-nested-malformed-filter", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+
+    assert any(p.text == "有效标题" and p.style.name == "Heading 1" for p in doc.paragraphs)
+    assert any(p.text == "有效正文" for p in doc.paragraphs)
+    assert any(p.text == "• 有效列表" for p in doc.paragraphs)
+    assert len(doc.tables) == 1
+    assert doc.tables[0].rows[0].cells[0].text == "表头"
+    assert doc.tables[0].rows[0].cells[1].text == "表格值"
 
 
 def test_no_template_builds_from_scratch_with_same_structure(tmp_path):

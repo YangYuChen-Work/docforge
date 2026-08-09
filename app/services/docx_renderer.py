@@ -73,17 +73,23 @@ def _chapter_nodes(chapter) -> list[dict]:
     exactly what ContentPanel.vue shows on screen (missingItems/conflictItems
     alert boxes + the Tiptap-rendered content_json body)."""
     nodes: list[dict] = []
-    if chapter.content_json:
+    content_json = getattr(chapter, "content_json", None)
+    if content_json:
         try:
-            parsed = json.loads(chapter.content_json)
-        except (json.JSONDecodeError, AttributeError):
+            parsed = json.loads(content_json)
+        except (TypeError, json.JSONDecodeError, AttributeError):
             pass
         else:
             content = parsed.get("content") if isinstance(parsed, dict) else None
             if isinstance(content, list):
-                nodes.extend(node for node in content if isinstance(node, dict))
-    if not nodes and chapter.plain_text:
-        nodes.append({"type": "paragraph", "content": [{"type": "text", "text": chapter.plain_text}]})
+                nodes.extend(
+                    sanitized
+                    for node in content
+                    if (sanitized := _sanitize_block_node(node)) is not None
+                )
+    plain_text = getattr(chapter, "plain_text", None)
+    if not nodes and isinstance(plain_text, str) and plain_text:
+        nodes.append({"type": "paragraph", "content": [{"type": "text", "text": plain_text}]})
 
     missing = _safe_json_list(getattr(chapter, "missing_information_json", None))
     if missing:
@@ -127,6 +133,134 @@ def _notice_node(label: str, detail: str, kind: str = "missing") -> dict:
     }
 
 
+def _node_content(node: dict) -> list | None:
+    if not isinstance(node, dict):
+        return None
+    if "content" not in node:
+        return []
+    content = node.get("content")
+    return content if isinstance(content, list) else None
+
+
+def _node_attrs(node: dict) -> dict:
+    if not isinstance(node, dict):
+        return {}
+    attrs = node.get("attrs")
+    return attrs if isinstance(attrs, dict) else {}
+
+
+def _sanitize_block_node(node) -> dict | None:
+    if not isinstance(node, dict):
+        return None
+
+    node_type = node.get("type")
+    if not isinstance(node_type, str):
+        return None
+
+    if node_type in ("paragraph", "heading"):
+        content = _node_content(node)
+        if content is None:
+            return None
+        runs = _sanitize_inline_content(content)
+        if content and not runs:
+            return None
+        return {"type": node_type, "attrs": _node_attrs(node), "content": runs}
+
+    if node_type in ("bulletList", "orderedList"):
+        content = _node_content(node)
+        if content is None:
+            return None
+        items = [_sanitize_list_item(item) for item in content]
+        items = [item for item in items if item is not None]
+        if not items:
+            return None
+        return {"type": node_type, "attrs": _node_attrs(node), "content": items}
+
+    if node_type == "table":
+        content = _node_content(node)
+        if content is None:
+            return None
+        rows = [_sanitize_table_row(row) for row in content]
+        rows = [row for row in rows if row is not None]
+        if not rows:
+            return None
+        return {"type": node_type, "attrs": _node_attrs(node), "content": rows}
+
+    # Keep unsupported but well-formed node types on the existing empty-
+    # paragraph path. Their malformed children are intentionally discarded.
+    return {"type": node_type}
+
+
+def _sanitize_inline_content(content: list) -> list[dict]:
+    runs = []
+    for run_node in content:
+        if not isinstance(run_node, dict) or run_node.get("type") != "text":
+            continue
+        text = run_node.get("text")
+        if not isinstance(text, str) or not text:
+            continue
+
+        raw_marks = run_node.get("marks")
+        marks = []
+        if isinstance(raw_marks, list):
+            marks = [
+                {"type": mark_type}
+                for mark in raw_marks
+                if isinstance(mark, dict)
+                and isinstance(mark_type := mark.get("type"), str)
+            ]
+        runs.append({"type": "text", "text": text, "marks": marks})
+    return runs
+
+
+def _sanitize_list_item(node) -> dict | None:
+    if not isinstance(node, dict) or node.get("type") != "listItem":
+        return None
+    content = _node_content(node)
+    if content is None:
+        return None
+
+    inner_nodes = []
+    for inner in content:
+        sanitized = _sanitize_block_node(inner)
+        if sanitized and sanitized["type"] in ("paragraph", "bulletList", "orderedList"):
+            inner_nodes.append(sanitized)
+    if not inner_nodes:
+        return None
+    return {"type": "listItem", "attrs": _node_attrs(node), "content": inner_nodes}
+
+
+def _sanitize_table_row(node) -> dict | None:
+    if not isinstance(node, dict) or node.get("type") != "tableRow":
+        return None
+    content = _node_content(node)
+    if content is None:
+        return None
+
+    cells = [_sanitize_table_cell(cell) for cell in content]
+    cells = [cell for cell in cells if cell is not None]
+    if not cells:
+        return None
+    return {"type": "tableRow", "attrs": _node_attrs(node), "content": cells}
+
+
+def _sanitize_table_cell(node) -> dict | None:
+    if not isinstance(node, dict) or node.get("type") not in ("tableCell", "tableHeader"):
+        return None
+    content = _node_content(node)
+    if content is None:
+        return None
+
+    blocks = []
+    for block in content:
+        sanitized = _sanitize_block_node(block)
+        if sanitized and sanitized["type"] in ("paragraph", "heading"):
+            blocks.append(sanitized)
+    if content and not blocks:
+        return None
+    return {"type": node["type"], "attrs": _node_attrs(node), "content": blocks}
+
+
 def _insert_nodes_after(doc: Document, heading_para, nodes: list[dict]):
     """Render each node by appending it to the end of `doc` (via the normal
     high-level python-docx API, so styles/borders/runs are built correctly),
@@ -148,10 +282,13 @@ def _append_node(doc: Document, node: dict):
 def _render_node_elements(doc: Document, node: dict) -> list:
     """Append `node` to the end of `doc` using python-docx's high-level API
     and return the created XML element(s), in document order."""
+    node = _sanitize_block_node(node)
+    if node is None:
+        return [doc.add_paragraph()._element]
     node_type = node.get("type")
 
     if node_type == "heading":
-        level = min(node.get("attrs", {}).get("level", 1), 3)
+        level = _heading_node_level(node)
         para = doc.add_paragraph(style=f"Heading {level}")
         _add_runs(para, node.get("content", []))
         _style_generated_heading(para)
@@ -161,8 +298,9 @@ def _render_node_elements(doc: Document, node: dict) -> list:
         para = doc.add_paragraph()
         _add_runs(para, node.get("content", []))
         _style_paragraph(para)
-        if node.get("attrs", {}).get("notice_kind"):
-            _style_notice(para, node["attrs"]["notice_kind"])
+        notice_kind = _node_attrs(node).get("notice_kind")
+        if isinstance(notice_kind, str) and notice_kind:
+            _style_notice(para, notice_kind)
         return [para._element]
 
     if node_type in ("bulletList", "orderedList"):
@@ -177,6 +315,9 @@ def _render_node_elements(doc: Document, node: dict) -> list:
 
 
 def _render_list(doc: Document, node: dict, ordered: bool) -> list:
+    node = _sanitize_block_node(node)
+    if node is None:
+        return []
     return _render_list_level(doc, node, ordered=ordered, level=0, number_prefix=())
 
 
@@ -188,13 +329,20 @@ def _render_list_level(
     number_prefix: tuple[int, ...],
 ) -> list:
     elements = []
-    attrs = node.get("attrs", {}) or {}
+    if not isinstance(node, dict):
+        return elements
+    attrs = _node_attrs(node)
     start = _list_start(attrs) if ordered else 1
 
-    for item_index, item in enumerate(node.get("content", [])):
+    content = _node_content(node) or []
+    for item_index, item in enumerate(content):
+        if not isinstance(item, dict) or item.get("type") != "listItem":
+            continue
         item_number = start + item_index
         paragraph_index = 0
-        for inner in item.get("content", []):
+        for inner in _node_content(item) or []:
+            if not isinstance(inner, dict):
+                continue
             inner_type = inner.get("type")
             if inner_type == "paragraph":
                 para = doc.add_paragraph()
@@ -227,8 +375,20 @@ def _render_list_level(
     return elements
 
 
+def _heading_node_level(node: dict) -> int:
+    raw_level = _node_attrs(node).get("level", 1)
+    try:
+        return max(1, min(int(raw_level), 3))
+    except (TypeError, ValueError):
+        return 1
+
+
 def _bullet_marker(level: int) -> str:
-    return ("•", "◦", "▪", "▫")[min(level, 3)]
+    try:
+        safe_level = max(0, int(level))
+    except (TypeError, ValueError):
+        safe_level = 0
+    return ("•", "◦", "▪", "▫")[min(safe_level, 3)]
 
 
 def _style_list_paragraph(paragraph, level: int):
@@ -238,6 +398,8 @@ def _style_list_paragraph(paragraph, level: int):
 
 
 def _list_start(attrs: dict) -> int:
+    if not isinstance(attrs, dict):
+        return 1
     try:
         return int(attrs.get("start", attrs.get("order", 1)))
     except (TypeError, ValueError):
@@ -245,11 +407,21 @@ def _list_start(attrs: dict) -> int:
 
 
 def _add_runs(paragraph, inline_content: list[dict]):
+    if not isinstance(inline_content, list):
+        return
     for run_node in inline_content:
-        text = run_node.get("text", "")
-        if not text:
+        if not isinstance(run_node, dict) or run_node.get("type") != "text":
             continue
-        marks = {m.get("type") for m in run_node.get("marks", [])}
+        text = run_node.get("text", "")
+        if not isinstance(text, str) or not text:
+            continue
+        raw_marks = run_node.get("marks", [])
+        marks = {
+            mark_type
+            for mark in raw_marks
+            if isinstance(mark, dict)
+            and isinstance(mark_type := mark.get("type"), str)
+        } if isinstance(raw_marks, list) else set()
         run = paragraph.add_run(text)
         _style_run_font(run)
         if "bold" in marks:
@@ -261,17 +433,21 @@ def _add_runs(paragraph, inline_content: list[dict]):
 
 
 def _render_table(doc: Document, node: dict):
-    rows = node.get("content", [])
+    node = _sanitize_block_node(node)
+    rows = node.get("content", []) if node is not None else []
     if not rows:
         return doc.add_paragraph()._element
 
-    n_cols = max(len(r.get("content", [])) for r in rows)
+    n_cols = max((len(row.get("content", [])) for row in rows), default=0)
+    if not n_cols:
+        return doc.add_paragraph()._element
     table = doc.add_table(rows=len(rows), cols=n_cols)
     _set_table_borders(table)
 
     for r, row_node in enumerate(rows):
-        is_header_row = row_node.get("content", [{}])[0].get("type") == "tableHeader"
-        for c, cell_node in enumerate(row_node.get("content", [])):
+        row_cells = row_node.get("content", [])
+        is_header_row = bool(row_cells) and row_cells[0].get("type") == "tableHeader"
+        for c, cell_node in enumerate(row_cells):
             cell = table.cell(r, c)
             cell.text = ""
             cell_para = cell.paragraphs[0]
@@ -297,7 +473,6 @@ def _style_table(table):
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
     table.autofit = False
 
-    n_cols = max(len(row.cells) for row in table.rows) if table.rows else 1
     total_width_twips = Cm(16.5).twips
     col_widths = _proportional_column_widths(table, total_width_twips)
     for row in table.rows:
@@ -909,10 +1084,16 @@ def _ensure_child(parent, tag_name: str):
 
 
 def _node_text(node: dict) -> str:
+    if not isinstance(node, dict):
+        return ""
     parts: list[str] = []
-    for child in node.get("content", []):
+    for child in _node_content(node) or []:
+        if not isinstance(child, dict):
+            continue
         if child.get("type") == "text":
-            parts.append(child.get("text", ""))
+            text = child.get("text", "")
+            if isinstance(text, str):
+                parts.append(text)
         else:
             parts.append(_node_text(child))
     return "".join(parts)
