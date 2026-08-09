@@ -46,6 +46,35 @@ def test_convert_to_pdf_raises_clear_error_for_missing_configured_libreoffice(
         convert_to_pdf(str(docx_path))
 
 
+@pytest.mark.parametrize(
+    ("configured_path", "launch_error"),
+    [
+        ("directory", PermissionError(13, "Permission denied")),
+        ("broken/soffice", OSError(5, "Input/output error")),
+    ],
+)
+def test_convert_to_pdf_raises_clear_error_for_invalid_configured_libreoffice_launch(
+    monkeypatch, tmp_path, configured_path, launch_error
+):
+    docx_path = tmp_path / "sample.docx"
+    docx_path.write_bytes(b"fake-docx")
+    libreoffice_path = tmp_path / configured_path
+    if configured_path == "directory":
+        libreoffice_path.mkdir()
+    monkeypatch.setattr(
+        pdf_exporter.settings, "libreoffice_path", str(libreoffice_path)
+    )
+
+    def fake_run(command, **_kwargs):
+        assert command[0] == str(libreoffice_path)
+        raise launch_error
+
+    monkeypatch.setattr(pdf_exporter.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="LibreOffice 未找到"):
+        convert_to_pdf(str(docx_path))
+
+
 def test_convert_to_pdf_gives_bundled_soffice_a_temporary_cjk_font_environment(
     monkeypatch, tmp_path
 ):
