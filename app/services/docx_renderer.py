@@ -17,7 +17,7 @@ from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_COLOR_INDEX
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Mm
+from docx.shared import Cm, Mm, Twips
 from app.config import get_storage_path
 from app.services.export_fonts import get_export_font_config
 
@@ -36,7 +36,6 @@ def render_to_docx(doc_id: str, chapters: list, template_source_path: str | None
     if template_source_path and Path(template_source_path).exists():
         shutil.copy2(template_source_path, out_path)
         doc = Document(str(out_path))
-        _configure_styles(doc)
         _inject_into_template(doc, chapters)
     else:
         doc = Document()
@@ -296,12 +295,12 @@ def _style_table(table):
     table.autofit = False
 
     n_cols = max(len(row.cells) for row in table.rows) if table.rows else 1
-    total_width = Cm(16.5)
-    col_widths = _proportional_column_widths(table, total_width)
+    total_width_twips = Cm(16.5).twips
+    col_widths = _proportional_column_widths(table, total_width_twips)
     for row in table.rows:
         for index, cell in enumerate(row.cells):
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
-            cell.width = col_widths[index]
+            cell.width = Twips(col_widths[index])
             _set_cell_width(cell, col_widths[index])
             _set_cell_margins(cell, top=90, start=100, bottom=90, end=100)
 
@@ -408,7 +407,7 @@ def _remove_template_placeholders(doc: Document, anchors: list[tuple[object, obj
                                 and next_element.tag == qn("w:tbl")
                             )
                             current.getparent().remove(current)
-                    else:
+                    elif _is_sample_placeholder_text(paragraph.text):
                         current.getparent().remove(current)
                 elif current.tag == qn("w:tbl") and (
                     current in replacement_elements
@@ -456,6 +455,8 @@ def _is_sample_placeholder_text(text: str) -> bool:
     if not compact:
         return False
     if any(marker in compact for marker in ("占位", "示例", "样例", "XXXX", "例：", "例:")):
+        return True
+    if "**规格的**" in compact or "**（用途和适用范围）" in compact:
         return True
     if any(
         marker in compact
@@ -753,7 +754,7 @@ def _set_cell_width(cell, width: int):
     tc_w.set(qn("w:type"), "dxa")
 
 
-def _proportional_column_widths(table, total_width):
+def _proportional_column_widths(table, total_width_twips: int):
     n_cols = max(len(row.cells) for row in table.rows) if table.rows else 1
     text_weights = [1] * n_cols
     for col_index in range(n_cols):
@@ -764,14 +765,14 @@ def _proportional_column_widths(table, total_width):
         text_weights[col_index] = max(1, min(col_text_length, 8))
 
     total_weight = sum(text_weights) or n_cols
-    min_width = int(total_width * 0.18)
-    remaining_width = max(int(total_width) - (min_width * n_cols), 0)
+    min_width = int(total_width_twips * 0.18)
+    remaining_width = max(total_width_twips - (min_width * n_cols), 0)
     widths = []
     for weight in text_weights:
         proportional_extra = int(remaining_width * weight / total_weight) if remaining_width else 0
         widths.append(min_width + proportional_extra)
 
-    width_delta = int(total_width) - sum(widths)
+    width_delta = total_width_twips - sum(widths)
     if widths and width_delta:
         widths[-1] += width_delta
     return widths

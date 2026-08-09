@@ -5,7 +5,7 @@ from docx import Document
 from docx.enum.section import WD_SECTION
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml.ns import qn
-from docx.shared import Mm
+from docx.shared import Cm, Mm
 from app.services.docx_renderer import render_to_docx
 from app.services.export_fonts import get_export_font_config
 from app.services.validator import validate_document
@@ -76,6 +76,32 @@ def _make_mixed_structure_template(tmp_path):
     doc.add_paragraph("模板占位内容")
 
     path = tmp_path / "mixed-structure-template.docx"
+    doc.save(str(path))
+    return str(path)
+
+
+def _make_template_with_appendix_tail(tmp_path):
+    doc = Document()
+    for title in ("第一章", "第二章"):
+        doc.add_heading(title, level=1)
+        doc.add_paragraph("模板占位内容")
+    doc.add_heading("附录 A", level=1)
+    doc.add_paragraph("附录普通尾部内容")
+    appendix_table = doc.add_table(rows=1, cols=1)
+    appendix_table.cell(0, 0).text = "附录结构表格"
+
+    path = tmp_path / "appendix-tail-template.docx"
+    doc.save(str(path))
+    return str(path)
+
+
+def _make_styled_template(tmp_path):
+    doc = Document()
+    doc.styles["Normal"].font.name = "Template Body"
+    for level in range(1, 4):
+        doc.styles[f"Heading {level}"].font.name = f"Template Heading {level}"
+    doc.add_heading("产品概述", level=1)
+    path = tmp_path / "styled-template.docx"
     doc.save(str(path))
     return str(path)
 
@@ -585,6 +611,83 @@ def test_table_rendering_adds_borders_and_header_shading(tmp_path):
     first_col_width = int(table.rows[1].cells[0]._tc.tcPr.find(qn("w:tcW")).get(qn("w:w")))
     second_col_width = int(table.rows[1].cells[1]._tc.tcPr.find(qn("w:tcW")).get(qn("w:w")))
     assert second_col_width > first_col_width
+
+
+def test_generated_table_width_xml_uses_word_dxa_twips(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "table", "content": [
+            {"type": "tableRow", "content": [
+                {"type": "tableHeader", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "编号"}]}]},
+                {"type": "tableHeader", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "较长的说明列"}]}]},
+            ]},
+            {"type": "tableRow", "content": [
+                {"type": "tableCell", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "1"}]}]},
+                {"type": "tableCell", "content": [{"type": "paragraph", "content": [{"type": "text", "text": "正文"}]}]},
+            ]},
+        ]},
+    ]}
+    template = _make_template(tmp_path, ["产品概述"])
+
+    out = render_to_docx("docx-width-regression", [_ch("c1", "产品概述", content)], template)
+    doc = Document(out)
+    row_widths = [
+        table_cell._tc.tcPr.find(qn("w:tcW"))
+        for table_cell in doc.tables[0].rows[1].cells
+    ]
+
+    assert all(width.get(qn("w:type")) == "dxa" for width in row_widths)
+    assert sum(int(width.get(qn("w:w"))) for width in row_widths) == Cm(16.5).twips
+    assert all(0 < int(width.get(qn("w:w"))) < 10000 for width in row_widths)
+
+
+def test_template_cleanup_retains_ordinary_appendix_tail_content(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "生成内容"}]},
+    ]}
+    template = _make_template_with_appendix_tail(tmp_path)
+
+    out = render_to_docx(
+        "docx-appendix-tail-regression",
+        [_ch("c1", "第一章", content), _ch("c2", "第二章", content)],
+        template,
+    )
+    doc = Document(out)
+    body_text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
+
+    assert "模板占位内容" not in body_text
+    assert "附录 A" in body_text
+    assert "附录普通尾部内容" in body_text
+    assert any(
+        cell.text == "附录结构表格"
+        for table in doc.tables
+        for row in table.rows
+        for cell in row.cells
+    )
+
+
+def test_template_rendering_preserves_normal_and_heading_styles(tmp_path):
+    content = {"type": "doc", "content": [
+        {"type": "paragraph", "content": [{"type": "text", "text": "生成内容"}]},
+    ]}
+    template = _make_styled_template(tmp_path)
+
+    out = render_to_docx(
+        "docx-template-style-regression",
+        [_ch("c1", "产品概述", content)],
+        template,
+    )
+    doc = Document(out)
+
+    assert doc.styles["Normal"].font.name == "Template Body"
+    for level in range(1, 4):
+        assert doc.styles[f"Heading {level}"].font.name == f"Template Heading {level}"
+    generated_run = next(
+        run
+        for paragraph in doc.paragraphs
+        for run in paragraph.runs
+        if run.text == "生成内容"
+    )
+    assert generated_run._element.rPr.rFonts.get(qn("w:eastAsia")) == get_export_font_config().cjk
 
 
 def core_title(doc: Document) -> str:
