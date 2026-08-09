@@ -12,6 +12,14 @@ from pathlib import Path
 DEFAULT_LATIN_FONT = "Arial"
 DEFAULT_CJK_FALLBACK = "Noto Sans CJK SC"
 
+_MACOS_FONT_SEARCH_ROOTS = (
+    Path("/System/Library/Fonts/Supplemental"),
+    Path("/System/Library/Fonts"),
+    Path("/Library/Fonts"),
+    Path("/System/Library/AssetsV2"),
+    Path("/System/Library/Assets"),
+)
+
 
 @dataclass(frozen=True)
 class ExportFontConfig:
@@ -52,16 +60,11 @@ def find_export_font_file(font_name: str, system_name: str | None = None) -> Pat
     if not filename:
         return None
 
-    for root in (
-        Path("/System/Library/Fonts"),
-        Path("/Library/Fonts"),
-        Path("/System/Library/AssetsV2"),
-        Path("/System/Library/Assets"),
-    ):
+    for root in _MACOS_FONT_SEARCH_ROOTS:
         candidate = root / filename
         if candidate.is_file():
             return candidate
-        if root.is_dir() and root.name in {"AssetsV2", "Assets"}:
+        if root.is_dir() and root.name in {"Supplemental", "AssetsV2", "Assets"}:
             try:
                 candidate = next(root.rglob(filename), None)
             except OSError:
