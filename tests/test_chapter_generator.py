@@ -232,7 +232,15 @@ def test_generate_chapter_rolls_back_final_citations_when_postprocessing_fails(t
 
         class Provider:
             def generate_chapter(self, request):
-                return _result(citations=[])
+                return _result(
+                    citations=[
+                        CitationItem(
+                            "source-postprocessing",
+                            "第9页",
+                            "模型最终引用（不应在失败后保留）",
+                        )
+                    ]
+                )
 
         result = generate_chapter(
             db,
