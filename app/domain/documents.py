@@ -52,8 +52,8 @@ def rename_document(db: Session, doc_id: str, title: str) -> GeneratedDocument:
     return doc
 
 
-def delete_document(db: Session, doc_id: str) -> dict:
-    doc = get_document(db, doc_id)
+def _delete_document_records(db: Session, doc: GeneratedDocument) -> str:
+    """Delete one document and all database records owned by its chapters."""
     title = doc.title
     chapter_ids = [
         chapter_id
@@ -80,18 +80,76 @@ def delete_document(db: Session, doc_id: str) -> dict:
         synchronize_session=False
     )
     db.delete(doc)
-    db.commit()
+    return title
 
+
+def _delete_generated_output(doc_id: str) -> None:
     generated_root = get_storage_path("generated").resolve()
     output_dir = (generated_root / doc_id).resolve()
     if generated_root in output_dir.parents and output_dir.is_dir():
         shutil.rmtree(output_dir)
+
+
+def delete_document(db: Session, doc_id: str) -> dict:
+    doc = get_document(db, doc_id)
+    title = _delete_document_records(db, doc)
+    db.commit()
+
+    _delete_generated_output(doc_id)
 
     audit_service.log(
         db, "delete_document", "generated_document", doc_id,
         result="success", payload_summary=title,
     )
     return {"id": doc_id, "deleted": True}
+
+
+def delete_documents(db: Session, doc_ids: list[str]) -> dict:
+    """Delete multiple documents in one database transaction."""
+    if not isinstance(doc_ids, list):
+        raise HTTPException(422, {"error_code": "DOCUMENT_IDS_REQUIRED"})
+
+    unique_ids = list(
+        dict.fromkeys(
+            doc_id.strip()
+            for doc_id in doc_ids
+            if isinstance(doc_id, str) and doc_id.strip()
+        )
+    )
+    if not unique_ids:
+        raise HTTPException(422, {"error_code": "DOCUMENT_IDS_REQUIRED"})
+
+    documents = (
+        db.query(GeneratedDocument)
+        .filter(GeneratedDocument.id.in_(unique_ids))
+        .all()
+    )
+    found_ids = {doc.id for doc in documents}
+    missing_ids = [doc_id for doc_id in unique_ids if doc_id not in found_ids]
+    if missing_ids:
+        raise HTTPException(
+            404,
+            {
+                "error_code": "DOCUMENT_NOT_FOUND",
+                "document_ids": missing_ids,
+            },
+        )
+
+    titles = {doc.id: _delete_document_records(db, doc) for doc in documents}
+    db.commit()
+
+    for doc_id in unique_ids:
+        _delete_generated_output(doc_id)
+        audit_service.log(
+            db,
+            "delete_document",
+            "generated_document",
+            doc_id,
+            result="success",
+            payload_summary=titles[doc_id],
+        )
+
+    return {"ids": unique_ids, "deleted": True, "deleted_count": len(unique_ids)}
 
 
 def get_chapter(db: Session, doc_id: str, chapter_id: str) -> DocumentChapter:

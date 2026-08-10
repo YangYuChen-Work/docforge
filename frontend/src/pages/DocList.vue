@@ -53,15 +53,39 @@
             :key="tab"
             class="cat-tab"
             :class="{ active: currentTab === tab }"
-            @click="currentTab = tab"
+            @click="selectCategory(tab)"
           >
             {{ tab }}
           </button>
         </div>
         <div v-if="deleteError" class="doc-action-error" role="alert">{{ deleteError }}</div>
+        <div class="doc-bulk-toolbar">
+          <label class="doc-select-all">
+            <input
+              ref="selectAllRef"
+              type="checkbox"
+              :checked="allVisibleSelected"
+              :indeterminate="someVisibleSelected && !allVisibleSelected"
+              :disabled="filteredDocs.length === 0 || bulkDeleting"
+              aria-label="全选当前列表文档"
+              @change="toggleSelectAll"
+            />
+            <span>全选</span>
+          </label>
+          <span v-if="selectedIds.length" class="doc-selected-count">已选 {{ selectedIds.length }} 项</span>
+          <button
+            class="doc-bulk-delete-btn"
+            type="button"
+            :disabled="selectedIds.length === 0 || bulkDeleting"
+            @click="removeSelectedDocuments"
+          >
+            {{ bulkDeleting ? '批量删除中…' : '批量删除' }}
+          </button>
+        </div>
         <table class="doc-table">
           <thead>
             <tr>
+              <th class="doc-select-header">选择</th>
               <th>项目文档</th>
               <th>项目</th>
               <th>状态</th>
@@ -71,9 +95,20 @@
           </thead>
           <tbody>
             <tr v-if="!loading && filteredDocs.length === 0">
-              <td colspan="5" style="text-align: center; color: #999; padding: 40px">暂无匹配文档</td>
+              <td colspan="6" style="text-align: center; color: #999; padding: 40px">暂无匹配文档</td>
             </tr>
             <tr v-for="doc in filteredDocs" :key="doc.id" @click="$router.push(`/doc/${doc.id}`)">
+              <td class="doc-select-cell">
+                <input
+                  type="checkbox"
+                  class="doc-row-checkbox"
+                  :checked="isSelected(doc.id)"
+                  :disabled="bulkDeleting || deletingId === doc.id"
+                  :aria-label="`选择 ${doc.title}`"
+                  @click.stop
+                  @change="toggleDocumentSelection(doc.id)"
+                />
+              </td>
               <td>
                 <div class="doc-name">{{ doc.title }}</div>
                 <div class="doc-meta">{{ doc.template_name }}</div>
@@ -84,7 +119,7 @@
               <td class="doc-actions-cell">
                 <button
                   class="doc-delete-btn"
-                  :disabled="deletingId === doc.id"
+                  :disabled="deletingId === doc.id || bulkDeleting"
                   title="删除项目文档"
                   @click.stop="removeDocument(doc)"
                 >
@@ -137,8 +172,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { deleteDocument, listDocuments } from '../api/documents'
+import { ref, onMounted, computed, watch } from 'vue'
+import { batchDeleteDocuments, deleteDocument, listDocuments } from '../api/documents'
 import { listProjects } from '../api/projects'
 import { listTemplates } from '../api/templates'
 
@@ -146,6 +181,9 @@ const docs = ref<any[]>([])
 const search = ref('')
 const loading = ref(false)
 const deletingId = ref('')
+const bulkDeleting = ref(false)
+const selectedIds = ref<string[]>([])
+const selectAllRef = ref<HTMLInputElement | null>(null)
 const deleteError = ref('')
 
 const categoryTabs = ['全部', '设计类', '分析类', '评审类']
@@ -170,12 +208,56 @@ const filteredDocs = computed(() => {
   return docs.value.filter((d) => (d.template_name || '').includes(keyword))
 })
 
+const allVisibleSelected = computed(() =>
+  filteredDocs.value.length > 0 && filteredDocs.value.every((doc) => selectedIds.value.includes(doc.id)),
+)
+const someVisibleSelected = computed(() =>
+  filteredDocs.value.some((doc) => selectedIds.value.includes(doc.id)),
+)
+
+watch(
+  [allVisibleSelected, someVisibleSelected],
+  () => {
+    if (selectAllRef.value) {
+      selectAllRef.value.indeterminate = someVisibleSelected.value && !allVisibleSelected.value
+    }
+  },
+  { flush: 'post' },
+)
+
+function selectCategory(tab: string) {
+  currentTab.value = tab
+  selectedIds.value = []
+}
+
 async function loadDocs() {
   loading.value = true
   try {
-    docs.value = await listDocuments({ search: search.value || undefined })
+    const nextDocs = await listDocuments({ search: search.value || undefined })
+    docs.value = nextDocs
+    const availableIds = new Set(nextDocs.map((doc: any) => doc.id))
+    selectedIds.value = selectedIds.value.filter((id) => availableIds.has(id))
   } finally {
     loading.value = false
+  }
+}
+
+function isSelected(id: string) {
+  return selectedIds.value.includes(id)
+}
+
+function toggleDocumentSelection(id: string) {
+  selectedIds.value = isSelected(id)
+    ? selectedIds.value.filter((selectedId) => selectedId !== id)
+    : [...selectedIds.value, id]
+}
+
+function toggleSelectAll() {
+  const visibleIds = filteredDocs.value.map((doc) => doc.id)
+  if (allVisibleSelected.value) {
+    selectedIds.value = selectedIds.value.filter((id) => !visibleIds.includes(id))
+  } else {
+    selectedIds.value = [...new Set([...selectedIds.value, ...visibleIds])]
   }
 }
 
@@ -206,6 +288,7 @@ async function removeDocument(doc: any) {
   try {
     await deleteDocument(doc.id)
     docs.value = docs.value.filter((item) => item.id !== doc.id)
+    selectedIds.value = selectedIds.value.filter((id) => id !== doc.id)
   } catch (err: any) {
     if (err.status === 404) {
       // The list can be stale if this document was already removed elsewhere.
@@ -216,6 +299,25 @@ async function removeDocument(doc: any) {
     deleteError.value = `删除失败：${err.message || '未知错误'}`
   } finally {
     deletingId.value = ''
+  }
+}
+
+async function removeSelectedDocuments() {
+  const ids = [...selectedIds.value]
+  if (ids.length === 0) return
+  if (!window.confirm(`确定批量删除选中的 ${ids.length} 个项目文档吗？\n文档章节、版本和导出记录都会一并删除。`)) return
+
+  bulkDeleting.value = true
+  deleteError.value = ''
+  try {
+    await batchDeleteDocuments(ids)
+    const selectedSet = new Set(ids)
+    docs.value = docs.value.filter((item) => !selectedSet.has(item.id))
+    selectedIds.value = selectedIds.value.filter((id) => !selectedSet.has(id))
+  } catch (err: any) {
+    deleteError.value = `批量删除失败：${err.message || '未知错误'}`
+  } finally {
+    bulkDeleting.value = false
   }
 }
 
@@ -235,3 +337,15 @@ onMounted(async () => {
   }
 })
 </script>
+
+<style scoped>
+.doc-bulk-toolbar { display: flex; align-items: center; gap: 12px; min-height: 34px; margin: -2px 0 8px; }
+.doc-select-all { display: inline-flex; align-items: center; gap: 6px; color: #475467; font-size: 12px; cursor: pointer; }
+.doc-select-all input, .doc-row-checkbox { width: 15px; height: 15px; accent-color: #1677ff; cursor: pointer; }
+.doc-select-all input:disabled, .doc-row-checkbox:disabled { cursor: wait; }
+.doc-selected-count { color: #1677ff; font-size: 12px; }
+.doc-bulk-delete-btn { padding: 5px 10px; border: 1px solid #ffccc7; border-radius: 5px; background: #fff; color: #cf1322; cursor: pointer; font-size: 12px; }
+.doc-bulk-delete-btn:hover:not(:disabled) { border-color: #ff4d4f; background: #fff1f0; }
+.doc-bulk-delete-btn:disabled { cursor: not-allowed; opacity: .45; }
+.doc-select-header, .doc-select-cell { width: 44px; text-align: center !important; }
+</style>

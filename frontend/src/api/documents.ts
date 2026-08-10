@@ -8,6 +8,8 @@ export const renameDocument = (id: string, title: string) =>
 
 export const deleteDocument = (id: string) =>
   client.delete(`/documents/${id}`).then((r) => r.data)
+export const batchDeleteDocuments = (ids: string[]) =>
+  client.post('/documents/batch-delete', { document_ids: ids }).then((r) => r.data)
 export const getChapter = (docId: string, chapId: string) =>
   client.get(`/documents/${docId}/chapters/${chapId}`).then((r) => r.data)
 export const createChapter = (docId: string, title: string) =>

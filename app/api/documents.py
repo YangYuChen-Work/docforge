@@ -76,6 +76,11 @@ def rename_document(doc_id: str, body: dict, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/documents/batch-delete")
+def batch_delete_documents(body: dict | None = None, db: Session = Depends(get_db)):
+    return domain.delete_documents(db, (body or {}).get("document_ids", []))
+
+
 @router.delete("/documents/{doc_id}")
 def delete_document(doc_id: str, db: Session = Depends(get_db)):
     return domain.delete_document(db, doc_id)
