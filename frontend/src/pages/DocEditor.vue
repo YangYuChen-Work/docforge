@@ -20,7 +20,9 @@
           <button class="title-cancel-btn" type="button" @click="cancelRename">取消</button>
         </form>
         <span class="editor-breadcrumb">AI 文档助手 / 在线编辑</span>
-        <span v-if="generating" class="badge badge-blue" style="margin-left:12px">章节生成中...</span>
+        <span v-if="generating" class="badge badge-blue" style="margin-left:12px" :title="generationProgress">
+          {{ generationProgress }}
+        </span>
         <span v-if="renameError" class="title-error">{{ renameError }}</span>
       </div>
     </div>
@@ -83,25 +85,42 @@
         :hasUnsavedChanges="hasUnsavedChanges"
         :isSaving="isSaving"
         @save="saveCurrentChapter"
+        :annotations="annotations"
+        :citations="chapterCitations"
+        :activeAnnotationId="activeAnnotationId"
+        :activeCitationKey="activeCitationKey"
         @confirm="confirmChapter"
         @regenerate="showRegenModal = true"
         @export="doExport"
         @edit="onEdit"
         @selectionChange="selectionText = $event"
         @editorStateChange="editorState = $event"
+        @annotationSelect="onAnnotationSelect"
+        @citationSelect="onCitationSelect"
+        @focusResult="showFocusMessage"
       />
       <AiPanel
         ref="aiPanelRef"
         :annotations="annotations"
+        :citations="chapterCitations"
+        :sourceDetails="sourceDetails"
         :chapterId="currentChapterId"
         :docId="docId"
         :selectionText="selectionText"
+        :activeAnnotationId="activeAnnotationId"
+        :activeCitationKey="activeCitationKey"
         @updateAnnotation="updateAnnotation"
         @replaceSelection="replaceSelection"
         @insertAtCursor="insertAtCursor"
         @aiAction="doAiAction"
+        @createAnnotation="handleCreateAnnotation"
+        @annotationFocus="focusAnnotation"
+        @citationFocus="focusCitation"
+        @commentAiAction="handleCommentAiAction"
       />
     </div>
+
+    <div v-if="focusMessage" class="editor-focus-message" role="status">{{ focusMessage }}</div>
 
     <div v-if="showRegenModal" class="modal-overlay">
       <div class="modal" style="width:420px">
@@ -130,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import OutlinePanel from '../components/OutlinePanel.vue'
 import ContentPanel from '../components/ContentPanel.vue'
@@ -144,11 +163,13 @@ import {
   regenerateChapter,
   aiAction as apiAiAction,
   listAnnotations,
+  createAnnotation as apiCreateAnnotation,
   updateAnnotation as apiUpdateAnnotation,
   createChapter,
   renameDocument,
 } from '../api/documents'
 import { createExport } from '../api/exports'
+import { getSource } from '../api/sources'
 
 const route = useRoute()
 const docId = route.params.docId as string
@@ -156,6 +177,10 @@ const doc = ref<any>(null)
 const currentChapterId = ref('')
 const currentChapter = ref<any>(null)
 const annotations = ref<any[]>([])
+const sourceDetails = ref<Record<string, any>>({})
+const activeAnnotationId = ref('')
+const activeCitationKey = ref('')
+const focusMessage = ref('')
 const saveStatus = ref('已保存')
 const savedAt = ref('')
 const hasUnsavedChanges = ref(false)
@@ -190,6 +215,25 @@ let savedSnapshot: ChapterSavePayload | null = null
 let pendingSave: { chapterId: string; payload: ChapterSavePayload } | null = null
 let saveRequest: Promise<boolean> | null = null
 const generating = ref(false)
+let focusMessageTimer: ReturnType<typeof setTimeout> | null = null
+
+const chapterCitations = computed(() =>
+  (currentChapter.value?.citations || []).map((citation: any, index: number) => ({
+    ...citation,
+    key: citation.key || `${citation.source_document_id}:${index}`,
+  })),
+)
+
+const generationProgress = computed(() => {
+  const chapters = doc.value?.chapters || []
+  if (chapters.length === 0) return '章节生成中...'
+  const active = chapters.find((chapter: any) => chapter.status === 'generating')
+  const finished = chapters.filter((chapter: any) => !['pending', 'generating'].includes(chapter.status)).length
+  if (active) {
+    return `第 ${active.order_index || finished + 1}/${chapters.length} 章生成中：${active.title}`
+  }
+  return `等待生成：${finished}/${chapters.length}`
+})
 
 onMounted(async () => {
   window.addEventListener('keydown', handleSaveShortcut)
@@ -206,7 +250,11 @@ onMounted(async () => {
     genPollTimer = setInterval(async () => {
       doc.value = await getDocument(docId)
       if (currentChapterId.value) {
-        currentChapter.value = await getChapter(docId, currentChapterId.value)
+        const polledChapter = await getChapter(docId, currentChapterId.value)
+        if (polledChapter.id === currentChapterId.value && !hasUnsavedChanges.value && !isSaving.value) {
+          currentChapter.value = polledChapter
+          await loadSourceDetails(polledChapter.citations || [], polledChapter.id)
+        }
       }
       if (!isStillGenerating(doc.value)) {
         generating.value = false
@@ -221,6 +269,7 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleSaveShortcut)
   if (saveTimer) clearTimeout(saveTimer)
   if (genPollTimer) clearInterval(genPollTimer)
+  if (focusMessageTimer) clearTimeout(focusMessageTimer)
 })
 
 function isStillGenerating(d: any) {
@@ -345,15 +394,41 @@ async function flushPendingSave() {
 
 async function selectChapter(ch: any) {
   if (currentChapterId.value && !(await flushPendingSave())) return
+  const chapterId = ch.id
   selectionText.value = ''
-  currentChapterId.value = ch.id
-  currentChapter.value = await getChapter(docId, ch.id)
-  savedSnapshot = payloadFromChapter(currentChapter.value)
+  activeAnnotationId.value = ''
+  activeCitationKey.value = ''
+  sourceDetails.value = {}
+  currentChapterId.value = chapterId
+  const [chapter, chapterAnnotations] = await Promise.all([
+    getChapter(docId, chapterId),
+    listAnnotations(docId, chapterId),
+  ])
+  if (currentChapterId.value !== chapterId) return
+  currentChapter.value = chapter
+  savedSnapshot = payloadFromChapter(chapter)
   pendingSave = null
   hasUnsavedChanges.value = false
   saveError.value = ''
   saveStatus.value = '已保存'
-  annotations.value = await listAnnotations(docId, ch.id)
+  annotations.value = chapterAnnotations
+  await loadSourceDetails(chapter.citations || [], chapterId)
+}
+
+async function loadSourceDetails(citations: any[], chapterId = currentChapterId.value) {
+  const sourceIds = [...new Set(citations.map((citation) => citation.source_document_id).filter(Boolean))]
+  const entries = await Promise.all(
+    sourceIds.map(async (sourceId) => {
+      try {
+        return [sourceId, await getSource(sourceId)] as const
+      } catch {
+        return [sourceId, { id: sourceId }] as const
+      }
+    }),
+  )
+  if (chapterId === currentChapterId.value) {
+    sourceDetails.value = Object.fromEntries(entries)
+  }
 }
 
 async function addChapter(title: string) {
@@ -439,6 +514,61 @@ function insertAtCursor(content: string) {
 async function updateAnnotation(annotationId: string, status: string) {
   await apiUpdateAnnotation(docId, currentChapterId.value, annotationId, { status })
   annotations.value = await listAnnotations(docId, currentChapterId.value)
+}
+
+async function handleCreateAnnotation(body: {
+  type: string
+  label: string
+  target_text: string
+  content: string
+}) {
+  try {
+    const result = await apiCreateAnnotation(docId, currentChapterId.value, body)
+    annotations.value = await listAnnotations(docId, currentChapterId.value)
+    activeAnnotationId.value = result.annotation_id || ''
+    activeCitationKey.value = ''
+    aiPanelRef.value?.annotationCreated()
+  } catch (err: any) {
+    aiPanelRef.value?.annotationCreateFailed(err.message || '保存批注失败')
+  }
+}
+
+function onAnnotationSelect(annotationId: string) {
+  activeAnnotationId.value = annotationId
+  activeCitationKey.value = ''
+  aiPanelRef.value?.openTab('annotations')
+}
+
+function onCitationSelect(citationKey: string) {
+  activeCitationKey.value = citationKey
+  activeAnnotationId.value = ''
+  aiPanelRef.value?.openTab('sources')
+}
+
+function focusAnnotation(annotationId: string) {
+  onAnnotationSelect(annotationId)
+  contentPanelRef.value?.focusAnnotation(annotationId)
+}
+
+function focusCitation(citationKey: string) {
+  onCitationSelect(citationKey)
+  contentPanelRef.value?.focusCitation(citationKey)
+}
+
+function showFocusMessage(message: string) {
+  focusMessage.value = message
+  if (focusMessageTimer) clearTimeout(focusMessageTimer)
+  focusMessageTimer = setTimeout(() => {
+    focusMessage.value = ''
+    focusMessageTimer = null
+  }, 3200)
+}
+
+async function handleCommentAiAction(annotation: any) {
+  activeAnnotationId.value = annotation.id
+  activeCitationKey.value = ''
+  aiPanelRef.value?.openTab('ai')
+  await doAiAction('address_comments', annotation.target_text || '', annotation.content || '')
 }
 
 async function doExport(format: string) {

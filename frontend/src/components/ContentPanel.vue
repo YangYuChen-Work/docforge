@@ -68,16 +68,17 @@
           <div v-if="chapter.status === 'failed'" class="alert-error">
             ⚠ 生成失败：{{ chapter.error_message || '未知错误' }}
           </div>
-          <div v-if="missingItems.length > 0" class="alert-warning">
-            <div style="font-weight:600;margin-bottom:6px">待补充项</div>
-            <div v-for="m in missingItems" :key="m">• {{ m }}</div>
-          </div>
           <div v-if="conflictItems.length > 0" class="alert-conflict">
             <div style="font-weight:600;margin-bottom:6px">内容冲突</div>
             <div v-for="c in conflictItems" :key="c.description">• {{ c.description }}</div>
           </div>
 
           <editor-content :editor="editor" class="word-body" />
+
+          <div v-if="missingItems.length > 0" class="missing-information-panel">
+            <div class="missing-information-title">待补充建议</div>
+            <div v-for="m in missingItems" :key="m" class="missing-information-item">• {{ m }}</div>
+          </div>
 
           <div
             v-if="chapter.diagram_mermaid && !chapter.diagram_mermaid.startsWith('ERROR:')"
@@ -109,6 +110,13 @@ import { TableHeader } from '@tiptap/extension-table-header'
 import { Highlight } from '@tiptap/extension-highlight'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { FontSize, TextStyle } from '@tiptap/extension-text-style'
+import {
+  createReferenceDecorations,
+  findReferenceRange,
+  REFERENCE_DECORATIONS_REFRESH,
+  type AnnotationRef,
+  type CitationRef,
+} from '../editor/ReferenceDecorations'
 
 export type EditorToolbarState = {
   block: string
@@ -126,6 +134,10 @@ const props = defineProps<{
   chapter: any
   hasUnsavedChanges: boolean
   isSaving: boolean
+  annotations?: AnnotationRef[]
+  citations?: CitationRef[]
+  activeAnnotationId?: string
+  activeCitationKey?: string
 }>()
 const emit = defineEmits<{
   save: []
@@ -135,6 +147,9 @@ const emit = defineEmits<{
   edit: [text: string, contentJson: string]
   selectionChange: [text: string]
   editorStateChange: [state: EditorToolbarState]
+  annotationSelect: [id: string]
+  citationSelect: [key: string]
+  focusResult: [message: string]
 }>()
 const showExport = ref(false)
 const mermaidContainer = ref<HTMLElement>()
@@ -166,6 +181,14 @@ const editor = useEditor({
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     TextStyle,
     FontSize,
+    createReferenceDecorations({
+      getAnnotations: () => props.annotations || [],
+      getCitations: () => props.citations || [],
+      getActiveAnnotationId: () => props.activeAnnotationId || '',
+      getActiveCitationKey: () => props.activeCitationKey || '',
+      onAnnotationClick: (id) => emit('annotationSelect', id),
+      onCitationClick: (key) => emit('citationSelect', key),
+    }),
   ],
   // Confirmation is a workflow state, not a formatting lock. A confirmed
   // chapter can still receive deliberate manual edits.
@@ -305,16 +328,72 @@ function insertAtCursor(text: string) {
   emit('edit', editor.value.getText(), JSON.stringify(editor.value.getJSON()))
 }
 
-defineExpose({ replaceSelection, insertAtCursor, runCommand, setLink })
+function refreshReferenceDecorations() {
+  const instance = editor.value
+  if (!instance) return
+  instance.view.dispatch(instance.state.tr.setMeta(REFERENCE_DECORATIONS_REFRESH, true))
+}
+
+function scrollToRange(range: { from: number; to: number }) {
+  const instance = editor.value
+  if (!instance) return
+  instance.chain().focus().setTextSelection(range).scrollIntoView().run()
+  nextTick(() => {
+    const node = instance.view.nodeDOM(range.from)
+    const element = node instanceof HTMLElement ? node : node?.parentElement
+    element?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+}
+
+function focusChapterBody() {
+  const instance = editor.value
+  if (!instance || instance.state.doc.content.size < 2) return
+  scrollToRange({ from: 1, to: Math.max(1, instance.state.doc.content.size - 1) })
+}
+
+function focusAnnotation(annotationId: string) {
+  const annotation = (props.annotations || []).find((item) => item.id === annotationId)
+  if (!annotation) return
+  emit('annotationSelect', annotationId)
+  const range = findReferenceRange(editor.value, annotation.target_text || '')
+  if (range) {
+    scrollToRange(range)
+  } else {
+    focusChapterBody()
+    emit('focusResult', '批注原文未在正文中找到精确片段，已定位到当前章节正文')
+  }
+}
+
+function focusCitation(citationKey: string) {
+  const citation = (props.citations || []).find((item) => item.key === citationKey)
+  if (!citation) return
+  emit('citationSelect', citationKey)
+  const range = findReferenceRange(editor.value, citation.source_excerpt || '')
+  if (range) {
+    scrollToRange(range)
+  } else {
+    focusChapterBody()
+    emit('focusResult', '来源原文未在正文中找到精确片段，已定位到当前章节正文')
+  }
+}
+
+defineExpose({ replaceSelection, insertAtCursor, runCommand, setLink, focusAnnotation, focusCitation })
 
 watch(
-  () => props.chapter?.id,
+  () => [props.chapter?.id, props.chapter?.content_json, props.chapter?.plain_text],
   () => {
     if (!editor.value) return
     editor.value.commands.setContent(parseContent(props.chapter), { emitUpdate: false })
     editor.value.setEditable(true)
     emit('editorStateChange', getToolbarState(editor.value))
+    refreshReferenceDecorations()
   }
+)
+
+watch(
+  () => [props.annotations, props.citations, props.activeAnnotationId, props.activeCitationKey],
+  refreshReferenceDecorations,
+  { deep: true },
 )
 
 watch(
@@ -507,6 +586,27 @@ onBeforeUnmount(() => {
   color: #92400e;
 }
 
+.missing-information-panel {
+  margin-top: 28px;
+  padding: 14px 16px;
+  border: 1px solid #f0f0f0;
+  border-radius: 6px;
+  background: #fafafa;
+  color: #7a5a16;
+  font-size: 12px;
+}
+
+.missing-information-title {
+  margin-bottom: 7px;
+  color: #8a6518;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.missing-information-item {
+  line-height: 1.7;
+}
+
 .alert-conflict {
   padding: 12px;
   background: #fef2f2;
@@ -528,5 +628,61 @@ onBeforeUnmount(() => {
 .mermaid-render {
   display: flex;
   justify-content: center;
+}
+
+.word-body :deep(.annotation-highlight) {
+  background: #fff1b8;
+  border-bottom: 2px solid #d48806;
+  cursor: pointer;
+}
+
+.word-body :deep(.annotation-highlight.active) {
+  background: #ffd666;
+}
+
+.word-body :deep(.source-highlight) {
+  background: #dbeafe;
+  border-bottom: 2px solid #1677ff;
+  cursor: pointer;
+}
+
+.word-body :deep(.source-highlight.active) {
+  background: #91caff;
+}
+
+.word-body :deep(.annotation-marker),
+.word-body :deep(.source-marker) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin: 0 3px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 9px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 10px;
+  line-height: 18px;
+  vertical-align: middle;
+}
+
+.word-body :deep(.annotation-marker) {
+  background: #d48806;
+}
+
+.word-body :deep(.annotation-marker.active) {
+  background: #ad6800;
+  box-shadow: 0 0 0 2px #ffe7ba;
+}
+
+.word-body :deep(.source-marker) {
+  background: #1677ff;
+}
+
+.word-body :deep(.source-marker.active) {
+  background: #0958d9;
+  box-shadow: 0 0 0 2px #dbeafe;
 }
 </style>

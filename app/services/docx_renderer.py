@@ -91,10 +91,6 @@ def _chapter_nodes(chapter) -> list[dict]:
     if not nodes and isinstance(plain_text, str) and plain_text:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": plain_text}]})
 
-    missing = _safe_json_list(getattr(chapter, "missing_information_json", None))
-    if missing:
-        nodes.append(_notice_node("待补充：", '; '.join(str(item) for item in missing[:5])))
-
     conflicts = _safe_json_list(getattr(chapter, "conflict_json", None))
     if conflicts:
         descriptions = [_conflict_detail(conflict) for conflict in conflicts]

@@ -442,7 +442,7 @@ def test_template_cleanup_preserves_structure_and_footer_page_fields(tmp_path):
     assert "PAGE" in second_footer._element.xml
 
 
-def test_missing_information_appended_as_highlighted_paragraph(tmp_path):
+def test_missing_information_stays_out_of_exported_docx(tmp_path):
     content = {"type": "doc", "content": [
         {"type": "paragraph", "content": [{"type": "text", "text": "正文内容"}]},
     ]}
@@ -451,10 +451,13 @@ def test_missing_information_appended_as_highlighted_paragraph(tmp_path):
         "doc1", [_ch("c1", "产品概述", content, missing=["下一年度销量预测"])], template
     )
     doc = Document(out)
-    assert any("待补充" in p.text and "下一年度销量预测" in p.text for p in doc.paragraphs)
+    body_text = "\n".join(p.text for p in doc.paragraphs)
+    assert "正文内容" in body_text
+    assert "待补充" not in body_text
+    assert "下一年度销量预测" not in body_text
 
 
-def test_missing_and_conflict_notes_are_rendered_as_highlighted_notices(tmp_path):
+def test_conflict_notes_are_rendered_as_highlighted_notices(tmp_path):
     content = {"type": "doc", "content": [
         {"type": "paragraph", "content": [{"type": "text", "text": "正文内容"}]},
     ]}
@@ -465,7 +468,6 @@ def test_missing_and_conflict_notes_are_rendered_as_highlighted_notices(tmp_path
             "c1",
             "产品概述",
             content,
-            missing=["下一年度销量预测"],
             conflicts=[{"description": "销售目标与产能规划不一致"}],
         )],
         template,
@@ -475,20 +477,20 @@ def test_missing_and_conflict_notes_are_rendered_as_highlighted_notices(tmp_path
     notice_paragraphs = [
         p
         for p in doc.paragraphs
-        if "待补充" in p.text or "内容冲突" in p.text
+        if "内容冲突" in p.text
     ]
 
-    assert len(notice_paragraphs) == 2
+    assert len(notice_paragraphs) == 1
     assert all(any(run.font.highlight_color is not None for run in p.runs) for p in notice_paragraphs)
     assert all(
         p._element.pPr is not None and p._element.pPr.find(qn("w:shd")) is not None
         for p in notice_paragraphs
     )
-    first_notice_runs = [run for run in notice_paragraphs[0].runs if run.text]
-    assert first_notice_runs[0].text == "【待补充："
-    assert first_notice_runs[0].bold is True
-    assert "下一年度销量预测" in first_notice_runs[1].text
-    assert first_notice_runs[1].bold is not True
+    conflict_runs = [run for run in notice_paragraphs[0].runs if run.text]
+    assert conflict_runs[0].text == "【内容冲突："
+    assert conflict_runs[0].bold is True
+    assert "销售目标与产能规划不一致" in conflict_runs[1].text
+    assert conflict_runs[1].bold is not True
 
 
 def test_scalar_conflict_warns_in_validation_and_renders_readable_notice(tmp_path):
