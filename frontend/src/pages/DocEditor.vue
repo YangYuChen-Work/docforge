@@ -225,7 +225,11 @@ onMounted(async () => {
     genPollTimer = setInterval(async () => {
       doc.value = await getDocument(docId)
       if (currentChapterId.value) {
-        currentChapter.value = await getChapter(docId, currentChapterId.value)
+        const polledChapter = await getChapter(docId, currentChapterId.value)
+        if (polledChapter.id === currentChapterId.value) {
+          currentChapter.value = polledChapter
+          await loadSourceDetails(polledChapter.citations || [], polledChapter.id)
+        }
       }
       if (!isStillGenerating(doc.value)) {
         generating.value = false
@@ -294,16 +298,23 @@ function changeFontSize(event: Event) {
 }
 
 async function selectChapter(ch: any) {
+  const chapterId = ch.id
   selectionText.value = ''
   activeAnnotationId.value = ''
   activeCitationKey.value = ''
-  currentChapterId.value = ch.id
-  currentChapter.value = await getChapter(docId, ch.id)
-  annotations.value = await listAnnotations(docId, ch.id)
-  await loadSourceDetails(currentChapter.value.citations || [])
+  sourceDetails.value = {}
+  currentChapterId.value = chapterId
+  const [chapter, chapterAnnotations] = await Promise.all([
+    getChapter(docId, chapterId),
+    listAnnotations(docId, chapterId),
+  ])
+  if (currentChapterId.value !== chapterId) return
+  currentChapter.value = chapter
+  annotations.value = chapterAnnotations
+  await loadSourceDetails(chapter.citations || [], chapterId)
 }
 
-async function loadSourceDetails(citations: any[]) {
+async function loadSourceDetails(citations: any[], chapterId = currentChapterId.value) {
   const sourceIds = [...new Set(citations.map((citation) => citation.source_document_id).filter(Boolean))]
   const entries = await Promise.all(
     sourceIds.map(async (sourceId) => {
@@ -314,7 +325,9 @@ async function loadSourceDetails(citations: any[]) {
       }
     }),
   )
-  sourceDetails.value = Object.fromEntries(entries)
+  if (chapterId === currentChapterId.value) {
+    sourceDetails.value = Object.fromEntries(entries)
+  }
 }
 
 async function addChapter(title: string) {
