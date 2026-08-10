@@ -300,3 +300,166 @@ def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path
         ]
     finally:
         db.close()
+
+
+def test_generate_chapter_uses_filename_matched_fallback_excerpt_when_keyword_match_is_empty(
+    tmp_path, monkeypatch
+):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'chapter-fallback.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    db = Session()
+    try:
+        db.add(
+            Project(
+                id="P002",
+                name="回退测试项目",
+                code="XG-ZX-2026-002",
+                model="XCA130",
+                phase="方案设计",
+                category="起重机",
+            )
+        )
+        db.add(
+            GeneratedDocument(
+                id="doc-fallback",
+                project_id="P002",
+                generation_task_id="task-fallback",
+                template_id="tpl-fallback",
+                title="回退测试文档",
+                status="draft",
+            )
+        )
+        chapter = DocumentChapter(
+            id="chapter-fallback",
+            document_id="doc-fallback",
+            template_chapter_id="template-fallback",
+            title="市场需求分析",
+            order_index=1,
+            status="pending",
+        )
+        db.add(chapter)
+        db.add(
+            SourceDocument(
+                id="source-match",
+                project_id="P002",
+                source_type="uploaded",
+                original_doc_id=None,
+                original_name="市场调研报告-2026.docx",
+                stored_path="/tmp/市场调研报告-2026.docx",
+                file_type="docx",
+                file_size=321,
+                sha256="c" * 64,
+                parse_status="parsed",
+            )
+        )
+        db.add(
+            SourceDocument(
+                id="source-other",
+                project_id="P002",
+                source_type="uploaded",
+                original_doc_id=None,
+                original_name="采购成本测算.xlsx",
+                stored_path="/tmp/采购成本测算.xlsx",
+                file_type="xlsx",
+                file_size=654,
+                sha256="d" * 64,
+                parse_status="parsed",
+            )
+        )
+        db.add(
+            ParsedSourceContent(
+                source_document_id="source-match",
+                content_type="paragraph",
+                heading_level=1,
+                heading_path="市场综述",
+                content_text="这是来自匹配资料的回退摘要，用于在标题关键词未命中时仍提供引用上下文。",
+                structured_value=None,
+                locator="第5页",
+                order_index=1,
+            )
+        )
+        db.add(
+            ParsedSourceContent(
+                source_document_id="source-other",
+                content_type="paragraph",
+                heading_level=1,
+                heading_path="成本说明",
+                content_text="这段内容来自非匹配资料，不应作为回退上下文发送。",
+                structured_value=None,
+                locator="第1页",
+                order_index=1,
+            )
+        )
+        db.commit()
+
+        monkeypatch.setattr(
+            "app.services.material_matcher.compute_match_status",
+            lambda chapter_info, matched_sources: "matched",
+        )
+        monkeypatch.setattr(
+            "app.services.material_matcher.extract_relevant_excerpts",
+            lambda chapter_title, sources, max_chars=3000: [],
+        )
+
+        provider_snapshots = {}
+
+        class Provider:
+            def generate_chapter(self, request):
+                provider_snapshots["matched_excerpts"] = request.matched_excerpts
+                return ChapterGenerationResult(
+                    chapter_id=request.chapter_id,
+                    content="生成正文",
+                    citations=[],
+                    missing_information=[],
+                    conflicts=[],
+                    confidence="medium",
+                )
+
+            def ai_action(self, action, selection, instruction, context):
+                raise NotImplementedError
+
+        result = generate_chapter(
+            db,
+            chapter,
+            {"gen_instruction": "按资料生成", "material_types": "市场调研报告"},
+            ["source-match", "source-other"],
+            {"id": "P002", "name": "回退测试项目", "model": "XCA130", "phase": "方案设计"},
+            Provider(),
+        )
+
+        assert result.status == "needs_material"
+        assert provider_snapshots["matched_excerpts"] == [
+            {
+                "source_id": "source-match",
+                "source_name": "市场调研报告-2026.docx",
+                "locator": "第5页",
+                "excerpt": "这是来自匹配资料的回退摘要，用于在标题关键词未命中时仍提供引用上下文。",
+                "relevance": 0,
+            }
+        ]
+        final_rows = [
+            {
+                "source_document_id": citation.source_document_id,
+                "locator": citation.locator,
+                "source_excerpt": citation.source_excerpt,
+                "citation_type": citation.citation_type,
+            }
+            for citation in db.query(Citation)
+            .filter(Citation.chapter_id == "chapter-fallback")
+            .order_by(Citation.created_at)
+            .all()
+        ]
+        assert final_rows == [
+            {
+                "source_document_id": "source-match",
+                "locator": "第5页",
+                "source_excerpt": "这是来自匹配资料的回退摘要，用于在标题关键词未命中时仍提供引用上下文。",
+                "citation_type": "context",
+            }
+        ]
+    finally:
+        db.close()

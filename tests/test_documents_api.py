@@ -18,6 +18,15 @@ def test_citation_state_distinguishes_pending_from_generating_chapters():
     assert _citation_state("generating", []) == "generating"
 
 
+def test_citation_state_prefers_actual_citations_over_generating_status():
+    assert _citation_state(
+        "generating", [SimpleNamespace(citation_type="context")]
+    ) == "context"
+    assert _citation_state(
+        "generating", [SimpleNamespace(citation_type="explicit")]
+    ) == "explicit"
+
+
 def test_citation_state_distinguishes_explicit_context_and_missing_sources():
     assert _citation_state(
         "needs_material", [SimpleNamespace(citation_type="explicit")]

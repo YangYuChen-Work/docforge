@@ -171,6 +171,52 @@ def _select_relevant_table_entries(
     return selected[:limit]
 
 
+def _build_filename_matched_fallback_excerpts(
+    material_types: str,
+    sources: list[dict],
+    max_chars: int = 1200,
+    max_items: int = 3,
+) -> list[dict]:
+    material_terms = [
+        term.strip().lower()
+        for term in (material_types or "").split(",")
+        if term.strip()
+    ]
+    if not material_terms:
+        return []
+
+    fallback_excerpts = []
+    total_chars = 0
+
+    for src in sources:
+        source_name = (src.get("original_name") or "").lower()
+        if not any(term in source_name for term in material_terms):
+            continue
+
+        for item in src.get("content_items", []):
+            text = (item.get("text") or "").strip()
+            if len(text) < 4:
+                continue
+            remaining_chars = max_chars - total_chars
+            if remaining_chars <= 0:
+                return fallback_excerpts
+            excerpt = text[: min(500, remaining_chars)]
+            fallback_excerpts.append(
+                {
+                    "source_id": src["id"],
+                    "source_name": src["original_name"],
+                    "locator": item.get("locator"),
+                    "excerpt": excerpt,
+                    "relevance": 0,
+                }
+            )
+            total_chars += len(excerpt)
+            if len(fallback_excerpts) >= max_items:
+                return fallback_excerpts
+
+    return fallback_excerpts
+
+
 def generate_chapter(
     db: Session,
     chapter: DocumentChapter,
@@ -189,6 +235,11 @@ def generate_chapter(
     chapter.match_status = match_status
 
     excerpts = extract_relevant_excerpts(chapter.title, sources_list, max_chars=3000)
+    if not excerpts:
+        excerpts = _build_filename_matched_fallback_excerpts(
+            template_chapter.get("material_types", ""),
+            sources_list,
+        )
     relevant_table_entries = _select_relevant_table_entries(
         chapter.title,
         template_chapter.get("material_types", ""),
