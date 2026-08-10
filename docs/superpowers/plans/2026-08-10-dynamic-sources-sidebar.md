@@ -326,3 +326,15 @@ Manual chapter regeneration must start the existing chapter polling before await
 - Modify: `tests/test_documents_api.py`
 
 When a generating chapter already has persisted `context` citations, the chapter API must derive `citation_state="context"` so the right panel labels the actual reference material as “待明确引用”. When chapter material types match a parsed source but title-keyword extraction returns no text, pass a bounded fallback excerpt from that matched source's parsed content to the provider and persist it as generation context when needed. Add focused tests for both behaviors.
+
+### Task 9: Preserve context-first and explicit failure states across API/UI
+
+**Files:**
+- Modify: `app/services/chapter_generator.py`
+- Modify: `app/api/documents.py`
+- Modify: `frontend/src/pages/DocEditor.vue`
+- Modify: `frontend/src/components/AiPanel.vue`
+- Modify: `tests/test_chapter_generator.py`
+- Modify: `tests/test_documents_api.py`
+
+The frontend fallback citation-state derivation must consult persisted citation state and citations before treating a chapter as generically generating. Any provider response containing an out-of-scope source ID must never produce `explicit` rows, even when no matched excerpt exists; preserve valid provider evidence as `context` where possible and retain a missing-information warning. Failed chapters need a dedicated `failed` source-panel state instead of being presented as ordinary missing sources.
