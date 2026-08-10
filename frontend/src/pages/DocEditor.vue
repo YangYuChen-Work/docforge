@@ -261,7 +261,7 @@ onMounted(async () => {
   doc.value = await getDocument(docId)
   titleDraft.value = doc.value.title || ''
   if (doc.value.chapters.length > 0) await selectChapter(doc.value.chapters[0])
-  if (isStillGenerating(doc.value)) startGenerationPolling()
+  if (isStillGenerating(doc.value)) startGenerationPolling(true)
 })
 
 onUnmounted(() => {
@@ -331,6 +331,7 @@ function stageLocalRegeneration(chapterId: string) {
   }
   sourceDetails.value = {}
   activeCitationKey.value = ''
+  aiPanelRef.value?.openTab('sources')
 }
 
 function applyPendingStatusToDocument(nextDoc: any, chapterId: string) {
@@ -521,6 +522,9 @@ async function selectChapter(ch: any) {
   ])
   if (currentChapterId.value !== chapterId) return
   currentChapter.value = chapter
+  if (chapter.status === 'pending' || chapter.status === 'generating') {
+    aiPanelRef.value?.openTab('sources')
+  }
   savedSnapshot = payloadFromChapter(chapter)
   pendingSave = null
   hasUnsavedChanges.value = false
@@ -532,23 +536,32 @@ async function selectChapter(ch: any) {
 
 async function loadSourceDetails(citations: any[], chapterId = currentChapterId.value, refreshId?: number) {
   const sourceIds = [...new Set(citations.map((citation) => citation.source_document_id).filter(Boolean))]
-  const entries = await Promise.all(
-    sourceIds.map(async (sourceId) => {
-      try {
-        return [sourceId, await getSource(sourceId), true] as const
-      } catch {
-        return [sourceId, null, false] as const
-      }
-    }),
-  )
-  if (refreshId !== undefined && refreshId !== latestGenerationRefreshId) return
-  if (chapterId === currentChapterId.value) {
-    const nextDetails = { ...sourceDetails.value }
-    for (const [sourceId, source, loaded] of entries) {
-      if (loaded && source) nextDetails[sourceId] = source
+  if (sourceIds.length === 0) {
+    if (refreshId !== undefined && refreshId !== latestGenerationRefreshId) return
+    if (chapterId === currentChapterId.value) sourceDetails.value = {}
+    return
+  }
+
+  // Load one source at a time so the right panel can reveal cards as the
+  // current chapter's references become available instead of flashing all
+  // source metadata in one Promise.all batch.
+  for (const sourceId of sourceIds) {
+    if (refreshId !== undefined && refreshId !== latestGenerationRefreshId) return
+    if (chapterId !== currentChapterId.value) return
+    if (Object.prototype.hasOwnProperty.call(sourceDetails.value, sourceId)) continue
+
+    let source: any = null
+    try {
+      source = await getSource(sourceId)
+    } catch {
+      // Preserve a loaded-but-unavailable marker so the card can still show
+      // the citation id and excerpt rather than waiting forever.
+      source = null
     }
-    if (sourceIds.length === 0) sourceDetails.value = {}
-    else sourceDetails.value = nextDetails
+
+    if (refreshId !== undefined && refreshId !== latestGenerationRefreshId) return
+    if (chapterId !== currentChapterId.value) return
+    sourceDetails.value = { ...sourceDetails.value, [sourceId]: source }
   }
 }
 

@@ -208,6 +208,7 @@
           :class="`source-state-${citationState}`"
           role="status"
         >
+          <span v-if="sourceSearching" class="source-search-spinner" aria-hidden="true"></span>
           {{ sourceStateMessage }}
         </div>
         <article
@@ -305,8 +306,10 @@ const annotationDraft = ref('')
 const annotationError = ref('')
 const annotationSaving = ref(false)
 const expandedSources = ref<Record<string, boolean>>({})
+const visibleCitationCount = ref(0)
 let msgId = 0
 let loadingTimer: ReturnType<typeof setInterval> | null = null
+let sourceRevealTimer: ReturnType<typeof setInterval> | null = null
 
 const tabs: Array<{ key: PanelTab; label: string; icon: string }> = [
   { key: 'ai', label: 'AI 助手', icon: '✦' },
@@ -319,8 +322,8 @@ const panelTitle = computed(() => tabs.find((tab) => tab.key === activeTab.value
 const panelDescription = computed(() => {
   if (activeTab.value === 'annotations') return '集中查看批示内容，并联动正文原文。'
   if (activeTab.value === 'sources') {
-    if (props.citationState === 'pending') return '本章已进入生成队列，等待开始处理后会自动加载参考资料。'
-    if (props.citationState === 'generating') return '本章生成中的参考资料将在引用完成后自动加载。'
+    if (props.citationState === 'pending') return '等待 AI 开始逐份检索本章相关资料。'
+    if (props.citationState === 'generating') return 'AI 正在逐份核对本章资料，来源卡片会随检索结果出现。'
     if (props.citationState === 'context') return '展示 AI 实际使用的参考上下文，待补充明确引用。'
     if (props.citationState === 'missing') return '没有可核验来源时会明确标记为待补充。'
     return '只展示本章最终引用的文件和参考原文。'
@@ -328,15 +331,28 @@ const panelDescription = computed(() => {
   return '预留数据一致性追踪能力。'
 })
 const sourcePanelHeading = computed(() => {
-  if (props.citationState === 'pending') return '本章来源等待生成'
+  if (props.citationState === 'pending') return '本章来源等待检索'
   if (props.citationState === 'context') return 'AI 生成参考资料（待明确引用）'
-  if (props.citationState === 'generating') return '本章来源生成中'
+  if (props.citationState === 'generating') return 'AI 正在检索本章资料'
   if (props.citationState === 'missing') return '本章来源待补充'
   return '本章最终来源'
 })
+const sourceSearching = computed(() => props.citationState === 'pending' || props.citationState === 'generating')
+const discoveredSourceCount = computed(() =>
+  new Set(props.citations.map((citation) => citation.source_document_id).filter(Boolean)).size,
+)
+const sourceCitationSignature = computed(() =>
+  props.citations
+    .map((citation, index) => `${citation.key || citation.source_document_id}:${citation.locator || ''}:${index}`)
+    .join('|'),
+)
 const sourceStateMessage = computed(() => {
-  if (props.citationState === 'pending') return '本章已提交生成，正在等待开始处理。'
-  if (props.citationState === 'generating') return '本章正在生成，引用完成后会自动加载。'
+  if (props.citationState === 'pending') return '本章已提交生成，等待 AI 开始逐份检索相关资料。'
+  if (props.citationState === 'generating') {
+    if (discoveredSourceCount.value === 0) return 'AI 正在查找与本章相关的项目资料，来源卡片会随匹配结果出现。'
+    return `AI 正在逐份核对本章资料，已发现 ${discoveredSourceCount.value} 份参考资料；来源卡片正在逐步加载。`
+  }
+  if (sourceCardsLoading.value) return '已找到本章来源，正在逐张加载文件定位和参考原文。'
   if (props.citationState === 'missing') return '本章未匹配到可用来源或未返回有效引用。'
   return ''
 })
@@ -345,7 +361,9 @@ const truncatedSelection = computed(() =>
 )
 const pendingAnnotationCount = computed(() => props.annotations.filter((annotation) => annotation.status === 'pending').length)
 const citationCards = computed(() =>
-  props.citations.map((citation, index) => {
+  props.citations.slice(0, visibleCitationCount.value).filter((citation) =>
+    Object.prototype.hasOwnProperty.call(props.sourceDetails, citation.source_document_id),
+  ).map((citation, index) => {
     const key = citation.key || `${citation.source_document_id}:${index}`
     const source = props.sourceDetails[citation.source_document_id] || {}
     return {
@@ -355,6 +373,33 @@ const citationCards = computed(() =>
     }
   }),
 )
+const sourceCardsLoading = computed(() =>
+  props.citations.length > 0 && citationCards.value.length < Math.min(visibleCitationCount.value, props.citations.length),
+)
+
+function stopSourceRevealTimer() {
+  if (sourceRevealTimer) clearInterval(sourceRevealTimer)
+  sourceRevealTimer = null
+}
+
+function syncSourceReveal() {
+  stopSourceRevealTimer()
+  const total = props.citations.length
+  if (!sourceSearching.value) {
+    visibleCitationCount.value = total
+    return
+  }
+
+  visibleCitationCount.value = Math.min(visibleCitationCount.value, total)
+  if (visibleCitationCount.value >= total) return
+  sourceRevealTimer = setInterval(() => {
+    if (!sourceSearching.value || visibleCitationCount.value >= props.citations.length) {
+      stopSourceRevealTimer()
+      return
+    }
+    visibleCitationCount.value += 1
+  }, 280)
+}
 
 const quickActions = [
   { key: 'polish', label: '润色', icon: '✎', hint: '改善表达，保持原意' },
@@ -369,6 +414,25 @@ const quickActions = [
 function openTab(tab: PanelTab) {
   activeTab.value = tab
 }
+
+watch(
+  () => props.citationState,
+  (state, previousState) => {
+    const searching = state === 'pending' || state === 'generating'
+    const wasSearching = previousState === 'pending' || previousState === 'generating'
+    if (searching && (!wasSearching || previousState === undefined)) {
+      activeTab.value = 'sources'
+      expandedSources.value = {}
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  [sourceCitationSignature, () => props.citationState],
+  syncSourceReveal,
+  { immediate: true },
+)
 
 function annotationStatus(status?: string) {
   if (status === 'applied') return '已处理'
@@ -475,5 +539,31 @@ defineExpose({
   },
 })
 
-onBeforeUnmount(stopLoadingTimer)
+onBeforeUnmount(() => {
+  stopLoadingTimer()
+  stopSourceRevealTimer()
+})
 </script>
+
+<style scoped>
+.source-state-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.source-search-spinner {
+  width: 11px;
+  height: 11px;
+  flex: 0 0 11px;
+  margin-top: 2px;
+  border: 2px solid #dbeafe;
+  border-top-color: #1677ff;
+  border-radius: 50%;
+  animation: source-search-spin .8s linear infinite;
+}
+
+@keyframes source-search-spin {
+  to { transform: rotate(360deg); }
+}
+</style>
