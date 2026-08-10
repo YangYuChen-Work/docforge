@@ -122,6 +122,20 @@ def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path
             )
         )
         db.add(
+            SourceDocument(
+                id="source-2",
+                project_id="P001",
+                source_type="uploaded",
+                original_doc_id=None,
+                original_name="采购成本测算.xlsx",
+                stored_path="/tmp/采购成本测算.xlsx",
+                file_type="xlsx",
+                file_size=456,
+                sha256="b" * 64,
+                parse_status="parsed",
+            )
+        )
+        db.add(
             ParsedSourceContent(
                 source_document_id="source-1",
                 content_type="paragraph",
@@ -143,6 +157,18 @@ def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path
                 structured_value='{"caption":"表1","headers":["指标"],"rows":[["20%"]]}',
                 locator="表1",
                 order_index=2,
+            )
+        )
+        db.add(
+            ParsedSourceContent(
+                source_document_id="source-2",
+                content_type="table",
+                heading_level=None,
+                heading_path=None,
+                content_text=None,
+                structured_value='{"caption":"表2","headers":["成本"],"rows":[["500万"]]}',
+                locator="表2",
+                order_index=1,
             )
         )
         db.commit()
@@ -168,21 +194,26 @@ def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path
 
         class Provider:
             def generate_chapter(self, request):
-                provider_snapshots["status_during_call"] = db.get(
-                    DocumentChapter, "chapter-1"
-                ).status
-                provider_snapshots["citations_during_call"] = [
-                    {
-                        "source_document_id": citation.source_document_id,
-                        "locator": citation.locator,
-                        "source_excerpt": citation.source_excerpt,
-                        "citation_type": citation.citation_type,
-                    }
-                    for citation in db.query(Citation)
-                    .filter(Citation.chapter_id == "chapter-1")
-                    .order_by(Citation.created_at)
-                    .all()
-                ]
+                fresh_db = Session()
+                try:
+                    provider_snapshots["status_during_call"] = fresh_db.get(
+                        DocumentChapter, "chapter-1"
+                    ).status
+                    provider_snapshots["citations_during_call"] = [
+                        {
+                            "source_document_id": citation.source_document_id,
+                            "locator": citation.locator,
+                            "source_excerpt": citation.source_excerpt,
+                            "citation_type": citation.citation_type,
+                        }
+                        for citation in fresh_db.query(Citation)
+                        .filter(Citation.chapter_id == "chapter-1")
+                        .order_by(Citation.created_at)
+                        .all()
+                    ]
+                finally:
+                    fresh_db.close()
+                provider_snapshots["structured_tables_during_call"] = request.structured_tables
                 return ChapterGenerationResult(
                     chapter_id=request.chapter_id,
                     content="生成正文",
@@ -199,7 +230,7 @@ def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path
             db,
             chapter,
             {"gen_instruction": "按资料生成", "material_types": "市场调研报告"},
-            ["source-1"],
+            ["source-1", "source-2"],
             {"id": "P001", "name": "测试项目", "model": "XCT80L7", "phase": "方案设计"},
             Provider(),
         )
@@ -213,6 +244,9 @@ def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path
             ("context", "第2页", "市场需求分析摘要"),
             ("context", "表1", '{"caption":"表1","headers":["指标"],"rows":[["20%"]]}'),
         }
+        assert provider_snapshots["structured_tables_during_call"] == [
+            {"caption": "表1", "headers": ["指标"], "rows": [["20%"]]}
+        ]
 
         final_rows = [
             {

@@ -18,6 +18,19 @@ def _load_source_data(db: Session, source_ids: list[str]) -> dict[str, dict]:
             .order_by(ParsedSourceContent.order_index)
             .all()
         )
+        table_entries = [
+            {
+                "table": json.loads(c.structured_value),
+                "context": {
+                    "source_id": sid,
+                    "source_name": src.original_name,
+                    "locator": c.locator,
+                    "excerpt": c.structured_value,
+                },
+            }
+            for c in contents
+            if c.content_type == "table" and c.structured_value
+        ]
         result[sid] = {
             "id": sid,
             "original_name": src.original_name,
@@ -27,21 +40,9 @@ def _load_source_data(db: Session, source_ids: list[str]) -> dict[str, dict]:
                 for c in contents
                 if c.content_text
             ],
-            "structured_tables": [
-                json.loads(c.structured_value)
-                for c in contents
-                if c.content_type == "table" and c.structured_value
-            ],
-            "structured_table_contexts": [
-                {
-                    "source_id": sid,
-                    "source_name": src.original_name,
-                    "locator": c.locator,
-                    "excerpt": c.structured_value,
-                }
-                for c in contents
-                if c.content_type == "table" and c.structured_value
-            ],
+            "structured_tables": [entry["table"] for entry in table_entries],
+            "structured_table_contexts": [entry["context"] for entry in table_entries],
+            "structured_table_entries": table_entries,
         }
     return result
 
@@ -111,6 +112,45 @@ def _build_context_citation_records(
     return context_rows, [message]
 
 
+def _chapter_title_terms(chapter_title: str) -> list[str]:
+    normalized = (
+        chapter_title.replace("（", " ")
+        .replace("）", " ")
+        .replace("/", " ")
+        .replace("、", " ")
+    )
+    return [term.strip().lower() for term in normalized.split() if len(term.strip()) >= 2]
+
+
+def _select_relevant_table_entries(
+    chapter_title: str,
+    material_types: str,
+    sources: list[dict],
+    limit: int = 5,
+) -> list[dict]:
+    material_terms = [
+        term.strip().lower()
+        for term in material_types.split(",")
+        if term.strip()
+    ]
+    title_terms = _chapter_title_terms(chapter_title)
+    selected = []
+
+    for src in sources:
+        source_name = (src.get("original_name") or "").lower()
+        if material_terms:
+            matches_source = any(term in source_name for term in material_terms)
+        else:
+            matches_source = any(term in source_name for term in title_terms)
+        if not matches_source:
+            continue
+        selected.extend(src.get("structured_table_entries", []))
+        if len(selected) >= limit:
+            return selected[:limit]
+
+    return selected[:limit]
+
+
 def generate_chapter(
     db: Session,
     chapter: DocumentChapter,
@@ -129,12 +169,14 @@ def generate_chapter(
     chapter.match_status = match_status
 
     excerpts = extract_relevant_excerpts(chapter.title, sources_list, max_chars=3000)
-    tables: list[dict] = []
-    table_contexts: list[dict] = []
-    for src in sources_list:
-        tables.extend(src.get("structured_tables", []))
-        table_contexts.extend(src.get("structured_table_contexts", []))
-    generation_context = excerpts + table_contexts[:5]
+    relevant_table_entries = _select_relevant_table_entries(
+        chapter.title,
+        template_chapter.get("material_types", ""),
+        sources_list,
+    )
+    tables = [entry["table"] for entry in relevant_table_entries]
+    table_contexts = [entry["context"] for entry in relevant_table_entries]
+    generation_context = excerpts + table_contexts
     context_rows, _ = _build_context_citation_records(
         generation_context,
         set(source_data),
@@ -151,7 +193,7 @@ def generate_chapter(
         gen_instruction=template_chapter.get("gen_instruction"),
         project_info=project_info,
         matched_excerpts=excerpts,
-        structured_tables=tables[:5],
+        structured_tables=tables,
         user_instruction=user_instruction,
         known_missing=known_missing,
     )
