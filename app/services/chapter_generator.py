@@ -32,6 +32,16 @@ def _load_source_data(db: Session, source_ids: list[str]) -> dict[str, dict]:
                 for c in contents
                 if c.content_type == "table" and c.structured_value
             ],
+            "structured_table_contexts": [
+                {
+                    "source_id": sid,
+                    "source_name": src.original_name,
+                    "locator": c.locator,
+                    "excerpt": c.structured_value,
+                }
+                for c in contents
+                if c.content_type == "table" and c.structured_value
+            ],
         }
     return result
 
@@ -107,8 +117,11 @@ def generate_chapter(
 
     excerpts = extract_relevant_excerpts(chapter.title, sources_list, max_chars=3000)
     tables: list[dict] = []
+    table_contexts: list[dict] = []
     for src in sources_list:
         tables.extend(src.get("structured_tables", []))
+        table_contexts.extend(src.get("structured_table_contexts", []))
+    generation_context = excerpts + table_contexts[:5]
 
     known_missing: list[str] = []
     if match_status == "unmatched":
@@ -140,7 +153,7 @@ def generate_chapter(
 
         citation_rows, missing_information = _build_citation_records(
             result,
-            excerpts,
+            generation_context,
             set(source_data),
         )
         for row in citation_rows:
