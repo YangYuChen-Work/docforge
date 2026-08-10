@@ -69,6 +69,21 @@ def _build_citation_records(
             for cit in valid_citations
         ], missing
 
+    context_rows, context_missing = _build_context_citation_records(
+        matched_excerpts,
+        valid_source_ids,
+    )
+    for message in context_missing:
+        if message not in missing:
+            missing.append(message)
+
+    return context_rows, missing
+
+
+def _build_context_citation_records(
+    matched_excerpts: list[dict],
+    valid_source_ids: set[str],
+) -> tuple[list[dict], list[str]]:
     seen: set[tuple[str, str | None, str]] = set()
     context_rows = []
     for excerpt in matched_excerpts:
@@ -93,9 +108,7 @@ def _build_citation_records(
         message = "AI 未返回有效引用；以下记录的是本次生成实际使用的参考上下文，请补充明确引用。"
     else:
         message = "本章未匹配到可用来源，AI 生成内容缺少可核验引用。"
-    if message not in missing:
-        missing.append(message)
-    return context_rows, missing
+    return context_rows, [message]
 
 
 def generate_chapter(
@@ -122,6 +135,10 @@ def generate_chapter(
         tables.extend(src.get("structured_tables", []))
         table_contexts.extend(src.get("structured_table_contexts", []))
     generation_context = excerpts + table_contexts[:5]
+    context_rows, _ = _build_context_citation_records(
+        generation_context,
+        set(source_data),
+    )
 
     known_missing: list[str] = []
     if match_status == "unmatched":
@@ -144,6 +161,17 @@ def generate_chapter(
     db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
         synchronize_session=False
     )
+    for row in context_rows:
+        db.add(
+            Citation(
+                id=uuid.uuid4().hex,
+                chapter_id=chapter.id,
+                source_document_id=row["source_document_id"],
+                locator=row["locator"],
+                source_excerpt=row["source_excerpt"],
+                citation_type=row["citation_type"],
+            )
+        )
     chapter.status = "generating"
     chapter.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
@@ -155,6 +183,9 @@ def generate_chapter(
             result,
             generation_context,
             set(source_data),
+        )
+        db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
+            synchronize_session=False
         )
         for row in citation_rows:
             db.add(
