@@ -46,7 +46,16 @@ def extract_relevant_excerpts(
     total_chars = 0
 
     for src in sources:
-        for text in src.get("content_texts", []):
+        content_items = src.get("content_items")
+        if content_items is None:
+            content_items = [
+                {"text": text, "locator": None}
+                for text in src.get("content_texts", [])
+            ]
+
+        for item in content_items:
+            text = item.get("text") if isinstance(item, dict) else item
+            locator = item.get("locator") if isinstance(item, dict) else None
             if not text or len(text) < 4:
                 continue
             relevance = sum(1 for kw in keywords if kw in text)
@@ -55,6 +64,7 @@ def extract_relevant_excerpts(
                 results.append({
                     "source_id": src["id"],
                     "source_name": src["original_name"],
+                    "locator": locator,
                     "excerpt": excerpt,
                     "relevance": relevance,
                 })

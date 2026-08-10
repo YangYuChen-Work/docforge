@@ -8,6 +8,17 @@ from app.domain.generation import get_provider
 router = APIRouter()
 
 
+def _citation_state(chapter_status: str, citations: list[Citation]) -> str:
+    """Derive the source-panel state without changing persisted data."""
+    if chapter_status in {"pending", "generating"}:
+        return "generating"
+    if any((citation.citation_type or "summary") != "context" for citation in citations):
+        return "explicit"
+    if citations:
+        return "context"
+    return "missing"
+
+
 @router.get("/documents")
 def list_documents(
     project_id: str | None = None,
@@ -94,11 +105,14 @@ def get_chapter(doc_id: str, chapter_id: str, db: Session = Depends(get_db)):
         "missing_information_json": ch.missing_information_json,
         "conflict_json": ch.conflict_json,
         "match_status": ch.match_status,
+        "citation_state": _citation_state(ch.status, citations),
         "citations": [
             {
+                "id": c.id,
                 "source_document_id": c.source_document_id,
                 "locator": c.locator,
                 "source_excerpt": c.source_excerpt,
+                "citation_type": c.citation_type or "summary",
             }
             for c in citations
         ],

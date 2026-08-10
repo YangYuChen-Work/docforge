@@ -2,7 +2,7 @@ import json
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
-from app.ai.base import ChapterGenerationRequest
+from app.ai.base import ChapterGenerationRequest, ChapterGenerationResult
 from app.db.models import DocumentChapter, ParsedSourceContent, Citation, SourceDocument
 
 
@@ -22,6 +22,11 @@ def _load_source_data(db: Session, source_ids: list[str]) -> dict[str, dict]:
             "id": sid,
             "original_name": src.original_name,
             "content_texts": [c.content_text for c in contents if c.content_text],
+            "content_items": [
+                {"text": c.content_text, "locator": c.locator}
+                for c in contents
+                if c.content_text
+            ],
             "structured_tables": [
                 json.loads(c.structured_value)
                 for c in contents
@@ -29,6 +34,58 @@ def _load_source_data(db: Session, source_ids: list[str]) -> dict[str, dict]:
             ],
         }
     return result
+
+
+def _build_citation_records(
+    result: ChapterGenerationResult,
+    matched_excerpts: list[dict],
+    valid_source_ids: set[str],
+) -> tuple[list[dict], list[str]]:
+    """Build explicit citations or preserve the exact context sent to the AI."""
+    missing = list(result.missing_information or [])
+    valid_citations = [
+        cit
+        for cit in (result.citations or [])
+        if cit.source_document_id in valid_source_ids
+    ]
+    if valid_citations:
+        return [
+            {
+                "source_document_id": cit.source_document_id,
+                "locator": cit.locator,
+                "source_excerpt": cit.quote_or_summary,
+                "citation_type": "explicit",
+            }
+            for cit in valid_citations
+        ], missing
+
+    seen: set[tuple[str, str | None, str]] = set()
+    context_rows = []
+    for excerpt in matched_excerpts:
+        source_id = excerpt.get("source_id")
+        source_excerpt = (excerpt.get("excerpt") or "").strip()
+        if source_id not in valid_source_ids or not source_excerpt:
+            continue
+        key = (source_id, excerpt.get("locator"), source_excerpt)
+        if key in seen:
+            continue
+        seen.add(key)
+        context_rows.append(
+            {
+                "source_document_id": source_id,
+                "locator": excerpt.get("locator"),
+                "source_excerpt": source_excerpt,
+                "citation_type": "context",
+            }
+        )
+
+    if context_rows:
+        message = "AI 未返回有效引用；以下记录的是本次生成实际使用的参考上下文，请补充明确引用。"
+    else:
+        message = "本章未匹配到可用来源，AI 生成内容缺少可核验引用。"
+    if message not in missing:
+        missing.append(message)
+    return context_rows, missing
 
 
 def generate_chapter(
@@ -69,6 +126,11 @@ def generate_chapter(
         known_missing=known_missing,
     )
 
+    # Remove stale provenance before starting so the source panel cannot show
+    # the previous generation while this one is in flight.
+    db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
+        synchronize_session=False
+    )
     chapter.status = "generating"
     chapter.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
@@ -76,18 +138,26 @@ def generate_chapter(
     try:
         result = provider.generate_chapter(request)
 
-        # Save citations
-        for cit in result.citations:
+        citation_rows, missing_information = _build_citation_records(
+            result,
+            excerpts,
+            set(source_data),
+        )
+        for row in citation_rows:
             db.add(
                 Citation(
                     id=uuid.uuid4().hex,
                     chapter_id=chapter.id,
-                    source_document_id=cit.source_document_id,
-                    locator=cit.locator,
-                    source_excerpt=cit.quote_or_summary,
-                    citation_type="summary",
+                    source_document_id=row["source_document_id"],
+                    locator=row["locator"],
+                    source_excerpt=row["source_excerpt"],
+                    citation_type=row["citation_type"],
                 )
             )
+
+        for known_item in known_missing:
+            if known_item not in missing_information:
+                missing_information.insert(0, known_item)
 
         # Build ProseMirror JSON for Tiptap rendering
         content_json = _result_to_prosemirror(result)
@@ -95,13 +165,13 @@ def generate_chapter(
         chapter.plain_text = result.content
         chapter.content_json = json.dumps(content_json, ensure_ascii=False)
         chapter.missing_information_json = json.dumps(
-            result.missing_information, ensure_ascii=False
+            missing_information, ensure_ascii=False
         )
         chapter.conflict_json = json.dumps(
             [{"description": c.description, "sources": c.sources} for c in result.conflicts],
             ensure_ascii=False,
         )
-        chapter.status = "needs_material" if result.missing_information else "generated"
+        chapter.status = "needs_material" if missing_information else "generated"
         chapter.error_message = None
     except Exception as e:
         chapter.status = "failed"
