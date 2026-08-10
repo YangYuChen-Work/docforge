@@ -73,24 +73,6 @@ def _build_citation_records(
             matched_excerpts,
             valid_source_ids,
         )
-        seen = {
-            (row["source_document_id"], row.get("locator"), row["source_excerpt"])
-            for row in context_rows
-        }
-        for cit in valid_citations:
-            source_excerpt = (cit.quote_or_summary or "").strip()
-            key = (cit.source_document_id, cit.locator, source_excerpt)
-            if not source_excerpt or key in seen:
-                continue
-            seen.add(key)
-            context_rows.append(
-                {
-                    "source_document_id": cit.source_document_id,
-                    "locator": cit.locator,
-                    "source_excerpt": source_excerpt,
-                    "citation_type": "context",
-                }
-            )
         if not context_rows:
             missing.append("本章未匹配到可用来源，AI 生成内容缺少可核验引用。")
         return context_rows, missing
@@ -233,7 +215,40 @@ def _build_filename_matched_fallback_excerpts(
     return fallback_excerpts
 
 
+def _mark_chapter_failed(db: Session, chapter: DocumentChapter, error: Exception) -> DocumentChapter:
+    db.rollback()
+    failed_chapter = db.get(DocumentChapter, chapter.id) or chapter
+    failed_chapter.status = "failed"
+    failed_chapter.error_message = str(error)[:500]
+    db.commit()
+    db.refresh(failed_chapter)
+    return failed_chapter
+
+
 def generate_chapter(
+    db: Session,
+    chapter: DocumentChapter,
+    template_chapter: dict,
+    source_ids: list[str],
+    project_info: dict,
+    provider,
+    user_instruction: str | None = None,
+) -> DocumentChapter:
+    try:
+        return _generate_chapter(
+            db,
+            chapter,
+            template_chapter,
+            source_ids,
+            project_info,
+            provider,
+            user_instruction,
+        )
+    except Exception as error:
+        return _mark_chapter_failed(db, chapter, error)
+
+
+def _generate_chapter(
     db: Session,
     chapter: DocumentChapter,
     template_chapter: dict,
@@ -305,50 +320,46 @@ def generate_chapter(
     chapter.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
 
-    try:
-        result = provider.generate_chapter(request)
+    result = provider.generate_chapter(request)
 
-        citation_rows, missing_information = _build_citation_records(
-            result,
-            generation_context,
-            set(source_data),
-        )
-        db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
-            synchronize_session=False
-        )
-        for row in citation_rows:
-            db.add(
-                Citation(
-                    id=uuid.uuid4().hex,
-                    chapter_id=chapter.id,
-                    source_document_id=row["source_document_id"],
-                    locator=row["locator"],
-                    source_excerpt=row["source_excerpt"],
-                    citation_type=row["citation_type"],
-                )
+    citation_rows, missing_information = _build_citation_records(
+        result,
+        generation_context,
+        set(source_data),
+    )
+    db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
+        synchronize_session=False
+    )
+    for row in citation_rows:
+        db.add(
+            Citation(
+                id=uuid.uuid4().hex,
+                chapter_id=chapter.id,
+                source_document_id=row["source_document_id"],
+                locator=row["locator"],
+                source_excerpt=row["source_excerpt"],
+                citation_type=row["citation_type"],
             )
-
-        for known_item in known_missing:
-            if known_item not in missing_information:
-                missing_information.insert(0, known_item)
-
-        # Build ProseMirror JSON for Tiptap rendering
-        content_json = _result_to_prosemirror(result)
-
-        chapter.plain_text = result.content
-        chapter.content_json = json.dumps(content_json, ensure_ascii=False)
-        chapter.missing_information_json = json.dumps(
-            missing_information, ensure_ascii=False
         )
-        chapter.conflict_json = json.dumps(
-            [{"description": c.description, "sources": c.sources} for c in result.conflicts],
-            ensure_ascii=False,
-        )
-        chapter.status = "needs_material" if missing_information else "generated"
-        chapter.error_message = None
-    except Exception as e:
-        chapter.status = "failed"
-        chapter.error_message = str(e)[:500]
+
+    for known_item in known_missing:
+        if known_item not in missing_information:
+            missing_information.insert(0, known_item)
+
+    # Build ProseMirror JSON for Tiptap rendering
+    content_json = _result_to_prosemirror(result)
+
+    chapter.plain_text = result.content
+    chapter.content_json = json.dumps(content_json, ensure_ascii=False)
+    chapter.missing_information_json = json.dumps(
+        missing_information, ensure_ascii=False
+    )
+    chapter.conflict_json = json.dumps(
+        [{"description": c.description, "sources": c.sources} for c in result.conflicts],
+        ensure_ascii=False,
+    )
+    chapter.status = "needs_material" if missing_information else "generated"
+    chapter.error_message = None
 
     db.commit()
     db.refresh(chapter)

@@ -89,12 +89,6 @@ def test_build_citation_records_downgrades_mixed_valid_and_invalid_citations_to_
             "source_excerpt": "市场上下文",
             "citation_type": "context",
         },
-        {
-            "source_document_id": "s1",
-            "locator": "第2页",
-            "source_excerpt": "明确引用",
-            "citation_type": "context",
-        },
     ]
     assert any("当前来源范围" in item for item in missing)
 
@@ -108,22 +102,156 @@ def test_build_citation_records_never_returns_explicit_rows_for_mixed_citations_
     )
     rows, missing = _build_citation_records(result, [], {"s1"})
 
-    assert rows == [
-        {
-            "source_document_id": "s1",
-            "locator": "第2页",
-            "source_excerpt": "明确引用",
-            "citation_type": "context",
-        }
-    ]
-    assert all(row["citation_type"] == "context" for row in rows)
+    assert rows == []
     assert any("当前来源范围" in item for item in missing)
+    assert any("未匹配到可用来源" in item for item in missing)
 
 
 def test_build_citation_records_does_not_fabricate_source_without_context():
     rows, missing = _build_citation_records(_result(citations=[]), [], set())
     assert rows == []
     assert "未匹配到可用来源" in missing[0]
+
+
+def test_generate_chapter_marks_source_preparation_failure_as_failed(tmp_path):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'chapter-preparation-failure.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    db = Session()
+    try:
+        db.add(
+            DocumentChapter(
+                id="chapter-preparation-failure",
+                document_id="doc-preparation-failure",
+                title="异常章节",
+                order_index=1,
+                status="pending",
+            )
+        )
+        db.add(
+            SourceDocument(
+                id="source-malformed",
+                project_id="project-preparation-failure",
+                source_type="uploaded",
+                original_name="异常表格.xlsx",
+                stored_path="/tmp/异常表格.xlsx",
+                file_type="xlsx",
+                file_size=1,
+                sha256="c" * 64,
+                parse_status="parsed",
+            )
+        )
+        db.add(
+            ParsedSourceContent(
+                source_document_id="source-malformed",
+                content_type="table",
+                structured_value="不是合法 JSON",
+                locator="表1",
+                order_index=1,
+            )
+        )
+        db.commit()
+
+        class Provider:
+            def generate_chapter(self, request):
+                raise AssertionError("provider must not run when source preparation fails")
+
+        result = generate_chapter(
+            db,
+            db.get(DocumentChapter, "chapter-preparation-failure"),
+            {"gen_instruction": "按资料生成", "material_types": "异常表格"},
+            ["source-malformed"],
+            {"id": "P003", "name": "失败测试项目", "model": "X", "phase": "方案设计"},
+            Provider(),
+        )
+
+        assert result.status == "failed"
+        assert "Expecting value" in result.error_message
+    finally:
+        db.close()
+
+
+def test_generate_chapter_rolls_back_final_citations_when_postprocessing_fails(tmp_path, monkeypatch):
+    engine = create_engine(
+        f"sqlite:///{tmp_path / 'chapter-postprocessing-failure.db'}",
+        connect_args={"check_same_thread": False},
+    )
+    Base.metadata.create_all(bind=engine)
+    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
+    db = Session()
+    try:
+        db.add(
+            DocumentChapter(
+                id="chapter-postprocessing-failure",
+                document_id="doc-postprocessing-failure",
+                title="市场分析",
+                order_index=1,
+                status="pending",
+            )
+        )
+        db.add(
+            SourceDocument(
+                id="source-postprocessing",
+                project_id="project-postprocessing-failure",
+                source_type="uploaded",
+                original_name="市场报告.docx",
+                stored_path="/tmp/市场报告.docx",
+                file_type="docx",
+                file_size=1,
+                sha256="d" * 64,
+                parse_status="parsed",
+            )
+        )
+        db.add(
+            ParsedSourceContent(
+                source_document_id="source-postprocessing",
+                content_type="paragraph",
+                content_text="市场分析上下文",
+                locator="第1页",
+                order_index=1,
+            )
+        )
+        db.commit()
+        monkeypatch.setattr(
+            "app.services.material_matcher.extract_relevant_excerpts",
+            lambda chapter_title, sources, max_chars=3000: [
+                {
+                    "source_id": "source-postprocessing",
+                    "locator": "第1页",
+                    "excerpt": "市场分析上下文",
+                }
+            ],
+        )
+        monkeypatch.setattr(
+            "app.services.chapter_generator._result_to_prosemirror",
+            lambda result: (_ for _ in ()).throw(RuntimeError("render failed")),
+        )
+
+        class Provider:
+            def generate_chapter(self, request):
+                return _result(citations=[])
+
+        result = generate_chapter(
+            db,
+            db.get(DocumentChapter, "chapter-postprocessing-failure"),
+            {"gen_instruction": "按资料生成", "material_types": "市场报告"},
+            ["source-postprocessing"],
+            {"id": "P004", "name": "失败测试项目", "model": "X", "phase": "方案设计"},
+            Provider(),
+        )
+
+        assert result.status == "failed"
+        citations = db.query(Citation).filter(
+            Citation.chapter_id == "chapter-postprocessing-failure"
+        ).all()
+        assert [(citation.citation_type, citation.source_excerpt) for citation in citations] == [
+            ("context", "市场分析上下文")
+        ]
+    finally:
+        db.close()
 
 
 def test_generate_chapter_shows_context_sources_before_provider_returns(tmp_path, monkeypatch):

@@ -372,6 +372,7 @@ async function refreshGenerationState() {
       } else {
         currentChapter.value = polledChapter
         await loadSourceDetails(polledChapter.citations || [], polledChapter.id, refreshId)
+        if (refreshId !== latestGenerationRefreshId || requestedChapterId !== currentChapterId.value) return
         const transition = regenerationTransition.value
         if (transition && transition.chapterId === polledChapter.id && !transition.requestPending) {
           regenerationTransition.value = null
@@ -379,6 +380,8 @@ async function refreshGenerationState() {
       }
     }
   }
+
+  if (refreshId !== latestGenerationRefreshId) return
   if (!isStillGenerating(doc.value)) {
     generating.value = false
     stopGenerationPolling()
