@@ -73,12 +73,16 @@
         :activeId="currentChapterId"
         :saveStatus="saveStatus"
         :savedAt="savedAt"
+        :saveError="saveError"
         @select="selectChapter"
         @addChapter="addChapter"
       />
       <ContentPanel
         ref="contentPanelRef"
         :chapter="currentChapter"
+        :hasUnsavedChanges="hasUnsavedChanges"
+        :isSaving="isSaving"
+        @save="saveCurrentChapter"
         @confirm="confirmChapter"
         @regenerate="showRegenModal = true"
         @export="doExport"
@@ -154,6 +158,9 @@ const currentChapter = ref<any>(null)
 const annotations = ref<any[]>([])
 const saveStatus = ref('已保存')
 const savedAt = ref('')
+const hasUnsavedChanges = ref(false)
+const isSaving = ref(false)
+const saveError = ref('')
 const showRegenModal = ref(false)
 const regenInstruction = ref('')
 const aiPanelRef = ref()
@@ -178,12 +185,17 @@ const titleInputRef = ref<HTMLInputElement | null>(null)
 const showMoreTools = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let genPollTimer: ReturnType<typeof setInterval> | null = null
+type ChapterSavePayload = { plain_text: string; content_json: string }
+let savedSnapshot: ChapterSavePayload | null = null
+let pendingSave: { chapterId: string; payload: ChapterSavePayload } | null = null
+let saveRequest: Promise<boolean> | null = null
 const generating = ref(false)
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleSaveShortcut)
   doc.value = await getDocument(docId)
   titleDraft.value = doc.value.title || ''
-  if (doc.value.chapters.length > 0) selectChapter(doc.value.chapters[0])
+  if (doc.value.chapters.length > 0) await selectChapter(doc.value.chapters[0])
   // Generation now runs in a background thread on the backend (see
   // app/domain/generation.py _run_generation_in_background), so when the
   // wizard navigates here right after creating the task, chapters may
@@ -206,6 +218,8 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleSaveShortcut)
+  if (saveTimer) clearTimeout(saveTimer)
   if (genPollTimer) clearInterval(genPollTimer)
 })
 
@@ -261,10 +275,84 @@ function changeFontSize(event: Event) {
   runEditorCommand('fontSize', value)
 }
 
+function payloadFromChapter(chapter: any): ChapterSavePayload {
+  return {
+    plain_text: chapter?.plain_text || '',
+    content_json: chapter?.content_json || '',
+  }
+}
+
+function samePayload(left: ChapterSavePayload | null, right: ChapterSavePayload) {
+  return left !== null && left.plain_text === right.plain_text && left.content_json === right.content_json
+}
+
+async function saveCurrentChapter(): Promise<boolean> {
+  if (isSaving.value) return saveRequest || Promise.resolve(true)
+
+  const request = pendingSave
+  if (!request || !hasUnsavedChanges.value || samePayload(savedSnapshot, request.payload)) {
+    pendingSave = null
+    hasUnsavedChanges.value = false
+    if (saveStatus.value !== '保存失败') saveStatus.value = '已保存'
+    return true
+  }
+
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+
+  isSaving.value = true
+  saveStatus.value = '保存中...'
+  saveError.value = ''
+
+  const requestPromise = editChapter(docId, request.chapterId, request.payload)
+    .then(() => {
+      if (pendingSave?.chapterId === request.chapterId && samePayload(pendingSave.payload, request.payload)) {
+        savedSnapshot = request.payload
+        pendingSave = null
+        hasUnsavedChanges.value = false
+        if (currentChapterId.value === request.chapterId) {
+          currentChapter.value = { ...currentChapter.value, ...request.payload }
+        }
+        savedAt.value = new Date().toTimeString().slice(0, 5)
+        saveStatus.value = '已保存'
+      }
+      return true
+    })
+    .catch((err: any) => {
+      saveError.value = err.message || '保存失败'
+      saveStatus.value = '保存失败'
+      hasUnsavedChanges.value = true
+      return false
+    })
+    .finally(() => {
+      isSaving.value = false
+      saveRequest = null
+    })
+
+  saveRequest = requestPromise
+  return requestPromise
+}
+
+async function flushPendingSave() {
+  while (saveRequest || (pendingSave && hasUnsavedChanges.value)) {
+    const saved = saveRequest ? await saveRequest : await saveCurrentChapter()
+    if (!saved) return false
+  }
+  return true
+}
+
 async function selectChapter(ch: any) {
+  if (currentChapterId.value && !(await flushPendingSave())) return
   selectionText.value = ''
   currentChapterId.value = ch.id
   currentChapter.value = await getChapter(docId, ch.id)
+  savedSnapshot = payloadFromChapter(currentChapter.value)
+  pendingSave = null
+  hasUnsavedChanges.value = false
+  saveError.value = ''
+  saveStatus.value = '已保存'
   annotations.value = await listAnnotations(docId, ch.id)
 }
 
@@ -277,13 +365,30 @@ async function addChapter(title: string) {
 
 function onEdit(text: string, contentJson: string) {
   if (!currentChapter.value) return
-  saveStatus.value = '保存中...'
+  const payload = { plain_text: text, content_json: contentJson }
+  pendingSave = { chapterId: currentChapterId.value, payload }
+  hasUnsavedChanges.value = !samePayload(savedSnapshot, payload)
+  saveError.value = ''
+  saveStatus.value = hasUnsavedChanges.value ? '有未保存修改' : '已保存'
+  if (!hasUnsavedChanges.value) {
+    pendingSave = null
+    return
+  }
+
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(async () => {
-    await editChapter(docId, currentChapterId.value, { plain_text: text, content_json: contentJson })
-    saveStatus.value = '已保存'
-    savedAt.value = new Date().toTimeString().slice(0, 5)
+  saveTimer = setTimeout(() => {
+    saveTimer = null
+    void saveCurrentChapter()
   }, 1000)
+}
+
+function handleSaveShortcut(event: KeyboardEvent) {
+  const tag = (event.target as HTMLElement | null)?.tagName.toLowerCase()
+  if (tag === 'input' || tag === 'textarea' || tag === 'select') return
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault()
+    void saveCurrentChapter()
+  }
 }
 
 async function confirmChapter() {

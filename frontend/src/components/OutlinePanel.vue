@@ -3,8 +3,14 @@
     <div class="outline-header">
       <div class="outline-title">{{ docTitle }}</div>
       <div class="outline-saved">
-        <span class="saved-badge">{{ saveStatus === '保存中...' ? '保存中' : '已保存' }}</span>
-        <span v-if="savedAt"> · 自动保存 {{ savedAt }}</span>
+        <span
+          class="saved-badge"
+          :class="saveStatusClass(saveStatus)"
+          :title="saveError || undefined"
+        >
+          {{ saveStatusLabel(saveStatus) }}
+        </span>
+        <span v-if="saveStatus === '已保存' && savedAt"> · 自动保存 {{ savedAt }}</span>
       </div>
     </div>
     <div class="outline-section-title">文档目录</div>
@@ -35,8 +41,25 @@ defineProps<{
   activeId: string
   saveStatus?: string
   savedAt?: string
+  saveError?: string
 }>()
 const emit = defineEmits<{ select: [chapter: any]; addChapter: [title: string] }>()
+
+function saveStatusLabel(status?: string) {
+  const map: Record<string, string> = {
+    '有未保存修改': '未保存',
+    '保存中...': '保存中',
+    '保存失败': '保存失败',
+    '已保存': '已保存',
+  }
+  return map[status || '已保存'] || '已保存'
+}
+
+function saveStatusClass(status?: string) {
+  if (status === '保存失败') return 'error'
+  if (status === '有未保存修改' || status === '保存中...') return 'unsaved'
+  return ''
+}
 
 function statusTag(s: string) {
   const map: Record<string, string> = {
