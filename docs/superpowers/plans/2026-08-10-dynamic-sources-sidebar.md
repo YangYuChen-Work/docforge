@@ -296,3 +296,33 @@ Expected: no merge markers or temporary debug logs; no whitespace errors.
 - [ ] **Step 5: Commit any final verification-only fixes and report exact evidence.**
 
 Use `git status --short --branch` and `git log --oneline -8` to report the branch and commits without staging unrelated existing untracked files.
+
+### Task 6: Show matched sources while each chapter is generating
+
+**Files:**
+- Modify: `app/services/chapter_generator.py`
+- Modify: `tests/test_chapter_generator.py`
+
+Before the provider call, persist the exact matched excerpts and table contexts for the current chapter as `citation_type="context"`, commit them with `chapter.status="generating"`, and only then call the provider. After the provider returns, replace those temporary rows with valid explicit citations or the existing context fallback rows. This makes the right source panel render actual chapter sources during generation while preserving the explicit/context distinction.
+
+### Task 7: Keep manual regeneration dynamic and reject mixed invalid citations
+
+**Files:**
+- Modify: `app/services/chapter_generator.py`
+- Modify: `app/api/documents.py`
+- Modify: `frontend/src/pages/DocEditor.vue`
+- Modify: `frontend/src/components/AiPanel.vue`
+- Modify: `tests/test_chapter_generator.py`
+- Modify: `tests/test_documents_api.py`
+
+Manual chapter regeneration must start the existing chapter polling before awaiting the regenerate request, so the right panel can read the committed in-flight context citations. The source-state API/UI must distinguish `pending` from `generating`. If a provider response contains any source ID outside the current source set, do not present the response as fully explicit; downgrade to context when matched context exists and add a missing-information warning. Remove unused source/context props introduced by the prior implementation.
+
+### Task 8: Prefer committed context state and guarantee matched-source fallback excerpts
+
+**Files:**
+- Modify: `app/services/chapter_generator.py`
+- Modify: `app/api/documents.py`
+- Modify: `tests/test_chapter_generator.py`
+- Modify: `tests/test_documents_api.py`
+
+When a generating chapter already has persisted `context` citations, the chapter API must derive `citation_state="context"` so the right panel labels the actual reference material as “待明确引用”. When chapter material types match a parsed source but title-keyword extraction returns no text, pass a bounded fallback excerpt from that matched source's parsed content to the provider and persist it as generation context when needed. Add focused tests for both behaviors.
