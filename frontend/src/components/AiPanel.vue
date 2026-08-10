@@ -50,9 +50,9 @@
           智能建议
           <span class="ai-count-badge">{{ annotations.length }}</span>
         </div>
-        <div v-for="a in annotations" :key="a.id" class="ai-suggestion-card">
+        <div v-for="(a, index) in annotations" :key="a.id" class="ai-suggestion-card">
           <div class="ai-suggestion-meta">
-            <span>{{ a.label || '批注建议' }}</span>
+            <span>批注{{ index + 1 }}</span>
             <span>{{ a.created_by || '系统' }}</span>
           </div>
           <p>{{ a.content }}</p>
@@ -167,7 +167,7 @@
           @click="$emit('annotationFocus', annotation.id)"
         >
           <div class="annotation-review-header">
-            <span class="annotation-number">批注 {{ index + 1 }}</span>
+            <span class="annotation-number">批注{{ index + 1 }}</span>
             <span class="annotation-status">{{ annotationStatus(annotation.status) }}</span>
           </div>
           <div class="annotation-original-text">{{ annotation.target_text || '未记录原文' }}</div>
@@ -395,7 +395,7 @@ function submitAnnotation() {
   annotationSaving.value = true
   emit('createAnnotation', {
     type: 'review_comment',
-    label: '领导批注',
+    label: '批注',
     target_text: targetText,
     content,
   })
