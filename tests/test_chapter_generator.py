@@ -88,8 +88,35 @@ def test_build_citation_records_downgrades_mixed_valid_and_invalid_citations_to_
             "locator": "第3页",
             "source_excerpt": "市场上下文",
             "citation_type": "context",
+        },
+        {
+            "source_document_id": "s1",
+            "locator": "第2页",
+            "source_excerpt": "明确引用",
+            "citation_type": "context",
+        },
+    ]
+    assert any("当前来源范围" in item for item in missing)
+
+
+def test_build_citation_records_never_returns_explicit_rows_for_mixed_citations_without_context():
+    result = _result(
+        citations=[
+            CitationItem("s1", "第2页", "明确引用"),
+            CitationItem("s-outside", "第9页", "越界引用"),
+        ]
+    )
+    rows, missing = _build_citation_records(result, [], {"s1"})
+
+    assert rows == [
+        {
+            "source_document_id": "s1",
+            "locator": "第2页",
+            "source_excerpt": "明确引用",
+            "citation_type": "context",
         }
     ]
+    assert all(row["citation_type"] == "context" for row in rows)
     assert any("当前来源范围" in item for item in missing)
 
 

@@ -12,6 +12,8 @@ def _citation_state(chapter_status: str, citations: list[Citation]) -> str:
     """Derive the source-panel state without changing persisted data."""
     if chapter_status == "pending":
         return "pending"
+    if chapter_status == "failed":
+        return "failed"
     if any((citation.citation_type or "summary") != "context" for citation in citations):
         return "explicit"
     if citations:

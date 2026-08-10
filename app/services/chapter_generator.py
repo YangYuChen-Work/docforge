@@ -69,15 +69,31 @@ def _build_citation_records(
         warning = "AI 返回了超出当前来源范围的引用，以下记录已降级为本次生成使用的参考上下文，请补充明确引用。"
         if warning not in missing:
             missing.append(warning)
-        context_rows, context_missing = _build_context_citation_records(
+        context_rows, _ = _build_context_citation_records(
             matched_excerpts,
             valid_source_ids,
         )
-        for message in context_missing:
-            if message not in missing:
-                missing.append(message)
-        if context_rows:
-            return context_rows, missing
+        seen = {
+            (row["source_document_id"], row.get("locator"), row["source_excerpt"])
+            for row in context_rows
+        }
+        for cit in valid_citations:
+            source_excerpt = (cit.quote_or_summary or "").strip()
+            key = (cit.source_document_id, cit.locator, source_excerpt)
+            if not source_excerpt or key in seen:
+                continue
+            seen.add(key)
+            context_rows.append(
+                {
+                    "source_document_id": cit.source_document_id,
+                    "locator": cit.locator,
+                    "source_excerpt": source_excerpt,
+                    "citation_type": "context",
+                }
+            )
+        if not context_rows:
+            missing.append("本章未匹配到可用来源，AI 生成内容缺少可核验引用。")
+        return context_rows, missing
 
     if valid_citations:
         return [

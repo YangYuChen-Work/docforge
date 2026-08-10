@@ -16,6 +16,7 @@ client = TestClient(app)
 def test_citation_state_distinguishes_pending_from_generating_chapters():
     assert _citation_state("pending", []) == "pending"
     assert _citation_state("generating", []) == "generating"
+    assert _citation_state("failed", []) == "failed"
 
 
 def test_citation_state_prefers_actual_citations_over_generating_status():

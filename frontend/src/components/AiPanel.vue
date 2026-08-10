@@ -274,7 +274,7 @@ type Citation = {
   citation_type?: string | null
 }
 
-type CitationState = 'pending' | 'generating' | 'explicit' | 'context' | 'missing'
+type CitationState = 'pending' | 'generating' | 'explicit' | 'context' | 'missing' | 'failed'
 
 const props = defineProps<{
   annotations: Annotation[]
@@ -325,6 +325,7 @@ const panelDescription = computed(() => {
     if (props.citationState === 'pending') return '等待 AI 开始逐份检索本章相关资料。'
     if (props.citationState === 'generating') return 'AI 正在逐份核对本章资料，来源卡片会随检索结果出现。'
     if (props.citationState === 'context') return '展示 AI 实际使用的参考上下文，待补充明确引用。'
+    if (props.citationState === 'failed') return '本章生成失败，请查看正文错误并重试。'
     if (props.citationState === 'missing') return '没有可核验来源时会明确标记为待补充。'
     return '只展示本章最终引用的文件和参考原文。'
   }
@@ -334,6 +335,7 @@ const sourcePanelHeading = computed(() => {
   if (props.citationState === 'pending') return '本章来源等待检索'
   if (props.citationState === 'context') return 'AI 生成参考资料（待明确引用）'
   if (props.citationState === 'generating') return 'AI 正在检索本章资料'
+  if (props.citationState === 'failed') return '本章生成失败'
   if (props.citationState === 'missing') return '本章来源待补充'
   return '本章最终来源'
 })
@@ -352,6 +354,7 @@ const sourceStateMessage = computed(() => {
     if (discoveredSourceCount.value === 0) return 'AI 正在查找与本章相关的项目资料，来源卡片会随匹配结果出现。'
     return `AI 正在逐份核对本章资料，已发现 ${discoveredSourceCount.value} 份参考资料；来源卡片正在逐步加载。`
   }
+  if (props.citationState === 'failed') return '本章生成失败，来源未完成确认，请重试或手动补充。'
   if (sourceCardsLoading.value) return '已找到本章来源，正在逐张加载文件定位和参考原文。'
   if (props.citationState === 'missing') return '本章未匹配到可用来源或未返回有效引用。'
   return ''

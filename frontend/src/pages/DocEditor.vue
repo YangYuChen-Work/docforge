@@ -237,12 +237,14 @@ const citationState = computed(() => {
   const chapter = currentChapter.value
   if (!chapter) return 'pending'
   if (chapter.status === 'pending') return 'pending'
-  if (chapter.status === 'generating') return 'generating'
   if (chapter.citation_state) return chapter.citation_state
   if (chapterCitations.value.some((citation: any) => (citation.citation_type || 'summary') !== 'context')) {
     return 'explicit'
   }
-  return chapterCitations.value.length > 0 ? 'context' : 'missing'
+  if (chapterCitations.value.length > 0) return 'context'
+  if (chapter.status === 'generating') return 'generating'
+  if (chapter.status === 'failed') return 'failed'
+  return 'missing'
 })
 
 const generationProgress = computed(() => {
