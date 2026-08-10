@@ -58,7 +58,7 @@ def _delete_document_records(db: Session, doc: GeneratedDocument) -> str:
     chapter_ids = [
         chapter_id
         for (chapter_id,) in db.query(DocumentChapter.id)
-        .filter(DocumentChapter.document_id == doc_id)
+        .filter(DocumentChapter.document_id == doc.id)
         .all()
     ]
 
@@ -70,13 +70,13 @@ def _delete_document_records(db: Session, doc: GeneratedDocument) -> str:
             synchronize_session=False
         )
 
-    db.query(DocumentVersion).filter(DocumentVersion.document_id == doc_id).delete(
+    db.query(DocumentVersion).filter(DocumentVersion.document_id == doc.id).delete(
         synchronize_session=False
     )
-    db.query(Export).filter(Export.document_id == doc_id).delete(
+    db.query(Export).filter(Export.document_id == doc.id).delete(
         synchronize_session=False
     )
-    db.query(DocumentChapter).filter(DocumentChapter.document_id == doc_id).delete(
+    db.query(DocumentChapter).filter(DocumentChapter.document_id == doc.id).delete(
         synchronize_session=False
     )
     db.delete(doc)
