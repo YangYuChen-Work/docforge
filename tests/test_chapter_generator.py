@@ -63,6 +63,36 @@ def test_build_citation_records_persists_context_when_ai_returns_no_citation():
     assert "未返回有效引用" in missing[0]
 
 
+def test_build_citation_records_downgrades_mixed_valid_and_invalid_citations_to_context():
+    result = _result(
+        citations=[
+            CitationItem("s1", "第2页", "明确引用"),
+            CitationItem("s-outside", "第9页", "越界引用"),
+        ]
+    )
+    rows, missing = _build_citation_records(
+        result,
+        [
+            {
+                "source_id": "s1",
+                "source_name": "市场报告.docx",
+                "locator": "第3页",
+                "excerpt": "市场上下文",
+            }
+        ],
+        {"s1"},
+    )
+    assert rows == [
+        {
+            "source_document_id": "s1",
+            "locator": "第3页",
+            "source_excerpt": "市场上下文",
+            "citation_type": "context",
+        }
+    ]
+    assert any("当前来源范围" in item for item in missing)
+
+
 def test_build_citation_records_does_not_fabricate_source_without_context():
     rows, missing = _build_citation_records(_result(citations=[]), [], set())
     assert rows == []

@@ -104,10 +104,7 @@
         :annotations="annotations"
         :citations="chapterCitations"
         :sourceDetails="sourceDetails"
-        :chapterStatus="currentChapter?.status || 'pending'"
         :citationState="citationState"
-        :chapterId="currentChapterId"
-        :docId="docId"
         :selectionText="selectionText"
         :activeAnnotationId="activeAnnotationId"
         :activeCitationKey="activeCitationKey"
@@ -228,7 +225,9 @@ const chapterCitations = computed(() =>
 
 const citationState = computed(() => {
   const chapter = currentChapter.value
-  if (!chapter || ['pending', 'generating'].includes(chapter.status)) return 'generating'
+  if (!chapter) return 'pending'
+  if (chapter.status === 'pending') return 'pending'
+  if (chapter.status === 'generating') return 'generating'
   if (chapter.citation_state) return chapter.citation_state
   if (chapterCitations.value.some((citation: any) => (citation.citation_type || 'summary') !== 'context')) {
     return 'explicit'
@@ -252,41 +251,49 @@ onMounted(async () => {
   doc.value = await getDocument(docId)
   titleDraft.value = doc.value.title || ''
   if (doc.value.chapters.length > 0) await selectChapter(doc.value.chapters[0])
-  // Generation now runs in a background thread on the backend (see
-  // app/domain/generation.py _run_generation_in_background), so when the
-  // wizard navigates here right after creating the task, chapters may
-  // still be "pending"/"generating". Poll until every chapter reaches a
-  // terminal state instead of showing a permanently stale outline.
-  if (isStillGenerating(doc.value)) {
-    generating.value = true
-    genPollTimer = setInterval(async () => {
-      doc.value = await getDocument(docId)
-      if (currentChapterId.value) {
-        const polledChapter = await getChapter(docId, currentChapterId.value)
-        if (polledChapter.id === currentChapterId.value && !hasUnsavedChanges.value && !isSaving.value) {
-          currentChapter.value = polledChapter
-          await loadSourceDetails(polledChapter.citations || [], polledChapter.id)
-        }
-      }
-      if (!isStillGenerating(doc.value)) {
-        generating.value = false
-        if (genPollTimer) clearInterval(genPollTimer)
-        genPollTimer = null
-      }
-    }, 3000)
-  }
+  if (isStillGenerating(doc.value)) startGenerationPolling()
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleSaveShortcut)
   if (saveTimer) clearTimeout(saveTimer)
-  if (genPollTimer) clearInterval(genPollTimer)
+  stopGenerationPolling()
   if (focusMessageTimer) clearTimeout(focusMessageTimer)
 })
 
 function isStillGenerating(d: any) {
   if (!d) return false
   return d.chapters.some((c: any) => c.status === 'pending' || c.status === 'generating')
+}
+
+function stopGenerationPolling() {
+  if (genPollTimer) clearInterval(genPollTimer)
+  genPollTimer = null
+}
+
+async function refreshGenerationState() {
+  doc.value = await getDocument(docId)
+  if (currentChapterId.value) {
+    const polledChapter = await getChapter(docId, currentChapterId.value)
+    if (polledChapter.id === currentChapterId.value && !hasUnsavedChanges.value && !isSaving.value) {
+      currentChapter.value = polledChapter
+      await loadSourceDetails(polledChapter.citations || [], polledChapter.id)
+    }
+  }
+  if (!isStillGenerating(doc.value)) {
+    generating.value = false
+    stopGenerationPolling()
+  }
+}
+
+function startGenerationPolling(runImmediately = false) {
+  generating.value = true
+  if (!genPollTimer) {
+    genPollTimer = setInterval(() => {
+      void refreshGenerationState()
+    }, 3000)
+  }
+  if (runImmediately) void refreshGenerationState()
 }
 
 function startRename() {
@@ -490,11 +497,26 @@ async function confirmChapter() {
 }
 
 async function doRegenerate() {
+  const chapterId = currentChapterId.value
+  if (!chapterId) return
   showRegenModal.value = false
-  await regenerateChapter(docId, currentChapterId.value, regenInstruction.value || undefined)
+  const instruction = regenInstruction.value || undefined
   regenInstruction.value = ''
-  currentChapter.value = await getChapter(docId, currentChapterId.value)
-  doc.value = await getDocument(docId)
+  if (currentChapter.value?.id === chapterId) {
+    currentChapter.value = { ...currentChapter.value, status: 'pending' }
+  }
+  if (doc.value?.chapters) {
+    doc.value = {
+      ...doc.value,
+      chapters: doc.value.chapters.map((chapter: any) =>
+        chapter.id === chapterId ? { ...chapter, status: 'pending' } : chapter,
+      ),
+    }
+  }
+  const regenerateRequest = regenerateChapter(docId, chapterId, instruction)
+  startGenerationPolling(true)
+  await regenerateRequest
+  await refreshGenerationState()
 }
 
 async function doAiAction(action: string, selection: string, instruction: string) {

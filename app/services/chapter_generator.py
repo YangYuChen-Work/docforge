@@ -54,11 +54,31 @@ def _build_citation_records(
 ) -> tuple[list[dict], list[str]]:
     """Build explicit citations or preserve the exact context sent to the AI."""
     missing = list(result.missing_information or [])
+    invalid_citations = [
+        cit
+        for cit in (result.citations or [])
+        if cit.source_document_id not in valid_source_ids
+    ]
     valid_citations = [
         cit
         for cit in (result.citations or [])
         if cit.source_document_id in valid_source_ids
     ]
+
+    if invalid_citations:
+        warning = "AI 返回了超出当前来源范围的引用，以下记录已降级为本次生成使用的参考上下文，请补充明确引用。"
+        if warning not in missing:
+            missing.append(warning)
+        context_rows, context_missing = _build_context_citation_records(
+            matched_excerpts,
+            valid_source_ids,
+        )
+        for message in context_missing:
+            if message not in missing:
+                missing.append(message)
+        if context_rows:
+            return context_rows, missing
+
     if valid_citations:
         return [
             {

@@ -9,8 +9,8 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_citation_state_is_generating_for_pending_or_generating_chapters():
-    assert _citation_state("pending", []) == "generating"
+def test_citation_state_distinguishes_pending_from_generating_chapters():
+    assert _citation_state("pending", []) == "pending"
     assert _citation_state("generating", []) == "generating"
 
 
