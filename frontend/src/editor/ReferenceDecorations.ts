@@ -47,37 +47,52 @@ function normalizeWithMap(value: string) {
     previousWhitespace = false
   }
 
-  return { text: chars.join(' '), map }
+  return { text: chars.join(''), map }
 }
 
 function findTextRange(doc: any, query: string): TextRange | null {
   const needle = query.trim()
   if (!needle) return null
 
-  let result: TextRange | null = null
+  const textNodes: Array<{ text: string; from: number }> = []
   doc.descendants((node: any, pos: number) => {
-    if (result || !node.isText || !node.text) return
-
-    const exactIndex = node.text.indexOf(needle)
-    if (exactIndex >= 0) {
-      result = { from: pos + 1 + exactIndex, to: pos + 1 + exactIndex + needle.length }
-      return
-    }
-
-    const normalizedNeedle = normalizeWithMap(needle).text.trim()
-    if (!normalizedNeedle) return
-    const normalizedNode = normalizeWithMap(node.text)
-    const normalizedIndex = normalizedNode.text.indexOf(normalizedNeedle)
-    if (normalizedIndex < 0) return
-
-    const startOffset = normalizedNode.map[normalizedIndex]
-    const endOffsetIndex = normalizedIndex + normalizedNeedle.length - 1
-    const endOffset = normalizedNode.map[endOffsetIndex]
-    if (startOffset === undefined || endOffset === undefined) return
-    result = { from: pos + 1 + startOffset, to: pos + 1 + endOffset + 1 }
+    if (node.isText && node.text) textNodes.push({ text: node.text, from: pos + 1 })
   })
 
-  return result
+  if (textNodes.length === 0) return null
+
+  const absolutePositions: number[] = []
+  let combinedText = ''
+  for (const node of textNodes) {
+    for (let index = 0; index < node.text.length; index += 1) {
+      combinedText += node.text[index]
+      absolutePositions.push(node.from + index)
+    }
+  }
+
+  const exactIndex = combinedText.indexOf(needle)
+  if (exactIndex >= 0) {
+    const endIndex = exactIndex + needle.length - 1
+    return {
+      from: absolutePositions[exactIndex],
+      to: absolutePositions[endIndex] + 1,
+    }
+  }
+
+  const normalizedNeedle = normalizeWithMap(needle).text.trim()
+  if (!normalizedNeedle) return null
+  const normalizedText = normalizeWithMap(combinedText)
+  const normalizedIndex = normalizedText.text.indexOf(normalizedNeedle)
+  if (normalizedIndex < 0) return null
+
+  const startOffset = normalizedText.map[normalizedIndex]
+  const endOffsetIndex = normalizedIndex + normalizedNeedle.length - 1
+  const endOffset = normalizedText.map[endOffsetIndex]
+  if (startOffset === undefined || endOffset === undefined) return null
+  return {
+    from: absolutePositions[startOffset],
+    to: absolutePositions[endOffset] + 1,
+  }
 }
 
 export function findReferenceRange(editor: any, text: string): TextRange | null {
