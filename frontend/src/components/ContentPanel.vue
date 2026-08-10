@@ -7,6 +7,16 @@
       <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ chapter?.title || '请选择章节' }}</span>
       <div style="display:flex;gap:8px;align-items:center">
         <button
+          v-if="chapter"
+          class="btn btn-primary"
+          style="margin-top:0;padding:6px 14px"
+          :disabled="!hasUnsavedChanges || isSaving"
+          :title="hasUnsavedChanges ? '保存当前章节' : '当前章节已是最新版本'"
+          @click="emit('save')"
+        >
+          {{ isSaving ? '保存中...' : '保存' }}
+        </button>
+        <button
           v-if="chapter && chapter.status !== 'confirmed'"
           @click="$emit('confirm')"
           class="btn btn-outline"
@@ -112,8 +122,13 @@ export type EditorToolbarState = {
   textAlign: string
 }
 
-const props = defineProps<{ chapter: any }>()
+const props = defineProps<{
+  chapter: any
+  hasUnsavedChanges: boolean
+  isSaving: boolean
+}>()
 const emit = defineEmits<{
+  save: []
   confirm: []
   regenerate: []
   export: [format: string]
