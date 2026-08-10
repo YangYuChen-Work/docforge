@@ -12,7 +12,33 @@ from app.db.models import (
 )
 from app.db.session import Base
 from app.services.chapter_generator import _build_citation_records
-from app.services.chapter_generator import generate_chapter
+from app.services.chapter_generator import generate_chapter, prepare_chapter_generation
+
+
+def test_prepare_chapter_limits_valid_citations_to_context_sources():
+    prepared = prepare_chapter_generation(
+        None,
+        DocumentChapter(id="chapter-context-boundary", title="市场分析", order_index=1),
+        {"gen_instruction": "按资料生成", "material_types": "市场报告"},
+        ["source-context", "source-unseen"],
+        {"id": "P1", "name": "项目", "model": "X", "phase": "方案设计"},
+        source_data={
+            "source-context": {
+                "id": "source-context",
+                "original_name": "市场报告.docx",
+                "content_items": [{"text": "市场分析来源", "locator": "第1页"}],
+                "structured_table_entries": [],
+            },
+            "source-unseen": {
+                "id": "source-unseen",
+                "original_name": "采购报告.docx",
+                "content_items": [{"text": "采购内容", "locator": "第2页"}],
+                "structured_table_entries": [],
+            },
+        },
+    )
+
+    assert prepared.valid_source_ids == {"source-context"}
 
 
 def _result(citations):

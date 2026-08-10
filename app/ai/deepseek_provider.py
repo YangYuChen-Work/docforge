@@ -13,17 +13,23 @@ from app.config import settings
 class DeepSeekProvider:
     """OpenAI-compatible provider targeting DeepSeek V4 Pro."""
 
+    def __init__(self):
+        self._client_instance = None
+
     def _client(self):
+        if self._client_instance is not None:
+            return self._client_instance
         try:
             from openai import OpenAI
         except ImportError as e:
             raise RuntimeError("openai package not installed. Run: pip install openai") from e
-        return OpenAI(
+        self._client_instance = OpenAI(
             api_key=settings.ai_api_key,
             base_url=settings.ai_base_url or "https://api.deepseek.com",
             timeout=settings.ai_timeout_seconds,
             max_retries=settings.ai_max_retries,
         )
+        return self._client_instance
 
     def generate_chapter(self, request: ChapterGenerationRequest) -> ChapterGenerationResult:
         excerpts_text = "\n\n".join(

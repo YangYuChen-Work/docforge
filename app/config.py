@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     ai_model: str = "deepseekv4-pro"
     ai_timeout_seconds: int = 60
     ai_max_retries: int = 2
+    generation_concurrency: int = 4
     libreoffice_path: str = ""
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}

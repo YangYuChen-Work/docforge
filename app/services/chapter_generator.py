@@ -1,9 +1,23 @@
 import json
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.ai.base import ChapterGenerationRequest, ChapterGenerationResult
 from app.db.models import DocumentChapter, ParsedSourceContent, Citation, SourceDocument
+
+
+@dataclass
+class PreparedChapterGeneration:
+    """Prepared provider input plus the provenance needed for persistence."""
+
+    chapter_id: str
+    request: ChapterGenerationRequest
+    generation_context: list[dict]
+    valid_source_ids: set[str]
+    context_rows: list[dict]
+    match_status: str
+    known_missing: list[str]
 
 
 def _load_source_data(db: Session, source_ids: list[str]) -> dict[str, dict]:
@@ -257,13 +271,41 @@ def _generate_chapter(
     provider,
     user_instruction: str | None = None,
 ) -> DocumentChapter:
+    prepared = prepare_chapter_generation(
+        db,
+        chapter,
+        template_chapter,
+        source_ids,
+        project_info,
+        user_instruction=user_instruction,
+    )
+    initialize_chapter_generation(db, chapter, prepared)
+    db.commit()
+    result = provider.generate_chapter(prepared.request)
+
+    return persist_chapter_result(db, chapter, prepared, result)
+
+
+def prepare_chapter_generation(
+    db: Session,
+    chapter: DocumentChapter,
+    template_chapter: dict,
+    source_ids: list[str],
+    project_info: dict,
+    user_instruction: str | None = None,
+    source_data: dict[str, dict] | None = None,
+) -> PreparedChapterGeneration:
+    """Build a chapter request from parsed sources.
+
+    ``source_data`` is optional for the single-chapter API. The task runner
+    passes one preloaded snapshot so every chapter avoids re-reading the same
+    parsed source rows from SQLite.
+    """
     from app.services.material_matcher import compute_match_status, extract_relevant_excerpts
 
-    source_data = _load_source_data(db, source_ids)
+    source_data = source_data if source_data is not None else _load_source_data(db, source_ids)
     sources_list = list(source_data.values())
-
     match_status = compute_match_status(template_chapter, sources_list)
-    chapter.match_status = match_status
 
     excerpts = extract_relevant_excerpts(chapter.title, sources_list, max_chars=3000)
     if not excerpts:
@@ -279,9 +321,14 @@ def _generate_chapter(
     tables = [entry["table"] for entry in relevant_table_entries]
     table_contexts = [entry["context"] for entry in relevant_table_entries]
     generation_context = excerpts + table_contexts
+    valid_source_ids = {
+        source_id
+        for source_id in (row.get("source_id") for row in generation_context)
+        if source_id
+    }
     context_rows, _ = _build_context_citation_records(
         generation_context,
-        set(source_data),
+        valid_source_ids,
     )
 
     known_missing: list[str] = []
@@ -299,13 +346,27 @@ def _generate_chapter(
         user_instruction=user_instruction,
         known_missing=known_missing,
     )
+    return PreparedChapterGeneration(
+        chapter_id=chapter.id,
+        request=request,
+        generation_context=generation_context,
+        valid_source_ids=valid_source_ids,
+        context_rows=context_rows,
+        match_status=match_status,
+        known_missing=known_missing,
+    )
 
-    # Remove stale provenance before starting so the source panel cannot show
-    # the previous generation while this one is in flight.
+
+def initialize_chapter_generation(
+    db: Session,
+    chapter: DocumentChapter,
+    prepared: PreparedChapterGeneration,
+) -> None:
+    """Mark a chapter running and expose its exact input context."""
     db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
         synchronize_session=False
     )
-    for row in context_rows:
+    for row in prepared.context_rows:
         db.add(
             Citation(
                 id=uuid.uuid4().hex,
@@ -316,17 +377,24 @@ def _generate_chapter(
                 citation_type=row["citation_type"],
             )
         )
+    chapter.match_status = prepared.match_status
     chapter.status = "generating"
     chapter.generated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.commit()
 
-    result = provider.generate_chapter(request)
 
+def persist_chapter_result(
+    db: Session,
+    chapter: DocumentChapter,
+    prepared: PreparedChapterGeneration,
+    result: ChapterGenerationResult,
+) -> DocumentChapter:
+    """Validate and persist one provider result on the coordinator thread."""
     citation_rows, missing_information = _build_citation_records(
         result,
-        generation_context,
-        set(source_data),
+        prepared.generation_context,
+        prepared.valid_source_ids,
     )
+
     db.query(Citation).filter(Citation.chapter_id == chapter.id).delete(
         synchronize_session=False
     )
@@ -342,7 +410,7 @@ def _generate_chapter(
             )
         )
 
-    for known_item in known_missing:
+    for known_item in prepared.known_missing:
         if known_item not in missing_information:
             missing_information.insert(0, known_item)
 
