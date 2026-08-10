@@ -376,7 +376,12 @@
 .annotation-review-actions .ai-bubble-btn { padding: 3px 6px; font-size: 10px; }
 
 /* Source cards */
+.source-state-message { padding: 10px 12px; margin-bottom: 8px; border: 1px solid #dbe4f0; border-radius: 6px; background: #f8fbff; color: #475467; font-size: 11px; line-height: 1.55; }
+.source-state-generating { border-color: #b7d7ff; background: #eff7ff; color: #1677ff; }
+.source-state-missing { border-color: #e4e7ec; background: #f9fafb; color: #667085; }
 .source-card { display: flex; flex-direction: column; min-height: 166px; padding: 10px; margin-bottom: 8px; border: 1px solid #dbe4f0; border-left: 3px solid #1677ff; border-radius: 6px; background: #fff; cursor: pointer; }
+.source-card.context { border-left-color: #f79009; background: #fffcf5; }
+.source-card.context:hover, .source-card.context.active { border-color: #f79009; background: #fffaf0; }
 .source-card:hover, .source-card.active { border-color: #1677ff; background: #f8fbff; }
 .source-card-header { display: flex; align-items: center; gap: 7px; min-width: 0; padding-bottom: 8px; border-bottom: 1px solid #eef2f6; }
 .source-file-icon { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex: 0 0 22px; border-radius: 4px; background: #e6f4ff; color: #1677ff; font-size: 11px; font-weight: 700; }

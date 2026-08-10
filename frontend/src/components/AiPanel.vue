@@ -199,15 +199,22 @@
     <template v-else-if="activeTab === 'sources'">
       <div class="panel-tab-scroll">
         <div class="panel-section-heading">
-          本章最终来源
-          <span class="ai-count-badge">{{ citationCards.length }}</span>
+          {{ sourcePanelHeading }}
+          <span v-if="citationCards.length" class="ai-count-badge">{{ citationCards.length }}</span>
         </div>
-        <div v-if="citationCards.length === 0" class="panel-empty-state">当前章节没有记录来源引用。</div>
+        <div
+          v-if="sourceStateMessage"
+          class="source-state-message"
+          :class="`source-state-${citationState}`"
+          role="status"
+        >
+          {{ sourceStateMessage }}
+        </div>
         <article
           v-for="citation in citationCards"
           :key="citation.key"
           class="source-card"
-          :class="{ active: activeCitationKey === citation.key }"
+          :class="{ active: activeCitationKey === citation.key, context: citation.citation_type === 'context' }"
           @click="$emit('citationFocus', citation.key)"
         >
           <div class="source-card-header">
@@ -215,7 +222,9 @@
             <strong :title="citation.fileName">{{ citation.fileName }}</strong>
           </div>
           <div class="source-card-locator">定位：{{ citation.locator || '未提供定位' }}</div>
-          <div class="source-card-excerpt-label">参考原文</div>
+          <div class="source-card-excerpt-label">
+            {{ citation.citation_type === 'context' ? 'AI 参考上下文（未返回明确引用）' : '参考原文' }}
+          </div>
           <div class="source-card-excerpt" :class="{ expanded: expandedSources[citation.key] }">
             {{ citation.source_excerpt || '未提供参考原文' }}
           </div>
@@ -261,12 +270,17 @@ type Citation = {
   source_document_id: string
   locator?: string | null
   source_excerpt?: string | null
+  citation_type?: string | null
 }
+
+type CitationState = 'generating' | 'explicit' | 'context' | 'missing'
 
 const props = defineProps<{
   annotations: Annotation[]
   citations: Citation[]
   sourceDetails: Record<string, any>
+  chapterStatus: string
+  citationState: CitationState
   chapterId: string
   docId: string
   selectionText: string
@@ -307,8 +321,24 @@ const tabs: Array<{ key: PanelTab; label: string; icon: string }> = [
 const panelTitle = computed(() => tabs.find((tab) => tab.key === activeTab.value)?.label || '')
 const panelDescription = computed(() => {
   if (activeTab.value === 'annotations') return '集中查看批示内容，并联动正文原文。'
-  if (activeTab.value === 'sources') return '只展示本章最终引用的文件和参考原文。'
+  if (activeTab.value === 'sources') {
+    if (props.citationState === 'generating') return '本章生成中的参考资料将在引用完成后自动加载。'
+    if (props.citationState === 'context') return '展示 AI 实际使用的参考上下文，待补充明确引用。'
+    if (props.citationState === 'missing') return '没有可核验来源时会明确标记为待补充。'
+    return '只展示本章最终引用的文件和参考原文。'
+  }
   return '预留数据一致性追踪能力。'
+})
+const sourcePanelHeading = computed(() => {
+  if (props.citationState === 'context') return 'AI 生成参考资料（待明确引用）'
+  if (props.citationState === 'generating') return '本章来源生成中'
+  if (props.citationState === 'missing') return '本章来源待补充'
+  return '本章最终来源'
+})
+const sourceStateMessage = computed(() => {
+  if (props.citationState === 'generating') return '本章正在生成，引用完成后会自动加载。'
+  if (props.citationState === 'missing') return '本章未匹配到可用来源或未返回有效引用。'
+  return ''
 })
 const truncatedSelection = computed(() =>
   props.selectionText.length > 120 ? props.selectionText.slice(0, 120) + '…' : props.selectionText,

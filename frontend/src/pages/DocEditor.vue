@@ -104,6 +104,8 @@
         :annotations="annotations"
         :citations="chapterCitations"
         :sourceDetails="sourceDetails"
+        :chapterStatus="currentChapter?.status || 'pending'"
+        :citationState="citationState"
         :chapterId="currentChapterId"
         :docId="docId"
         :selectionText="selectionText"
@@ -223,6 +225,16 @@ const chapterCitations = computed(() =>
     key: citation.key || `${citation.source_document_id}:${index}`,
   })),
 )
+
+const citationState = computed(() => {
+  const chapter = currentChapter.value
+  if (!chapter || ['pending', 'generating'].includes(chapter.status)) return 'generating'
+  if (chapter.citation_state) return chapter.citation_state
+  if (chapterCitations.value.some((citation: any) => (citation.citation_type || 'summary') !== 'context')) {
+    return 'explicit'
+  }
+  return chapterCitations.value.length > 0 ? 'context' : 'missing'
+})
 
 const generationProgress = computed(() => {
   const chapters = doc.value?.chapters || []
@@ -420,14 +432,19 @@ async function loadSourceDetails(citations: any[], chapterId = currentChapterId.
   const entries = await Promise.all(
     sourceIds.map(async (sourceId) => {
       try {
-        return [sourceId, await getSource(sourceId)] as const
+        return [sourceId, await getSource(sourceId), true] as const
       } catch {
-        return [sourceId, { id: sourceId }] as const
+        return [sourceId, null, false] as const
       }
     }),
   )
   if (chapterId === currentChapterId.value) {
-    sourceDetails.value = Object.fromEntries(entries)
+    const nextDetails = { ...sourceDetails.value }
+    for (const [sourceId, source, loaded] of entries) {
+      if (loaded && source) nextDetails[sourceId] = source
+    }
+    if (sourceIds.length === 0) sourceDetails.value = {}
+    else sourceDetails.value = nextDetails
   }
 }
 
