@@ -210,11 +210,21 @@ const showMoreTools = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let genPollTimer: ReturnType<typeof setInterval> | null = null
 type ChapterSavePayload = { plain_text: string; content_json: string }
+type RegenerationTransition = {
+  chapterId: string
+  preStatus: string
+  prePlainText: string
+  preContentJson: string
+  preCitationSignature: string
+  requestPending: boolean
+}
 let savedSnapshot: ChapterSavePayload | null = null
 let pendingSave: { chapterId: string; payload: ChapterSavePayload } | null = null
 let saveRequest: Promise<boolean> | null = null
 const generating = ref(false)
 let focusMessageTimer: ReturnType<typeof setTimeout> | null = null
+const regenerationTransition = ref<RegenerationTransition | null>(null)
+let latestGenerationRefreshId = 0
 
 const chapterCitations = computed(() =>
   (currentChapter.value?.citations || []).map((citation: any, index: number) => ({
@@ -266,18 +276,104 @@ function isStillGenerating(d: any) {
   return d.chapters.some((c: any) => c.status === 'pending' || c.status === 'generating')
 }
 
+function buildCitationSignature(citations: any[] = []) {
+  return JSON.stringify(
+    citations.map((citation) => ({
+      source_document_id: citation.source_document_id || '',
+      locator: citation.locator || '',
+      source_excerpt: citation.source_excerpt || '',
+      citation_type: citation.citation_type || 'summary',
+    })),
+  )
+}
+
+function buildRegenerationTransition(chapter: any): RegenerationTransition | null {
+  if (!chapter?.id) return null
+  return {
+    chapterId: chapter.id,
+    preStatus: chapter.status || '',
+    prePlainText: chapter.plain_text || '',
+    preContentJson: chapter.content_json || '',
+    preCitationSignature: buildCitationSignature(chapter.citations || []),
+    requestPending: true,
+  }
+}
+
+function shouldKeepLocalPending(polledChapter: any) {
+  const transition = regenerationTransition.value
+  if (!transition || !transition.requestPending || !polledChapter) return false
+  if (polledChapter.id !== transition.chapterId) return false
+  if (polledChapter.status === 'pending' || polledChapter.status === 'generating') return false
+  return (
+    (polledChapter.status || '') === transition.preStatus &&
+    (polledChapter.plain_text || '') === transition.prePlainText &&
+    (polledChapter.content_json || '') === transition.preContentJson &&
+    buildCitationSignature(polledChapter.citations || []) === transition.preCitationSignature
+  )
+}
+
+function stageLocalRegeneration(chapterId: string) {
+  if (currentChapter.value?.id === chapterId) {
+    currentChapter.value = {
+      ...currentChapter.value,
+      status: 'pending',
+      citation_state: 'pending',
+      citations: [],
+    }
+  }
+  if (doc.value?.chapters) {
+    doc.value = {
+      ...doc.value,
+      chapters: doc.value.chapters.map((chapter: any) =>
+        chapter.id === chapterId ? { ...chapter, status: 'pending' } : chapter,
+      ),
+    }
+  }
+  sourceDetails.value = {}
+  activeCitationKey.value = ''
+}
+
+function applyPendingStatusToDocument(nextDoc: any, chapterId: string) {
+  if (!nextDoc?.chapters) return nextDoc
+  return {
+    ...nextDoc,
+    chapters: nextDoc.chapters.map((chapter: any) =>
+      chapter.id === chapterId ? { ...chapter, status: 'pending' } : chapter,
+    ),
+  }
+}
+
 function stopGenerationPolling() {
   if (genPollTimer) clearInterval(genPollTimer)
   genPollTimer = null
 }
 
 async function refreshGenerationState() {
-  doc.value = await getDocument(docId)
-  if (currentChapterId.value) {
-    const polledChapter = await getChapter(docId, currentChapterId.value)
+  const refreshId = ++latestGenerationRefreshId
+  const requestedChapterId = currentChapterId.value
+  const nextDoc = await getDocument(docId)
+  const polledChapter = requestedChapterId ? await getChapter(docId, requestedChapterId) : null
+
+  if (refreshId !== latestGenerationRefreshId) return
+
+  const keepLocalPending = shouldKeepLocalPending(polledChapter)
+  doc.value =
+    keepLocalPending && requestedChapterId
+      ? applyPendingStatusToDocument(nextDoc, requestedChapterId)
+      : nextDoc
+
+  if (requestedChapterId && polledChapter) {
     if (polledChapter.id === currentChapterId.value && !hasUnsavedChanges.value && !isSaving.value) {
-      currentChapter.value = polledChapter
-      await loadSourceDetails(polledChapter.citations || [], polledChapter.id)
+      if (keepLocalPending) {
+        stageLocalRegeneration(requestedChapterId)
+      } else {
+        currentChapter.value = polledChapter
+        await loadSourceDetails(polledChapter.citations || [], polledChapter.id, refreshId)
+        const transition = regenerationTransition.value
+        if (transition && transition.chapterId === polledChapter.id && !transition.requestPending) {
+          regenerationTransition.value = null
+        }
+      }
     }
   }
   if (!isStillGenerating(doc.value)) {
@@ -434,7 +530,7 @@ async function selectChapter(ch: any) {
   await loadSourceDetails(chapter.citations || [], chapterId)
 }
 
-async function loadSourceDetails(citations: any[], chapterId = currentChapterId.value) {
+async function loadSourceDetails(citations: any[], chapterId = currentChapterId.value, refreshId?: number) {
   const sourceIds = [...new Set(citations.map((citation) => citation.source_document_id).filter(Boolean))]
   const entries = await Promise.all(
     sourceIds.map(async (sourceId) => {
@@ -445,6 +541,7 @@ async function loadSourceDetails(citations: any[], chapterId = currentChapterId.
       }
     }),
   )
+  if (refreshId !== undefined && refreshId !== latestGenerationRefreshId) return
   if (chapterId === currentChapterId.value) {
     const nextDetails = { ...sourceDetails.value }
     for (const [sourceId, source, loaded] of entries) {
@@ -502,21 +599,25 @@ async function doRegenerate() {
   showRegenModal.value = false
   const instruction = regenInstruction.value || undefined
   regenInstruction.value = ''
-  if (currentChapter.value?.id === chapterId) {
-    currentChapter.value = { ...currentChapter.value, status: 'pending' }
-  }
-  if (doc.value?.chapters) {
-    doc.value = {
-      ...doc.value,
-      chapters: doc.value.chapters.map((chapter: any) =>
-        chapter.id === chapterId ? { ...chapter, status: 'pending' } : chapter,
-      ),
-    }
-  }
+  regenerationTransition.value = buildRegenerationTransition(currentChapter.value)
+  stageLocalRegeneration(chapterId)
   const regenerateRequest = regenerateChapter(docId, chapterId, instruction)
   startGenerationPolling(true)
-  await regenerateRequest
-  await refreshGenerationState()
+  try {
+    await regenerateRequest
+    const transition = regenerationTransition.value
+    if (transition?.chapterId === chapterId) {
+      regenerationTransition.value = {
+        ...transition,
+        requestPending: false,
+      }
+    }
+    await refreshGenerationState()
+  } catch (err) {
+    regenerationTransition.value = null
+    await refreshGenerationState()
+    throw err
+  }
 }
 
 async function doAiAction(action: string, selection: string, instruction: string) {
