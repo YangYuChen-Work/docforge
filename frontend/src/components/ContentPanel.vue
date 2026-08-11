@@ -34,25 +34,42 @@
         </button>
         <div style="position:relative">
           <button
-            @click="showExport = !showExport"
+            @click="toggleExportMenu"
             class="btn btn-primary"
             style="margin-top:0;padding:6px 14px"
           >
             导出 ▾
           </button>
           <div v-if="showExport" class="export-dropdown">
-            <div class="export-drop-title">选择导出格式</div>
-            <div
-              v-for="fmt in ['docx', 'pdf', 'xlsx']"
-              :key="fmt"
-              class="export-drop-item"
-              @click="$emit('export', fmt); showExport = false"
-            >
-              <span class="export-fmt-icon" style="background:#2b5eb8">{{ fmt.charAt(0).toUpperCase() }}</span>
-              <div>
-                <div class="export-fmt-name">{{ fmt.toUpperCase() }}</div>
+            <template v-if="!selectedExportFormat">
+              <div class="export-drop-title">选择导出格式</div>
+              <div
+                v-for="fmt in ['docx', 'pdf', 'xlsx']"
+                :key="fmt"
+                class="export-drop-item"
+                @click="selectedExportFormat = fmt"
+              >
+                <span class="export-fmt-icon" style="background:#2b5eb8">{{ fmt.charAt(0).toUpperCase() }}</span>
+                <div>
+                  <div class="export-fmt-name">{{ fmt.toUpperCase() }}</div>
+                </div>
               </div>
-            </div>
+            </template>
+            <template v-else>
+              <div class="export-comment-header">
+                <button class="export-back-button" type="button" @click="selectedExportFormat = ''">‹</button>
+                <span>导出 {{ selectedExportFormat.toUpperCase() }}</span>
+              </div>
+              <div class="export-drop-title">选择是否带批注</div>
+              <button class="export-comment-option" type="button" @click="emitExport(false)">
+                <span class="export-comment-option-title">不带批注</span>
+                <span class="export-comment-option-desc">只导出正文和表格</span>
+              </button>
+              <button class="export-comment-option" type="button" @click="emitExport(true)">
+                <span class="export-comment-option-title">带批注</span>
+                <span class="export-comment-option-desc">保留当前章节的审阅批注</span>
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -144,7 +161,7 @@ const emit = defineEmits<{
   save: []
   confirm: []
   regenerate: []
-  export: [format: string]
+  export: [format: string, includeComments: boolean]
   edit: [text: string, contentJson: string]
   selectionChange: [text: string]
   editorStateChange: [state: EditorToolbarState]
@@ -153,7 +170,20 @@ const emit = defineEmits<{
   focusResult: [message: string]
 }>()
 const showExport = ref(false)
+const selectedExportFormat = ref('')
 const mermaidContainer = ref<HTMLElement>()
+
+function emitExport(includeComments: boolean) {
+  if (!selectedExportFormat.value) return
+  emit('export', selectedExportFormat.value, includeComments)
+  selectedExportFormat.value = ''
+  showExport.value = false
+}
+
+function toggleExportMenu() {
+  showExport.value = !showExport.value
+  if (!showExport.value) selectedExportFormat.value = ''
+}
 
 function parseContent(chapter: any) {
   if (!chapter?.content_json)

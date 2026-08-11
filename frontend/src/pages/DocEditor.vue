@@ -860,9 +860,9 @@ async function handleCommentAiAction(annotation: any) {
   await doAiAction('address_comments', annotation.target_text || '', annotation.content || '')
 }
 
-async function doExport(format: string) {
+async function doExport(format: string, includeComments: boolean) {
   try {
-    const result = await createExport(docId, format)
+    const result = await createExport(docId, format, includeComments)
     if (result.error_message) {
       alert(`导出失败：${result.error_message}`)
       return

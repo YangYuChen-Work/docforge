@@ -4,13 +4,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
-from app.db.models import GeneratedDocument, DocumentChapter, Export, DocumentTemplate
+from app.db.models import Annotation, GeneratedDocument, DocumentChapter, Export, DocumentTemplate
 from app.services.validator import validate_document
 from app.services.docx_renderer import render_to_docx
 from app.services import audit_service
 
 
-def create_export(db: Session, doc_id: str, fmt: str) -> Export:
+def create_export(
+    db: Session,
+    doc_id: str,
+    fmt: str,
+    include_comments: bool = False,
+) -> Export:
     doc = db.get(GeneratedDocument, doc_id)
     if not doc:
         raise HTTPException(404, {"error_code": "DOCUMENT_NOT_FOUND"})
@@ -22,6 +27,7 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
         .all()
     )
     tpl = db.get(DocumentTemplate, doc.template_id)
+    annotations = _load_export_annotations(db, chapters) if include_comments else []
 
     validation = validate_document(chapters, tpl.source_path if tpl else None)
     if not validation["can_export"]:
@@ -44,6 +50,7 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
         id=uuid.uuid4().hex,
         document_id=doc_id,
         format=fmt,
+        include_comments=include_comments,
         status="running",
         has_missing_info=validation["has_missing_info"],
         validation_report=json.dumps(validation, ensure_ascii=False),
@@ -54,9 +61,23 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
     try:
         template_path = tpl.source_path if tpl else None
         if fmt == "docx":
-            path = render_to_docx(doc_id, chapters, template_path)
+            path = render_to_docx(
+                doc_id,
+                chapters,
+                template_path,
+                annotations=annotations,
+                include_comments=include_comments,
+                comment_mode="native",
+            )
         elif fmt == "pdf":
-            docx_path = render_to_docx(doc_id, chapters, template_path)
+            docx_path = render_to_docx(
+                doc_id,
+                chapters,
+                template_path,
+                annotations=annotations,
+                include_comments=include_comments,
+                comment_mode="visible",
+            )
             from app.services.pdf_exporter import convert_to_pdf
             path = convert_to_pdf(docx_path)
         elif fmt == "xlsx":
@@ -69,7 +90,15 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
                 "missing_items": _collect_issue_summary(chapters, "missing_information_json"),
                 "conflicts": _collect_issue_summary(chapters, "conflict_json"),
             }
-            path = export_tables_to_xlsx(doc_id, chapters, document_meta)
+            if include_comments:
+                path = export_tables_to_xlsx(
+                    doc_id,
+                    chapters,
+                    document_meta,
+                    annotations=annotations,
+                )
+            else:
+                path = export_tables_to_xlsx(doc_id, chapters, document_meta)
         else:
             raise ValueError(f"不支持的导出格式: {fmt}")
 
@@ -91,6 +120,32 @@ def create_export(db: Session, doc_id: str, fmt: str) -> Export:
         error_message=export.error_message,
     )
     return export
+
+
+def _load_export_annotations(db: Session, chapters: list) -> list[dict]:
+    chapter_ids = [chapter.id for chapter in chapters if getattr(chapter, "id", None)]
+    if not chapter_ids:
+        return []
+    titles = {chapter.id: chapter.title for chapter in chapters}
+    rows = (
+        db.query(Annotation)
+        .filter(Annotation.chapter_id.in_(chapter_ids))
+        .order_by(Annotation.created_at)
+        .all()
+    )
+    return [
+        {
+            "id": annotation.id,
+            "chapter_id": annotation.chapter_id,
+            "chapter_title": titles.get(annotation.chapter_id, ""),
+            "target_text": annotation.target_text,
+            "content": annotation.content,
+            "status": annotation.status,
+            "created_by": annotation.created_by,
+            "locator": annotation.locator,
+        }
+        for annotation in rows
+    ]
 
 
 def _collect_issue_summary(chapters: list, field_name: str) -> list[str]:

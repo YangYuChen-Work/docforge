@@ -7,11 +7,17 @@ tables the user sees in the editor — instead of the previous behavior of
 dumping `chapter.plain_text` (raw markdown-ish text with literal "##",
 "**bold**", "| a | b |" that was never parsed) as flat unstyled paragraphs.
 """
+import base64
+import binascii
+import io
 import json
 import re
 import shutil
 import unicodedata
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
+from xml.etree import ElementTree as ET
 from docx import Document
 from docx.enum.table import WD_ALIGN_VERTICAL, WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_COLOR_INDEX
@@ -27,47 +33,78 @@ DEFAULT_EAST_ASIA_FONT = EXPORT_FONTS.cjk
 DEFAULT_COMPLEX_SCRIPT_FONT = EXPORT_FONTS.cjk
 
 
-def render_to_docx(doc_id: str, chapters: list, template_source_path: str | None) -> str:
+def render_to_docx(
+    doc_id: str,
+    chapters: list,
+    template_source_path: str | None,
+    annotations: list | None = None,
+    include_comments: bool = False,
+    comment_mode: str = "native",
+) -> str:
     """Write confirmed chapter content into a copy of the Word template."""
     out_dir = get_storage_path("generated") / doc_id
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "output.docx"
 
+    export_annotations = _active_export_annotations(annotations) if include_comments else []
+    visible_annotations = _annotations_by_chapter(export_annotations)
+
     if template_source_path and Path(template_source_path).exists():
         shutil.copy2(template_source_path, out_path)
         doc = Document(str(out_path))
-        _inject_into_template(doc, chapters)
+        _inject_into_template(doc, chapters, visible_annotations if comment_mode == "visible" else None)
     else:
         doc = Document()
-        _build_from_scratch(doc, chapters)
+        _build_from_scratch(doc, chapters, visible_annotations if comment_mode == "visible" else None)
+
+    native_comment_records = []
+    if export_annotations and comment_mode == "native":
+        native_comment_records = _add_native_comments(
+            doc,
+            export_annotations,
+            chapters,
+            start_id=_next_comment_id(out_path),
+        )
 
     doc.save(str(out_path))
+    if native_comment_records:
+        _write_native_comments_part(out_path, native_comment_records)
     return str(out_path)
 
 
-def _inject_into_template(doc: Document, chapters: list):
+def _inject_into_template(doc: Document, chapters: list, visible_annotations: dict | None = None):
     """Find each chapter's heading paragraph in the template and insert the
     chapter's rendered content (headings/paragraphs/lists/tables) after it."""
     anchors = _template_chapter_anchors(doc, chapters)
     if anchors:
         _remove_template_placeholders(doc, anchors)
         for chapter, heading_para in anchors:
-            _insert_nodes_after(doc, heading_para, _nodes_for_template(chapter))
+            chapter_annotations = (visible_annotations or {}).get(
+                _annotation_value(chapter, "id", ""), []
+            )
+            _insert_nodes_after(
+                doc,
+                heading_para,
+                _nodes_for_template(chapter, chapter_annotations),
+            )
 
     _ensure_template_footer_page_fields(doc)
 
 
-def _build_from_scratch(doc: Document, chapters: list):
+def _build_from_scratch(doc: Document, chapters: list, visible_annotations: dict | None = None):
     """Fallback used when the target template file is unavailable."""
     _configure_generated_document(doc, chapters)
     for chapter in chapters:
         heading = doc.add_heading(chapter.title, level=1)
         _style_generated_heading(heading)
-        for node in _chapter_nodes(chapter):
+        chapter_annotations = (visible_annotations or {}).get(
+            _annotation_value(chapter, "id", ""), []
+        )
+        for node in _chapter_nodes(chapter, chapter_annotations):
             _append_node(doc, node)
 
 
-def _chapter_nodes(chapter) -> list[dict]:
+def _chapter_nodes(chapter, comment_annotations: list[dict] | None = None) -> list[dict]:
     """Return the ProseMirror content nodes for a chapter, plus a trailing
     highlighted note for any missing-information / conflict items — mirroring
     exactly what ContentPanel.vue shows on screen (missingItems/conflictItems
@@ -100,7 +137,59 @@ def _chapter_nodes(chapter) -> list[dict]:
 
     if not nodes:
         nodes.append({"type": "paragraph", "content": [{"type": "text", "text": "（内容待生成）"}]})
+    if comment_annotations:
+        nodes.extend(
+            _comment_node(index, annotation)
+            for index, annotation in enumerate(comment_annotations, start=1)
+        )
     return nodes
+
+
+def _active_export_annotations(annotations: list | None) -> list[dict]:
+    """Normalize persisted annotations and exclude comments explicitly ignored by the reviewer."""
+    normalized = []
+    for annotation in annotations or []:
+        status = _annotation_value(annotation, "status", "pending")
+        if status == "ignored":
+            continue
+        content = str(_annotation_value(annotation, "content", "") or "").strip()
+        target_text = str(_annotation_value(annotation, "target_text", "") or "").strip()
+        if not content and not target_text:
+            continue
+        normalized.append(
+            {
+                "id": _annotation_value(annotation, "id", ""),
+                "chapter_id": _annotation_value(annotation, "chapter_id", ""),
+                "chapter_title": _annotation_value(annotation, "chapter_title", ""),
+                "target_text": target_text,
+                "content": content or "（未填写批示内容）",
+                "created_by": _annotation_value(annotation, "created_by", "本地用户") or "本地用户",
+                "locator": _annotation_value(annotation, "locator", "") or "",
+            }
+        )
+    return normalized
+
+
+def _annotations_by_chapter(annotations: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = {}
+    for annotation in annotations:
+        chapter_id = str(annotation.get("chapter_id") or "")
+        grouped.setdefault(chapter_id, []).append(annotation)
+    return grouped
+
+
+def _annotation_value(annotation, name: str, default=None):
+    if isinstance(annotation, dict):
+        return annotation.get(name, default)
+    return getattr(annotation, name, default)
+
+
+def _comment_node(index: int, annotation: dict) -> dict:
+    target = annotation.get("target_text") or "未提供原文"
+    locator = annotation.get("locator")
+    location = f"（定位：{locator}）" if locator else ""
+    detail = f"原文：{target}；批示：{annotation.get('content', '')}{location}"
+    return _notice_node(f"批注 {index}：", detail, kind="comment")
 
 
 def _conflict_detail(entry) -> str:
@@ -181,6 +270,21 @@ def _sanitize_block_node(node) -> dict | None:
         if not rows:
             return None
         return {"type": node_type, "attrs": _node_attrs(node), "content": rows}
+
+    if node_type == "image":
+        attrs = _node_attrs(node)
+        src = attrs.get("src")
+        if not _is_supported_data_image(src):
+            return None
+        return {
+            "type": node_type,
+            "attrs": {
+                "src": src,
+                "width": attrs.get("width"),
+                "height": attrs.get("height"),
+                "alt": attrs.get("alt"),
+            },
+        }
 
     # Keep unsupported but well-formed node types on the existing empty-
     # paragraph path. Their malformed children are intentionally discarded.
@@ -305,6 +409,9 @@ def _render_node_elements(doc: Document, node: dict) -> list:
     if node_type == "table":
         return [_render_table(doc, node)]
 
+    if node_type == "image":
+        return [_render_image(doc, node)]
+
     # Unsupported node types (e.g. horizontalRule) fall back to an empty
     # paragraph rather than raising, so one odd node never breaks the export.
     return [doc.add_paragraph()._element]
@@ -428,6 +535,51 @@ def _add_runs(paragraph, inline_content: list[dict]):
             run.font.highlight_color = WD_COLOR_INDEX.YELLOW
 
 
+def _is_supported_data_image(src) -> bool:
+    if not isinstance(src, str) or "," not in src:
+        return False
+    header = src.split(",", 1)[0].lower()
+    return header.startswith("data:image/") and ";base64" in header
+
+
+def _decode_data_image(src: str) -> bytes | None:
+    if not _is_supported_data_image(src):
+        return None
+    try:
+        return base64.b64decode(src.split(",", 1)[1], validate=True)
+    except (ValueError, binascii.Error):
+        return None
+
+
+def _image_dimension(value, minimum: float, maximum: float) -> Mm | None:
+    try:
+        pixels = float(value)
+    except (TypeError, ValueError):
+        return None
+    if pixels <= 0:
+        return None
+    millimeters = max(minimum, min(maximum, pixels * 25.4 / 96))
+    return Mm(millimeters)
+
+
+def _render_image(doc: Document, node: dict):
+    attrs = _node_attrs(node)
+    data = _decode_data_image(attrs.get("src"))
+    if not data:
+        return doc.add_paragraph()._element
+
+    paragraph = doc.add_paragraph()
+    _style_paragraph(paragraph)
+    run = paragraph.add_run()
+    width = _image_dimension(attrs.get("width"), 25, 165)
+    height = _image_dimension(attrs.get("height"), 20, 230)
+    if width and height:
+        run.add_picture(io.BytesIO(data), width=width, height=height)
+    else:
+        run.add_picture(io.BytesIO(data), width=Cm(16.5))
+    return paragraph._element
+
+
 def _render_table(doc: Document, node: dict):
     node = _sanitize_block_node(node)
     rows = node.get("content", []) if node is not None else []
@@ -499,8 +651,8 @@ def _set_table_borders(table):
     tbl_pr.append(borders)
 
 
-def _nodes_for_template(chapter) -> list[dict]:
-    nodes = _chapter_nodes(chapter)
+def _nodes_for_template(chapter, comment_annotations: list[dict] | None = None) -> list[dict]:
+    nodes = _chapter_nodes(chapter, comment_annotations)
     while nodes and nodes[0].get("type") == "heading":
         heading_text = _normalized_heading_text(_node_text(nodes[0]))
         chapter_title = _normalized_heading_text(getattr(chapter, "title", ""))
@@ -864,6 +1016,264 @@ def _element_text(element) -> str:
     return "".join(text.text or "" for text in element.iter(qn("w:t")))
 
 
+def _add_native_comments(
+    doc: Document,
+    annotations: list[dict],
+    chapters: list,
+    start_id: int = 0,
+) -> list[dict]:
+    """Attach persisted annotations to exported runs as real Word comments.
+
+    The editor stores the selected source text rather than a ProseMirror
+    position. Export therefore resolves the text against the rendered runs.
+    If a manual edit means the text is no longer present, the comment is
+    anchored to its chapter heading and the original text is included in the
+    comment body so it remains reviewable instead of being silently dropped.
+    """
+    paragraphs = list(_iter_document_paragraphs(doc))
+    chapter_fallbacks = _chapter_heading_fallbacks(paragraphs, chapters)
+
+    comment_records = []
+    for comment_id, annotation in enumerate(annotations, start=start_id):
+        target_text = annotation.get("target_text", "")
+        match = _find_text_runs(paragraphs, target_text)
+        fallback = None
+        if match is None:
+            fallback = chapter_fallbacks.get(str(annotation.get("chapter_id") or ""))
+            if fallback is not None:
+                match = _first_non_empty_run(fallback)
+        if match is None:
+            continue
+
+        content = annotation.get("content", "（未填写批示内容）")
+        target_was_located = bool(target_text) and isinstance(match, list)
+        if not target_was_located:
+            content = f"{content}\n原文：{target_text or '未提供原文'}（导出时未能在正文中精确定位）"
+        author = str(annotation.get("created_by") or "本地用户")
+        runs = match if isinstance(match, list) else [match]
+        _mark_comment_range(runs[0], runs[-1], comment_id)
+        comment_records.append(
+            {
+                "id": comment_id,
+                "text": content,
+                "author": author,
+                "initials": author[:2],
+                "created_at": datetime.now(timezone.utc)
+                .replace(microsecond=0)
+                .isoformat()
+                .replace("+00:00", "Z"),
+            }
+        )
+    return comment_records
+
+
+def _mark_comment_range(first_run, last_run, comment_id: int):
+    start = OxmlElement("w:commentRangeStart")
+    start.set(qn("w:id"), str(comment_id))
+    first_run._r.addprevious(start)
+
+    end = OxmlElement("w:commentRangeEnd")
+    end.set(qn("w:id"), str(comment_id))
+    last_run._r.addnext(end)
+
+    reference_run = OxmlElement("w:r")
+    reference_properties = OxmlElement("w:rPr")
+    reference_style = OxmlElement("w:rStyle")
+    reference_style.set(qn("w:val"), "CommentReference")
+    reference_properties.append(reference_style)
+    reference_run.append(reference_properties)
+    reference = OxmlElement("w:commentReference")
+    reference.set(qn("w:id"), str(comment_id))
+    reference_run.append(reference)
+    end.addnext(reference_run)
+
+
+_WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+_REL_NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+_CT_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
+_XML_NS = "http://www.w3.org/XML/1998/namespace"
+
+
+def _next_comment_id(docx_path: Path) -> int:
+    try:
+        with zipfile.ZipFile(docx_path) as archive:
+            comments_xml = archive.read("word/comments.xml")
+    except (FileNotFoundError, KeyError, zipfile.BadZipFile):
+        return 0
+    root = ET.fromstring(comments_xml)
+    ids = []
+    for comment in root.iter(f"{{{_WORD_NS}}}comment"):
+        try:
+            ids.append(int(comment.attrib.get(f"{{{_WORD_NS}}}id", "-1")))
+        except ValueError:
+            continue
+    return max(ids, default=-1) + 1
+
+
+def _write_native_comments_part(docx_path: Path, comments: list[dict]):
+    """Add the comments part and its package relationships to a DOCX archive."""
+    ET.register_namespace("w", _WORD_NS)
+    replacements = {}
+    with zipfile.ZipFile(docx_path, "r") as source:
+        names = set(source.namelist())
+        if "word/comments.xml" in names:
+            comments_root = ET.fromstring(source.read("word/comments.xml"))
+        else:
+            comments_root = ET.Element(f"{{{_WORD_NS}}}comments")
+        for comment in comments:
+            comments_root.append(_comment_element(comment))
+        replacements["word/comments.xml"] = ET.tostring(
+            comments_root, encoding="utf-8", xml_declaration=True
+        )
+
+        rels_root = ET.fromstring(source.read("word/_rels/document.xml.rels"))
+        comments_relation = next(
+            (
+                relation
+                for relation in rels_root.findall(f"{{{_REL_NS}}}Relationship")
+                if relation.attrib.get("Type", "").endswith("/comments")
+            ),
+            None,
+        )
+        if comments_relation is None:
+            existing_ids = {
+                relation.attrib.get("Id", "")
+                for relation in rels_root.findall(f"{{{_REL_NS}}}Relationship")
+            }
+            relation_id = "rIdComments"
+            suffix = 2
+            while relation_id in existing_ids:
+                relation_id = f"rIdComments{suffix}"
+                suffix += 1
+            ET.SubElement(
+                rels_root,
+                f"{{{_REL_NS}}}Relationship",
+                {
+                    "Id": relation_id,
+                    "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments",
+                    "Target": "comments.xml",
+                },
+            )
+            ET.register_namespace("", _REL_NS)
+            replacements["word/_rels/document.xml.rels"] = ET.tostring(
+                rels_root, encoding="utf-8", xml_declaration=True
+            )
+
+        content_types_root = ET.fromstring(source.read("[Content_Types].xml"))
+        has_override = any(
+            element.attrib.get("PartName") == "/word/comments.xml"
+            for element in content_types_root.findall(f"{{{_CT_NS}}}Override")
+        )
+        if not has_override:
+            ET.SubElement(
+                content_types_root,
+                f"{{{_CT_NS}}}Override",
+                {
+                    "PartName": "/word/comments.xml",
+                    "ContentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml",
+                },
+            )
+            ET.register_namespace("", _CT_NS)
+            replacements["[Content_Types].xml"] = ET.tostring(
+                content_types_root, encoding="utf-8", xml_declaration=True
+            )
+
+        temporary_path = docx_path.with_suffix(".comments.tmp.docx")
+        with zipfile.ZipFile(temporary_path, "w", zipfile.ZIP_DEFLATED) as target:
+            for info in source.infolist():
+                target.writestr(info, replacements.get(info.filename, source.read(info.filename)))
+            if "word/comments.xml" not in names:
+                target.writestr("word/comments.xml", replacements["word/comments.xml"])
+        temporary_path.replace(docx_path)
+
+
+def _comment_element(comment: dict):
+    element = ET.Element(
+        f"{{{_WORD_NS}}}comment",
+        {
+            f"{{{_WORD_NS}}}id": str(comment["id"]),
+            f"{{{_WORD_NS}}}author": comment["author"],
+            f"{{{_WORD_NS}}}initials": comment["initials"],
+            f"{{{_WORD_NS}}}date": comment["created_at"],
+        },
+    )
+    lines = str(comment.get("text") or "（未填写批示内容）").splitlines() or [""]
+    for line_index, line in enumerate(lines):
+        paragraph = ET.SubElement(element, f"{{{_WORD_NS}}}p")
+        if line_index == 0:
+            paragraph_properties = ET.SubElement(paragraph, f"{{{_WORD_NS}}}pPr")
+            paragraph_style = ET.SubElement(paragraph_properties, f"{{{_WORD_NS}}}pStyle")
+            paragraph_style.set(f"{{{_WORD_NS}}}val", "CommentText")
+            reference_run = ET.SubElement(paragraph, f"{{{_WORD_NS}}}r")
+            reference_properties = ET.SubElement(reference_run, f"{{{_WORD_NS}}}rPr")
+            reference_style = ET.SubElement(reference_properties, f"{{{_WORD_NS}}}rStyle")
+            reference_style.set(f"{{{_WORD_NS}}}val", "CommentReference")
+            ET.SubElement(reference_run, f"{{{_WORD_NS}}}annotationRef")
+        run = ET.SubElement(paragraph, f"{{{_WORD_NS}}}r")
+        text = ET.SubElement(run, f"{{{_WORD_NS}}}t")
+        if line[:1].isspace() or line[-1:].isspace():
+            text.set(f"{{{_XML_NS}}}space", "preserve")
+        text.text = line
+    return element
+
+
+def _iter_document_paragraphs(doc: Document):
+    yield from doc.paragraphs
+    for table in doc.tables:
+        yield from _iter_table_paragraphs(table)
+
+
+def _iter_table_paragraphs(table):
+    for row in table.rows:
+        for cell in row.cells:
+            yield from cell.paragraphs
+            for nested_table in cell.tables:
+                yield from _iter_table_paragraphs(nested_table)
+
+
+def _find_text_runs(paragraphs: list, target_text: str):
+    target_text = str(target_text or "")
+    if not target_text:
+        return None
+    for paragraph in paragraphs:
+        runs = [run for run in paragraph.runs if run.text]
+        full_text = "".join(run.text for run in runs)
+        start = full_text.find(target_text)
+        if start < 0:
+            continue
+        end = start + len(target_text)
+        selected = []
+        offset = 0
+        for run in runs:
+            run_start = offset
+            run_end = offset + len(run.text)
+            if run_end > start and run_start < end:
+                selected.append(run)
+            offset = run_end
+        if selected:
+            return selected
+    return None
+
+
+def _first_non_empty_run(paragraph):
+    return next((run for run in paragraph.runs if run.text), None)
+
+
+def _chapter_heading_fallbacks(paragraphs: list, chapters: list) -> dict[str, object]:
+    result = {}
+    for chapter in chapters:
+        chapter_id = str(_annotation_value(chapter, "id", "") or "")
+        title = str(_annotation_value(chapter, "title", "") or "").strip()
+        if not chapter_id or not title:
+            continue
+        normalized_title = _normalized_heading_text(title)
+        for paragraph in paragraphs:
+            if _normalized_heading_text(paragraph.text) == normalized_title:
+                result[chapter_id] = paragraph
+                break
+    return result
+
+
 def _configure_generated_document(doc: Document, chapters: list):
     section = doc.sections[0]
     section.page_width = Mm(210)
@@ -917,18 +1327,20 @@ def _style_notice(paragraph, kind: str):
     paragraph.paragraph_format.space_before = Mm(2)
     paragraph.paragraph_format.space_after = Mm(2)
     p_pr = _ensure_child(paragraph._element, "w:pPr")
-    _append_border_block(
-        p_pr,
-        "w:pBdr",
-        color="C00000" if kind == "conflict" else "C9A227",
-    )
+    colors = {
+        "conflict": ("C00000", "FDE9D9"),
+        "comment": ("4472C4", "DDEBF7"),
+        "missing": ("C9A227", "FFF2CC"),
+    }
+    border_color, fill_color = colors.get(kind, colors["missing"])
+    _append_border_block(p_pr, "w:pBdr", color=border_color)
     shd = p_pr.find(qn("w:shd"))
     if shd is None:
         shd = OxmlElement("w:shd")
         p_pr.append(shd)
     shd.set(qn("w:val"), "clear")
     shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), "FDE9D9" if kind == "conflict" else "FFF2CC")
+    shd.set(qn("w:fill"), fill_color)
 
 
 def _shade_cell(cell, fill: str):

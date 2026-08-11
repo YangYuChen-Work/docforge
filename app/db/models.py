@@ -198,6 +198,7 @@ class Export(Base):
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     document_id: Mapped[str] = mapped_column(String(50), ForeignKey("generated_documents.id"))
     format: Mapped[str] = mapped_column(String(10))
+    include_comments: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="pending")
     output_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)

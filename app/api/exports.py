@@ -10,10 +10,12 @@ router = APIRouter()
 
 
 @router.post("/documents/{doc_id}/export")
-def create_export(doc_id: str, body: dict, db: Session = Depends(get_db)):
+def create_export(doc_id: str, body: dict | None = None, db: Session = Depends(get_db)):
+    body = body or {}
     fmt = body.get("format", "docx")
+    include_comments = body.get("include_comments", False) is True
     try:
-        exp = domain.create_export(db, doc_id, fmt)
+        exp = domain.create_export(db, doc_id, fmt, include_comments=include_comments)
     except HTTPException:
         raise
     except Exception as e:
@@ -21,6 +23,7 @@ def create_export(doc_id: str, body: dict, db: Session = Depends(get_db)):
     return {
         "export_id": exp.id,
         "status": exp.status,
+        "include_comments": exp.include_comments,
         "error_message": exp.error_message,
         "output_path": exp.output_path,
     }
@@ -35,6 +38,7 @@ def get_export(export_id: str, db: Session = Depends(get_db)):
         "id": exp.id,
         "document_id": exp.document_id,
         "format": exp.format,
+        "include_comments": exp.include_comments,
         "status": exp.status,
         "output_path": exp.output_path,
         "file_size": exp.file_size,

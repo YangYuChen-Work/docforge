@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from datetime import date, datetime, timezone
 
 from openpyxl import Workbook
+from openpyxl.comments import Comment
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
@@ -36,7 +37,12 @@ LEFT_WRAP = Alignment(horizontal="left", vertical="center", wrap_text=True)
 LINK_ALIGNMENT = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
 
-def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | None = None) -> str:
+def export_tables_to_xlsx(
+    doc_id: str,
+    chapters: list,
+    document_meta: dict | None = None,
+    annotations: list | None = None,
+) -> str:
     out_dir = get_storage_path("generated") / doc_id
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "tables.xlsx"
@@ -45,6 +51,9 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
     wb.remove(wb.active)
 
     document_meta = document_meta or {}
+    export_annotations = _active_export_annotations(annotations)
+    annotations_by_chapter = _annotations_by_chapter(export_annotations)
+    comment_locations: dict[str, str] = {}
     export_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     overview = wb.create_sheet("项目概览")
@@ -54,6 +63,8 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
     _build_directory_header(directory)
 
     used_sheet_names: set[str] = set(overview.title for overview in wb.worksheets)
+    if export_annotations:
+        used_sheet_names.add("批注")
     directory_rows: list[dict[str, object]] = []
     has_table = False
 
@@ -72,7 +83,13 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
             ws = wb.create_sheet(title=sheet_name)
             actual_sheet_name = ws.title
             chapter_sheet_names.append(actual_sheet_name)
-            _write_table_sheet(ws, chapter, table)
+            _write_table_sheet(
+                ws,
+                chapter,
+                table,
+                annotations_by_chapter.get(str(getattr(chapter, "id", "")), []),
+                comment_locations,
+            )
             has_table = True
 
         directory_rows.append(
@@ -110,6 +127,8 @@ def export_tables_to_xlsx(doc_id: str, chapters: list, document_meta: dict | Non
             ws[cell].font = BODY_FONT
             ws[cell].alignment = LEFT_WRAP
         ws.column_dimensions["A"].width = 72
+    if export_annotations:
+        _build_comments_sheet(wb, export_annotations, comment_locations)
     wb.save(str(out_path))
     return str(out_path)
 
@@ -166,7 +185,13 @@ def _build_directory_header(ws) -> None:
     ws.column_dimensions["D"].width = 12
 
 
-def _write_table_sheet(ws, chapter, table: dict) -> None:
+def _write_table_sheet(
+    ws,
+    chapter,
+    table: dict,
+    annotations: list[dict] | None = None,
+    comment_locations: dict[str, str] | None = None,
+) -> None:
     raw_headers = table.get("headers")
     raw_rows = table.get("rows")
     headers = _normalize_row(raw_headers) if isinstance(raw_headers, list) else []
@@ -213,6 +238,72 @@ def _write_table_sheet(ws, chapter, table: dict) -> None:
     ws.print_title_rows = "1:3"
 
     _set_column_widths(ws, max_cols, headers, rows)
+    _attach_cell_comments(
+        ws,
+        annotations or [],
+        comment_locations if comment_locations is not None else {},
+    )
+
+
+def _attach_cell_comments(ws, annotations: list[dict], comment_locations: dict[str, str]) -> None:
+    for annotation in annotations:
+        annotation_id = str(annotation.get("id") or "")
+        if annotation_id in comment_locations:
+            continue
+        target_text = annotation.get("target_text", "")
+        if not target_text:
+            continue
+        for row in ws.iter_rows(min_row=4):
+            for cell in row:
+                if target_text not in str(cell.value or ""):
+                    continue
+                content = annotation.get("content") or "（未填写批示内容）"
+                author = str(annotation.get("created_by") or "本地用户")
+                cell.comment = Comment(content, author)
+                comment_locations[annotation_id] = f"{ws.title}!{cell.coordinate}"
+                break
+            if annotation_id in comment_locations:
+                break
+
+
+def _build_comments_sheet(wb: Workbook, annotations: list[dict], comment_locations: dict[str, str]) -> None:
+    ws = wb.create_sheet("批注")
+    ws.merge_cells("A1:F1")
+    ws["A1"] = "批注清单"
+    ws["A1"].fill = PROJECT_BLUE_FILL
+    ws["A1"].font = _cell_font(color="FFFFFF", bold=True, size=14)
+    ws["A1"].alignment = CENTER_WRAP
+    ws["A1"].border = NEUTRAL_BORDER
+
+    headers = ("原文", "批注内容", "章节", "状态", "定位说明", "位置")
+    for column, header in enumerate(headers, start=1):
+        cell = ws.cell(row=3, column=column, value=header)
+        cell.fill = PALE_BLUE_FILL
+        cell.font = SECTION_FONT
+        cell.border = NEUTRAL_BORDER
+        cell.alignment = CENTER_WRAP
+
+    for row_index, annotation in enumerate(annotations, start=4):
+        annotation_id = str(annotation.get("id") or "")
+        values = (
+            annotation.get("target_text") or "未提供原文",
+            annotation.get("content") or "（未填写批示内容）",
+            annotation.get("chapter_title") or annotation.get("chapter_id") or "未命名章节",
+            annotation.get("status") or "pending",
+            annotation.get("locator") or "未提供定位",
+            comment_locations.get(annotation_id, "未在表格中定位"),
+        )
+        for column, value in enumerate(values, start=1):
+            cell = ws.cell(row=row_index, column=column, value=value)
+            cell.font = BODY_FONT
+            cell.border = NEUTRAL_BORDER
+            cell.alignment = LEFT_WRAP
+
+    widths = (28, 42, 24, 12, 24, 24)
+    for column, width in enumerate(widths, start=1):
+        ws.column_dimensions[get_column_letter(column)].width = width
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:F{max(3, len(annotations) + 3)}"
 
 
 def _legacy_table_title(table: dict, chapter) -> str:
@@ -512,3 +603,41 @@ def _normalize_metadata_text(value) -> str:
         except (TypeError, ValueError, RecursionError):
             pass
     return str(value).strip()
+
+
+def _active_export_annotations(annotations: list | None) -> list[dict]:
+    normalized = []
+    for annotation in annotations or []:
+        if _annotation_value(annotation, "status", "pending") == "ignored":
+            continue
+        target_text = str(_annotation_value(annotation, "target_text", "") or "").strip()
+        content = str(_annotation_value(annotation, "content", "") or "").strip()
+        if not target_text and not content:
+            continue
+        normalized.append(
+            {
+                "id": _annotation_value(annotation, "id", ""),
+                "chapter_id": _annotation_value(annotation, "chapter_id", ""),
+                "chapter_title": _annotation_value(annotation, "chapter_title", ""),
+                "target_text": target_text,
+                "content": content or "（未填写批示内容）",
+                "status": _annotation_value(annotation, "status", "pending") or "pending",
+                "created_by": _annotation_value(annotation, "created_by", "本地用户") or "本地用户",
+                "locator": _annotation_value(annotation, "locator", "") or "",
+            }
+        )
+    return normalized
+
+
+def _annotations_by_chapter(annotations: list[dict]) -> dict[str, list[dict]]:
+    grouped: dict[str, list[dict]] = {}
+    for annotation in annotations:
+        chapter_id = str(annotation.get("chapter_id") or "")
+        grouped.setdefault(chapter_id, []).append(annotation)
+    return grouped
+
+
+def _annotation_value(annotation, name: str, default=None):
+    if isinstance(annotation, dict):
+        return annotation.get(name, default)
+    return getattr(annotation, name, default)
