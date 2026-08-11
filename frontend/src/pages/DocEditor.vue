@@ -111,6 +111,18 @@
       </div>
     </div>
 
+    <div
+      v-if="isSaving || generating || confirmingAllChapters || renameSaving"
+      class="editor-operation-feedback"
+      role="status"
+      aria-live="polite"
+    >
+      <span class="editor-operation-pulse" aria-hidden="true"></span>
+      <span>
+        {{ isSaving ? '正在保存章节' : generating ? '正在生成章节' : confirmingAllChapters ? '正在确认章节' : '正在保存文档名称' }}
+      </span>
+    </div>
+
     <!-- Editor Body: 3-column layout -->
     <div class="editor-body">
       <OutlinePanel

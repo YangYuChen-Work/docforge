@@ -2,9 +2,15 @@
   <div class="app" :data-theme="theme">
     <AppSidebar :theme="theme" @toggle-theme="toggleTheme" />
     <a class="skip-link" href="#main-content">跳转到主要内容</a>
-    <main id="main-content" class="main-content" tabindex="-1">
-      <RouterView />
-    </main>
+    <RouterView v-slot="{ Component, route }">
+      <main id="main-content" class="main-content" tabindex="-1">
+        <Transition name="page" mode="out-in">
+          <div class="page-transition-shell">
+            <component :is="Component" :key="route.path" />
+          </div>
+        </Transition>
+      </main>
+    </RouterView>
   </div>
 </template>
 

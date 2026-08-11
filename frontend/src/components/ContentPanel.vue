@@ -73,7 +73,13 @@
     </div>
 
     <!-- Word-like page area -->
-    <div class="editor-content">
+    <div
+      class="editor-content"
+      tabindex="0"
+      role="region"
+      aria-label="章节正文"
+      :class="{ 'is-chapter-entering': chapterEntering }"
+    >
       <div v-if="!chapter" class="editor-empty-state">
         从左侧目录选择章节
       </div>
@@ -171,6 +177,17 @@ const emit = defineEmits<{
 const showExport = ref(false)
 const selectedExportFormat = ref('')
 const mermaidContainer = ref<HTMLElement>()
+const chapterEntering = ref(false)
+let chapterTransitionTimer: ReturnType<typeof setTimeout> | null = null
+
+function pulseChapterEntry() {
+  chapterEntering.value = true
+  if (chapterTransitionTimer) clearTimeout(chapterTransitionTimer)
+  chapterTransitionTimer = setTimeout(() => {
+    chapterEntering.value = false
+    chapterTransitionTimer = null
+  }, 240)
+}
 
 function emitExport(includeComments: boolean) {
   if (!selectedExportFormat.value || props.isExporting) return
@@ -478,6 +495,13 @@ watch(
 )
 
 watch(
+  () => props.chapter?.id,
+  (chapterId, previousChapterId) => {
+    if (chapterId && previousChapterId && chapterId !== previousChapterId) pulseChapterEntry()
+  },
+)
+
+watch(
   () => [props.annotations, props.citations, props.activeAnnotationId, props.activeCitationKey],
   refreshReferenceDecorations,
   { deep: true },
@@ -525,6 +549,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (chapterTransitionTimer) clearTimeout(chapterTransitionTimer)
   editor.value?.destroy()
 })
 </script>

@@ -8,5 +8,6 @@ import './styles/page-audit.css'
 import './styles/modern-shell.css'
 import './styles/editor-refresh.css'
 import './styles/visual-system.css'
+import './styles/editor-interaction.css'
 
 createApp(App).use(createPinia()).use(router).mount('#app')
