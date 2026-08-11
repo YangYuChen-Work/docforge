@@ -154,6 +154,6 @@ Capture `output/playwright/sidebar-brand-cleanup.png` and confirm the browser co
 - [ ] **Step 4: Commit the implementation**
 
 ```powershell
-git add -- frontend/src/components/AppSidebar.vue frontend/src/styles/app.css frontend/tests/sidebar-brand-cleanup.test.mjs
+git add -- frontend/src/components/AppSidebar.vue frontend/src/styles/visual-system.css frontend/tests/sidebar-brand-cleanup.test.mjs
 git commit -m "feat: simplify sidebar branding"
 ```
