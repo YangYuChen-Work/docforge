@@ -34,3 +34,17 @@ test('styles full filename markers and the source-card flash state', () => {
   assert.match(styles, /\.source-card-flash\s*\{[^}]*animation:/)
   assert.match(styles, /@keyframes sourceCardFlash/)
 })
+
+test('maps structured table citations to table-level source markers', () => {
+  assert.match(decorations, /locator\?: string \| null/)
+  assert.match(decorations, /function findCitationRange\(/)
+  assert.match(decorations, /JSON\.parse\(excerpt\)/)
+  assert.match(decorations, /source-table-marker/)
+  assert.match(decorations, /source-table-highlight/)
+  assert.match(contentPanel, /findCitationRange\(editor\.value, citation\)/)
+})
+
+test('keeps long table source labels readable and active', () => {
+  assert.match(contentPanel, /\.word-body :deep\(\.source-table-marker\)/)
+  assert.match(contentPanel, /\.word-body :deep\(\.source-table-highlight\.active\)/)
+})
