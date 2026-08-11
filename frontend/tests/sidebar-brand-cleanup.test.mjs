@@ -51,3 +51,10 @@ test('品牌图标与文案在侧栏收起时保持可识别', async () => {
   assert.match(source, /\.sidebar\.collapsed \.brand-emblem/)
   assert.match(source, /\.sidebar\.collapsed \.sidebar-header h1\.brand-lockup\s*\{[\s\S]*?display:\s*flex/)
 })
+
+test('品牌图标尺寸略微放大且收起态保持紧凑', async () => {
+  const source = await readFile(stylePath, 'utf8')
+
+  assert.match(source, /\.brand-emblem\s*\{[\s\S]*?width:\s*36px/)
+  assert.match(source, /\.sidebar\.collapsed \.brand-emblem\s*\{[\s\S]*?width:\s*32px/)
+})

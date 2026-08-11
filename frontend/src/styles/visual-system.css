@@ -196,9 +196,9 @@ textarea {
 }
 
 .brand-emblem {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   object-fit: contain;
   filter: drop-shadow(0 3px 8px rgba(20, 91, 132, 0.22));
 }
@@ -228,9 +228,9 @@ textarea {
 }
 
 .sidebar.collapsed .brand-emblem {
-  width: 28px;
-  height: 28px;
-  flex-basis: 28px;
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
 }
 
 .sidebar-collapse-toggle,
