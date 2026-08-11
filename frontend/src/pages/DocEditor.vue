@@ -25,6 +25,16 @@
         </span>
         <span v-if="renameError" class="title-error">{{ renameError }}</span>
       </div>
+      <button
+        v-if="confirmableChapterCount"
+        class="document-confirm-button"
+        type="button"
+        :disabled="confirmingAllChapters || generating || isSaving"
+        :title="`确认当前文档 ${confirmableChapterCount} 个已生成章节`"
+        @click="confirmAllChapters"
+      >
+        {{ confirmingAllChapters ? `确认中 ${confirmedChapterCount}/${confirmableChapterCount}` : '一键确认全部章节' }}
+      </button>
     </div>
 
     <!-- Editor Toolbar -->
@@ -59,6 +69,40 @@
       <span class="tb-sep"></span>
       <button class="tb-btn" :class="{ active: editorState.blockquote }" title="引用" @mousedown.prevent @click="runEditorCommand('blockquote')">❝</button>
       <button class="tb-btn" title="插入链接" @mousedown.prevent @click="contentPanelRef?.setLink()">🔗</button>
+      <div class="toolbar-menu-group">
+        <button
+          class="tb-btn tb-label-btn"
+          type="button"
+          title="插入和编辑表格"
+          @mousedown.prevent
+          @click="showTableMenu = !showTableMenu"
+        >
+          表格
+        </button>
+        <div v-if="showTableMenu" class="toolbar-popover toolbar-table-menu">
+          <button type="button" @mousedown.prevent @click="runEditorCommand('insertTable', '3x3'); showTableMenu = false">
+            插入 3 × 3 表格
+          </button>
+          <div class="toolbar-popover-label">当前表格</div>
+          <button type="button" @mousedown.prevent @click="runEditorCommand('addRowAfter')">下方插入行</button>
+          <button type="button" @mousedown.prevent @click="runEditorCommand('addColumnAfter')">右侧插入列</button>
+          <button type="button" @mousedown.prevent @click="runEditorCommand('deleteRow')">删除当前行</button>
+          <button type="button" @mousedown.prevent @click="runEditorCommand('deleteColumn')">删除当前列</button>
+          <button type="button" @mousedown.prevent @click="runEditorCommand('mergeCells')">合并单元格</button>
+          <button type="button" @mousedown.prevent @click="runEditorCommand('splitCell')">拆分单元格</button>
+          <button type="button" class="toolbar-danger-item" @mousedown.prevent @click="runEditorCommand('deleteTable'); showTableMenu = false">
+            删除表格
+          </button>
+        </div>
+      </div>
+      <button class="tb-btn" type="button" title="插入图片" @mousedown.prevent @click="openImagePicker">▧</button>
+      <input
+        ref="imageInputRef"
+        class="editor-image-input"
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/bmp"
+        @change="handleImageSelected"
+      />
       <button class="tb-btn" title="清除格式" @mousedown.prevent @click="runEditorCommand('clear')">Tx</button>
       <button class="tb-btn" title="更多格式" @mousedown.prevent @click="showMoreTools = !showMoreTools">⋯</button>
       <div v-if="showMoreTools" class="toolbar-more-menu">
@@ -93,7 +137,7 @@
         @regenerate="showRegenModal = true"
         @export="doExport"
         @edit="onEdit"
-        @selectionChange="selectionText = $event"
+        @selectionChange="handleSelectionChange"
         @editorStateChange="editorState = $event"
         @annotationSelect="onAnnotationSelect"
         @citationSelect="onCitationSelect"
@@ -189,6 +233,7 @@ const showRegenModal = ref(false)
 const regenInstruction = ref('')
 const aiPanelRef = ref()
 const contentPanelRef = ref()
+const imageInputRef = ref<HTMLInputElement | null>(null)
 const selectionText = ref('')
 const editorState = ref<EditorToolbarState>({
   block: 'paragraph',
@@ -207,6 +252,7 @@ const renameError = ref('')
 const titleDraft = ref('')
 const titleInputRef = ref<HTMLInputElement | null>(null)
 const showMoreTools = ref(false)
+const showTableMenu = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let genPollTimer: ReturnType<typeof setInterval> | null = null
 type ChapterSavePayload = { plain_text: string; content_json: string }
@@ -222,6 +268,8 @@ let savedSnapshot: ChapterSavePayload | null = null
 let pendingSave: { chapterId: string; payload: ChapterSavePayload } | null = null
 let saveRequest: Promise<boolean> | null = null
 const generating = ref(false)
+const confirmingAllChapters = ref(false)
+const confirmedChapterCount = ref(0)
 let focusMessageTimer: ReturnType<typeof setTimeout> | null = null
 const regenerationTransition = ref<RegenerationTransition | null>(null)
 let latestGenerationRefreshId = 0
@@ -230,6 +278,9 @@ const chapterCitations = computed(() =>
   (currentChapter.value?.citations || []).map((citation: any, index: number) => ({
     ...citation,
     key: citation.key || `${citation.source_document_id}:${index}`,
+    fileName:
+      sourceDetails.value[citation.source_document_id]?.original_name ||
+      `来源资料 ${citation.source_document_id || citation.key}`,
   })),
 )
 
@@ -256,6 +307,11 @@ const generationProgress = computed(() => {
     return `第 ${active.order_index || finished + 1}/${chapters.length} 章生成中：${active.title}`
   }
   return `等待生成：${finished}/${chapters.length}`
+})
+
+const confirmableChapterCount = computed(() => {
+  const chapters = doc.value?.chapters || []
+  return chapters.filter((chapter: any) => ['generated', 'needs_material'].includes(chapter.status)).length
 })
 
 onMounted(async () => {
@@ -435,6 +491,28 @@ function runEditorCommand(command: string, value?: string) {
   contentPanelRef.value?.runCommand(command, value)
 }
 
+function openImagePicker() {
+  imageInputRef.value?.click()
+}
+
+function handleImageSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (file.size > 5 * 1024 * 1024) {
+    showFocusMessage('图片不能超过 5 MB')
+    return
+  }
+
+  const reader = new FileReader()
+  reader.onload = () => {
+    if (typeof reader.result === 'string') contentPanelRef.value?.insertImage(reader.result)
+  }
+  reader.onerror = () => showFocusMessage('图片读取失败，请重试')
+  reader.readAsDataURL(file)
+}
+
 function changeBlockStyle(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   runEditorCommand('block', value)
@@ -443,6 +521,13 @@ function changeBlockStyle(event: Event) {
 function changeFontSize(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   runEditorCommand('fontSize', value)
+}
+
+function handleSelectionChange(text: string) {
+  // Moving focus or placing the caret emits a transient empty selection. Keep
+  // the last non-empty selection locked for annotation/AI actions until the
+  // user selects different text, changes chapter, or applies a replacement.
+  if (text.trim()) selectionText.value = text
 }
 
 function payloadFromChapter(chapter: any): ChapterSavePayload {
@@ -609,6 +694,51 @@ async function confirmChapter() {
   await apiConfirm(docId, currentChapterId.value)
   currentChapter.value = await getChapter(docId, currentChapterId.value)
   doc.value = await getDocument(docId)
+}
+
+async function confirmAllChapters() {
+  if (confirmingAllChapters.value) return
+
+  if (!(await flushPendingSave())) {
+    showFocusMessage('当前章节保存失败，暂不能一键确认')
+    return
+  }
+
+  const chapters = (doc.value?.chapters || []).filter((chapter: any) =>
+    ['generated', 'needs_material'].includes(chapter.status),
+  )
+  if (chapters.length === 0) {
+    showFocusMessage('当前没有可确认的 AI 生成章节')
+    return
+  }
+
+  confirmingAllChapters.value = true
+  confirmedChapterCount.value = 0
+  const failed: string[] = []
+  try {
+    for (const chapter of chapters) {
+      try {
+        await apiConfirm(docId, chapter.id)
+        confirmedChapterCount.value += 1
+      } catch (err: any) {
+        failed.push(`${chapter.title}：${err.message || '确认失败'}`)
+      }
+    }
+
+    doc.value = await getDocument(docId)
+    if (currentChapterId.value) {
+      currentChapter.value = await getChapter(docId, currentChapterId.value)
+    }
+    if (failed.length === 0) {
+      showFocusMessage(`已一键确认 ${confirmedChapterCount.value} 个章节`)
+    } else {
+      showFocusMessage(`已确认 ${confirmedChapterCount.value} 个章节，${failed.length} 个失败：${failed[0]}`)
+    }
+  } catch (err: any) {
+    showFocusMessage(`一键确认后刷新失败：${err.message || '请重新打开文档核对状态'}`)
+  } finally {
+    confirmingAllChapters.value = false
+  }
 }
 
 async function doRegenerate() {

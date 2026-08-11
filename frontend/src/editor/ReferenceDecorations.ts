@@ -11,6 +11,8 @@ export type AnnotationRef = {
 export type CitationRef = {
   key: string
   source_excerpt?: string | null
+  fileName?: string | null
+  source_document_id?: string | null
 }
 
 export type ReferenceDecorationOptions = {
@@ -131,7 +133,6 @@ function buildDecorations(state: any, options: ReferenceDecorationOptions) {
   const annotations = options.getAnnotations() || []
   const citations = options.getCitations() || []
   let annotationNumber = 0
-  let citationNumber = 0
 
   for (const annotation of annotations) {
     const range = findTextRange(state.doc, annotation.target_text || '')
@@ -156,8 +157,9 @@ function buildDecorations(state: any, options: ReferenceDecorationOptions) {
   for (const citation of citations) {
     const range = findTextRange(state.doc, citation.source_excerpt || '')
     if (!range) continue
-    citationNumber += 1
     const active = citation.key === options.getActiveCitationKey()
+    const fileName = citation.fileName || `来源资料 ${citation.source_document_id || citation.key}`
+    const label = `来源：${fileName}`
     decorations.push(
       Decoration.inline(range.from, range.to, {
         class: active ? 'source-highlight active' : 'source-highlight',
@@ -167,7 +169,7 @@ function buildDecorations(state: any, options: ReferenceDecorationOptions) {
       markerDecoration(
         range.to,
         active ? 'source-marker active' : 'source-marker',
-        `来源 ${citationNumber}`,
+        label,
         () => options.onCitationClick(citation.key),
       ),
     )
