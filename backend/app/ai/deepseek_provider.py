@@ -22,7 +22,7 @@ class DeepSeekProvider:
         try:
             from openai import OpenAI
         except ImportError as e:
-            raise RuntimeError("openai package not installed. Run: pip install openai") from e
+            raise RuntimeError("openai package not installed. Run: uv sync") from e
         self._client_instance = OpenAI(
             api_key=settings.ai_api_key,
             base_url=settings.ai_base_url or "https://api.deepseek.com",

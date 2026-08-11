@@ -18,11 +18,11 @@ data/                    本地数据库、上传、解析和导出产物（已�
 从仓库根目录执行：
 
 ```bash
-python3 -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements.txt
+uv python install 3.12
+uv sync
 (cd frontend && npm ci)
 
-AI_PROVIDER=mock .venv/bin/python -m uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
+AI_PROVIDER=mock uv run uvicorn app.main:app --app-dir backend --reload --host 127.0.0.1 --port 8000
 ```
 
 在第二个终端启动前端：
@@ -34,13 +34,13 @@ AI_PROVIDER=mock .venv/bin/python -m uvicorn app.main:app --app-dir backend --re
 首次建立本地数据库或迁移旧场景模板路径后，运行：
 
 ```bash
-.venv/bin/python backend/scripts/seed_demo_projects.py
+uv run python backend/scripts/seed_demo_projects.py
 ```
 
 后端运行后，可导入场景 1 资料：
 
 ```bash
-.venv/bin/python backend/scripts/import_scenario1.py
+uv run python backend/scripts/import_scenario1.py
 ```
 
 `.env` 始终放在仓库根目录，`data/` 也始终位于仓库根目录；无论从根目录还是 `backend/` 执行命令，路径解析结果一致。
@@ -48,8 +48,10 @@ AI_PROVIDER=mock .venv/bin/python -m uvicorn app.main:app --app-dir backend --re
 ## 验证
 
 ```bash
-(cd backend && ../.venv/bin/python -m pytest -q)
+(cd backend && uv run pytest -q)
 (cd frontend && npm run build && node --test tests/*.test.mjs)
 ```
+
+`pyproject.toml` 是 Python 依赖的唯一声明，`uv.lock` 固定可复现的精确版本。日常安装或更新环境运行 `uv sync`；在 CI 或需要严格复现时运行 `uv sync --locked`。不要再使用 `pip install -r backend/requirements.txt`。
 
 更多业务规则、运行说明和 Windows 命令见 [`docs/README.md`](docs/README.md) 与 [`WINDOWS_SETUP.md`](WINDOWS_SETUP.md)。

@@ -95,6 +95,9 @@ AI_API_KEY=
 document-generation/
 ├── AGENTS.md
 ├── CONTEXT.md
+├── .python-version                # uv 使用的 Python 主版本（3.12）
+├── pyproject.toml                 # Python 依赖与 Python 3.12 约束
+├── uv.lock                        # uv 精确依赖锁定文件
 ├── docs/
 │   ├── PRD.md
 │   ├── BUSINESS_DOMAIN.md
@@ -105,8 +108,7 @@ document-generation/
 │   ├── alembic/                   # 数据库迁移
 │   ├── scripts/                   # 种子数据与场景导入
 │   ├── tests/                     # 后端与场景验收测试
-│   ├── alembic.ini
-│   └── requirements.txt
+│   └── alembic.ini
 ├── frontend/                      # 独立 Vue + Vite 项目
 ├── data/
 │   ├── app.db
