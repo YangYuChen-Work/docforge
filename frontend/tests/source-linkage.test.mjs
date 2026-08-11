@@ -25,6 +25,7 @@ test('focuses and flashes the matching source card from a citation selection', (
   assert.match(panel, /function focusCitationCard\(citationKey: string\)/)
   assert.match(panel, /scrollIntoView\(/)
   assert.match(panel, /classList\.add\('source-card-flash'\)/)
+  assert.match(panel, /citationFocusRetryTimer = setInterval/)
   assert.match(editor, /focusCitationCard\(citationKey\)/)
 })
 

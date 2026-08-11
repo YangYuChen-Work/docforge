@@ -397,7 +397,6 @@ function focusAnnotation(annotationId: string) {
 function focusCitation(citationKey: string) {
   const citation = (props.citations || []).find((item) => item.key === citationKey)
   if (!citation) return
-  emit('citationSelect', citationKey)
   const range = findReferenceRange(editor.value, citation.source_excerpt || '')
   if (range) {
     scrollToRange(range)

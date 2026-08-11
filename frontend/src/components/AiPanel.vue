@@ -314,6 +314,8 @@ let msgId = 0
 let loadingTimer: ReturnType<typeof setInterval> | null = null
 let sourceRevealTimer: ReturnType<typeof setInterval> | null = null
 let citationFlashTimer: ReturnType<typeof setTimeout> | null = null
+let citationFocusRetryTimer: ReturnType<typeof setInterval> | null = null
+let citationFocusRetryAttempts = 0
 
 const tabs: Array<{ key: PanelTab; label: string; icon: string }> = [
   { key: 'ai', label: 'AI 助手', icon: '✦' },
@@ -422,13 +424,21 @@ function openTab(tab: PanelTab) {
   activeTab.value = tab
 }
 
+function stopCitationFocusRetry() {
+  if (citationFocusRetryTimer) clearInterval(citationFocusRetryTimer)
+  citationFocusRetryTimer = null
+  citationFocusRetryAttempts = 0
+}
+
 function focusCitationCard(citationKey: string) {
   activeTab.value = 'sources'
   visibleCitationCount.value = props.citations.length
-  nextTick(() => {
+
+  stopCitationFocusRetry()
+  const locateCard = () => {
     const card = Array.from(document.querySelectorAll<HTMLElement>('.source-card'))
       .find((item) => item.dataset.citationKey === citationKey)
-    if (!card) return
+    if (!card) return false
 
     card.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     card.classList.remove('source-card-flash')
@@ -439,6 +449,16 @@ function focusCitationCard(citationKey: string) {
       card.classList.remove('source-card-flash')
       citationFlashTimer = null
     }, 1000)
+    stopCitationFocusRetry()
+    return true
+  }
+
+  nextTick(() => {
+    if (locateCard()) return
+    citationFocusRetryTimer = setInterval(() => {
+      citationFocusRetryAttempts += 1
+      if (locateCard() || citationFocusRetryAttempts >= 30) stopCitationFocusRetry()
+    }, 100)
   })
 }
 
@@ -570,6 +590,7 @@ defineExpose({
 onBeforeUnmount(() => {
   stopLoadingTimer()
   stopSourceRevealTimer()
+  stopCitationFocusRetry()
   if (citationFlashTimer) clearTimeout(citationFlashTimer)
 })
 </script>
