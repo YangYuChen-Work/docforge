@@ -128,6 +128,7 @@
         :chapter="currentChapter"
         :hasUnsavedChanges="hasUnsavedChanges"
         :isSaving="isSaving"
+        :isExporting="isExporting"
         @save="saveCurrentChapter"
         :annotations="annotations"
         :citations="chapterCitations"
@@ -165,6 +166,61 @@
 
     <div v-if="focusMessage" class="editor-focus-message" role="status">{{ focusMessage }}</div>
 
+    <div
+      v-if="exportState !== 'idle'"
+      class="export-progress-overlay"
+      :class="`is-${exportState}`"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-progress-title"
+      aria-describedby="export-progress-detail"
+    >
+      <div
+        ref="exportStatusCardRef"
+        class="export-progress-card"
+        role="status"
+        aria-live="polite"
+        tabindex="-1"
+      >
+        <div class="export-progress-icon" aria-hidden="true">
+          {{ exportState === 'failed' ? '!' : exportState === 'completed' ? '✓' : '↻' }}
+        </div>
+        <div id="export-progress-title" class="export-progress-title">
+          {{ exportState === 'failed' ? '导出失败' : exportState === 'completed' ? '导出完成' : `正在导出 ${exportFormat.toUpperCase()}` }}
+        </div>
+        <div id="export-progress-detail" class="export-progress-subtitle">
+          {{ exportIncludeComments ? '包含批注' : '不含批注' }}
+        </div>
+        <div v-if="exportState === 'failed'" class="export-progress-error">{{ exportError }}</div>
+        <template v-else>
+          <div class="export-progress-stage-label">
+            {{ exportState === 'preparing' ? '准备导出' : exportState === 'generating' ? '正在生成文件' : exportState === 'preparing-download' ? '正在准备下载' : '导出完成' }}
+          </div>
+          <div class="export-progress-steps" aria-hidden="true">
+            <span
+              v-for="(label, index) in ['准备', '生成', '下载']"
+              :key="label"
+              :class="{ done: index < exportStageIndex, active: index === exportStageIndex }"
+            >
+              {{ label }}
+            </span>
+          </div>
+          <div v-if="exportState !== 'completed'" class="export-progress-track" aria-hidden="true">
+            <span class="export-progress-indeterminate"></span>
+          </div>
+        </template>
+        <button
+          v-if="exportState === 'failed'"
+          ref="exportStatusCloseRef"
+          type="button"
+          class="btn btn-outline export-progress-close"
+          @click="closeExportStatus"
+        >
+          关闭
+        </button>
+      </div>
+    </div>
+
     <div v-if="showRegenModal" class="modal-overlay">
       <div class="modal" style="width:420px">
         <div class="modal-header">
@@ -192,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import OutlinePanel from '../components/OutlinePanel.vue'
 import ContentPanel from '../components/ContentPanel.vue'
@@ -213,6 +269,7 @@ import {
 } from '../api/documents'
 import { createExport } from '../api/exports'
 import { getSource } from '../api/sources'
+import { runExportProgressFlow } from '../utils/exportProgressFlow.mjs'
 
 const route = useRoute()
 const docId = route.params.docId as string
@@ -234,6 +291,25 @@ const regenInstruction = ref('')
 const aiPanelRef = ref()
 const contentPanelRef = ref()
 const imageInputRef = ref<HTMLInputElement | null>(null)
+const exportStatusCardRef = ref<HTMLElement | null>(null)
+const exportStatusCloseRef = ref<HTMLButtonElement | null>(null)
+type ExportState = 'idle' | 'preparing' | 'generating' | 'preparing-download' | 'completed' | 'failed'
+const exportState = ref<ExportState>('idle')
+const exportFormat = ref('')
+const exportIncludeComments = ref(false)
+const exportError = ref('')
+const prefersReducedMotion = ref(false)
+const exportStageIndex = computed(() => ({
+  idle: -1,
+  preparing: 0,
+  generating: 1,
+  'preparing-download': 2,
+  completed: 3,
+  failed: 1,
+}[exportState.value] ?? -1))
+const isExporting = computed(() =>
+  ['preparing', 'generating', 'preparing-download', 'completed'].includes(exportState.value),
+)
 const selectionText = ref('')
 const editorState = ref<EditorToolbarState>({
   block: 'paragraph',
@@ -273,6 +349,8 @@ const confirmedChapterCount = ref(0)
 let focusMessageTimer: ReturnType<typeof setTimeout> | null = null
 const regenerationTransition = ref<RegenerationTransition | null>(null)
 let latestGenerationRefreshId = 0
+let exportMotionMediaQuery: MediaQueryList | null = null
+let exportStatusReturnFocusEl: HTMLElement | null = null
 
 const chapterCitations = computed(() =>
   (currentChapter.value?.citations || []).map((citation: any, index: number) => ({
@@ -316,6 +394,9 @@ const confirmableChapterCount = computed(() => {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleSaveShortcut)
+  exportMotionMediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  prefersReducedMotion.value = exportMotionMediaQuery.matches
+  exportMotionMediaQuery.addEventListener('change', handleExportMotionPreferenceChange)
   doc.value = await getDocument(docId)
   titleDraft.value = doc.value.title || ''
   if (doc.value.chapters.length > 0) await selectChapter(doc.value.chapters[0])
@@ -324,10 +405,33 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleSaveShortcut)
+  exportMotionMediaQuery?.removeEventListener('change', handleExportMotionPreferenceChange)
   if (saveTimer) clearTimeout(saveTimer)
   stopGenerationPolling()
   if (focusMessageTimer) clearTimeout(focusMessageTimer)
 })
+
+watch(exportState, async (state, previousState) => {
+  if (state !== 'idle' && previousState === 'idle') {
+    exportStatusReturnFocusEl = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }
+
+  if (state !== 'idle') {
+    await nextTick()
+    const focusTarget = state === 'failed' ? exportStatusCloseRef.value : exportStatusCardRef.value
+    focusTarget?.focus()
+    return
+  }
+
+  if (previousState !== 'idle') {
+    exportStatusReturnFocusEl?.focus()
+    exportStatusReturnFocusEl = null
+  }
+})
+
+function handleExportMotionPreferenceChange(event: MediaQueryListEvent) {
+  prefersReducedMotion.value = event.matches
+}
 
 function isStillGenerating(d: any) {
   if (!d) return false
@@ -860,22 +964,38 @@ async function handleCommentAiAction(annotation: any) {
   await doAiAction('address_comments', annotation.target_text || '', annotation.content || '')
 }
 
+function closeExportStatus() {
+  exportState.value = 'idle'
+  exportFormat.value = ''
+  exportIncludeComments.value = false
+  exportError.value = ''
+}
+
 async function doExport(format: string, includeComments: boolean) {
-  try {
-    const result = await createExport(docId, format, includeComments)
-    if (result.error_message) {
-      alert(`导出失败：${result.error_message}`)
-      return
-    }
-    window.open(`/api/exports/${result.export_id}/download`, '_blank')
-  } catch (err: any) {
-    const validation = err.raw?.response?.data?.detail?.validation_report
-    if (validation) {
-      const msg = [...(validation.errors || []), ...(validation.warnings || [])].join('\n')
-      alert(`导出前校验未通过：\n${msg}`)
-    } else {
-      alert(`导出失败：${err.message || '未知错误'}`)
-    }
-  }
+  if (isExporting.value) return
+  await runExportProgressFlow({
+    createExport,
+    docId,
+    format,
+    includeComments,
+    onStateChange: async ({
+      state,
+      format: nextFormat,
+      includeComments: nextIncludeComments,
+      error,
+    }: { state: ExportState; format: string; includeComments: boolean; error: string }) => {
+      exportState.value = state
+      exportFormat.value = nextFormat
+      exportIncludeComments.value = nextIncludeComments
+      exportError.value = error
+      if (state === 'preparing') {
+        await nextTick()
+      }
+    },
+    openDownload: (result: any) => {
+      window.open(`/api/exports/${result.export_id}/download`, '_blank')
+    },
+    reducedMotion: prefersReducedMotion.value,
+  })
 }
 </script>

@@ -37,6 +37,7 @@
             @click="toggleExportMenu"
             class="btn btn-primary"
             style="margin-top:0;padding:6px 14px"
+            :disabled="isExporting"
           >
             导出 ▾
           </button>
@@ -47,7 +48,9 @@
                 v-for="fmt in ['docx', 'pdf', 'xlsx']"
                 :key="fmt"
                 class="export-drop-item"
-                @click="selectedExportFormat = fmt"
+                :class="{ 'is-disabled': isExporting }"
+                :aria-disabled="isExporting"
+                @click="!isExporting && (selectedExportFormat = fmt)"
               >
                 <span class="export-fmt-icon" style="background:#2b5eb8">{{ fmt.charAt(0).toUpperCase() }}</span>
                 <div>
@@ -61,11 +64,11 @@
                 <span>导出 {{ selectedExportFormat.toUpperCase() }}</span>
               </div>
               <div class="export-drop-title">选择是否带批注</div>
-              <button class="export-comment-option" type="button" @click="emitExport(false)">
+              <button class="export-comment-option" type="button" :disabled="isExporting" @click="emitExport(false)">
                 <span class="export-comment-option-title">不带批注</span>
                 <span class="export-comment-option-desc">只导出正文和表格</span>
               </button>
-              <button class="export-comment-option" type="button" @click="emitExport(true)">
+              <button class="export-comment-option" type="button" :disabled="isExporting" @click="emitExport(true)">
                 <span class="export-comment-option-title">带批注</span>
                 <span class="export-comment-option-desc">保留当前章节的审阅批注</span>
               </button>
@@ -153,6 +156,7 @@ const props = defineProps<{
   chapter: any
   hasUnsavedChanges: boolean
   isSaving: boolean
+  isExporting?: boolean
   annotations?: AnnotationRef[]
   citations?: CitationRef[]
   activeAnnotationId?: string
@@ -175,13 +179,14 @@ const selectedExportFormat = ref('')
 const mermaidContainer = ref<HTMLElement>()
 
 function emitExport(includeComments: boolean) {
-  if (!selectedExportFormat.value) return
+  if (!selectedExportFormat.value || props.isExporting) return
   emit('export', selectedExportFormat.value, includeComments)
   selectedExportFormat.value = ''
   showExport.value = false
 }
 
 function toggleExportMenu() {
+  if (props.isExporting) return
   showExport.value = !showExport.value
   if (!showExport.value) selectedExportFormat.value = ''
 }
