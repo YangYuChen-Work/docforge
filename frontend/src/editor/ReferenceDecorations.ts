@@ -30,22 +30,21 @@ export const REFERENCE_DECORATIONS_REFRESH = 'referenceDecorationsRefresh'
 
 type TextRange = { from: number; to: number }
 type NodeRange = { from: number; to: number }
-type CaptionRange = NodeRange | null
 type TableValue = {
-  raw: string
   normalized: string
   isMeaningful: boolean
   isNumeric: boolean
+  isDiscriminative: boolean
 }
 type TableMetadata = {
   range: NodeRange
   markerPosition: number
-  captionRange: CaptionRange
-  cellValues: TableValue[]
-  normalizedCellValues: string[]
+  values: TableValue[]
 }
 
 const STRUCTURED_TABLE_FIELDS = new Set(['caption', 'headers', 'rows'])
+const GENERIC_TABLE_VALUES = new Set(['序号', '备注', '编号', '说明'])
+const LONG_TEXT_MATCH_MIN_LENGTH = 8
 
 function normalizeWithMap(value: string) {
   const chars: string[] = []
@@ -75,13 +74,19 @@ function normalizeTableValue(value: string) {
     .normalize('NFKC')
     .trim()
     .toLowerCase()
-    .replace(/[\s\p{P}]+/gu, '')
+    .replace(/\s+/gu, '')
   const isMeaningful = normalized.length > 1
+  const isNumeric = isMeaningful && /^[+\-−]?\d/u.test(normalized)
+  const isTableNumber = /^(?:表(?:格)?|table)[-–—_:#.]?\d+(?:[.-]\d+)*$/u.test(normalized)
   return {
-    raw: value,
     normalized,
     isMeaningful,
-    isNumeric: isMeaningful && /^\d+$/.test(normalized),
+    isNumeric,
+    isDiscriminative:
+      isMeaningful
+      && !isNumeric
+      && !isTableNumber
+      && !GENERIC_TABLE_VALUES.has(normalized),
   }
 }
 
@@ -98,7 +103,6 @@ function collectTableMetadata(doc: any): TableMetadata[] {
 
     const range = { from: pos, to: pos + node.nodeSize }
     let markerPosition = range.to
-    let captionRange: CaptionRange = null
 
     if (parent && typeof index === 'number' && index > 0) {
       const previousSibling = parent.child(index - 1)
@@ -106,25 +110,26 @@ function collectTableMetadata(doc: any): TableMetadata[] {
       const previousRange = { from: previousPos, to: previousPos + previousSibling.nodeSize }
       if (previousSibling.type?.name === 'paragraph' && isTableCaption(previousSibling.textContent || '')) {
         markerPosition = previousRange.to
-        captionRange = previousRange
       }
     }
 
-    const cellValues: TableValue[] = []
+    const values: TableValue[] = []
     node.descendants((child: any) => {
+      if (child.type?.name === 'table') return false
       if (child.type?.name === 'tableCell' || child.type?.name === 'tableHeader') {
-        cellValues.push(normalizeTableValue(child.textContent || ''))
+        const ownText: string[] = []
+        child.descendants((descendant: any) => {
+          if (descendant.type?.name === 'table') return false
+          if (descendant.isText && descendant.text) ownText.push(descendant.text)
+        })
+        values.push(normalizeTableValue(ownText.join(' ')))
       }
     })
 
     tables.push({
       range,
       markerPosition,
-      captionRange,
-      cellValues,
-      normalizedCellValues: cellValues
-        .filter((value) => value.isMeaningful)
-        .map((value) => value.normalized),
+      values: values.filter((value) => value.isMeaningful),
     })
   })
 
@@ -164,7 +169,7 @@ function getStructuredSourceValues(sourceExcerpt: string | null | undefined) {
       new Map(
         values
           .map((value) => normalizeTableValue(value))
-          .filter((value) => value.isMeaningful)
+          .filter((value) => value.isDiscriminative || value.isNumeric)
           .map((value) => [value.normalized, value] as const),
       ).values(),
     )
@@ -189,18 +194,24 @@ function findStructuredTableMatch(
   for (const table of tables) {
     const matchedValues = new Set<string>()
     let hasLongNonNumericMatch = false
+    let hasDiscriminativeMatch = false
 
     for (const sourceValue of sourceValues) {
-      const matched = table.normalizedCellValues.some((cellValue) => cellValue.includes(sourceValue.normalized))
+      const exactMatch = table.values.some((cellValue) => cellValue.normalized === sourceValue.normalized)
+      const longTextMatch = sourceValue.isDiscriminative
+        && sourceValue.normalized.length >= LONG_TEXT_MATCH_MIN_LENGTH
+        && table.values.some((cellValue) => cellValue.normalized.includes(sourceValue.normalized))
+      const matched = exactMatch || longTextMatch
       if (!matched) continue
       matchedValues.add(sourceValue.normalized)
-      if (!sourceValue.isNumeric && sourceValue.normalized.length >= 8) {
+      if (sourceValue.isDiscriminative) hasDiscriminativeMatch = true
+      if (longTextMatch) {
         hasLongNonNumericMatch = true
       }
     }
 
     const score = matchedValues.size
-    if (score < 2 && !hasLongNonNumericMatch) continue
+    if (!hasDiscriminativeMatch || (score < 2 && !hasLongNonNumericMatch)) continue
 
     if (!bestMatch || score > bestMatch.score) {
       bestMatch = { table, score }
