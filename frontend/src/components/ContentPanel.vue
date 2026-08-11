@@ -107,6 +107,7 @@ import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
 import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
+import Image from '@tiptap/extension-image'
 import { Highlight } from '@tiptap/extension-highlight'
 import { TextAlign } from '@tiptap/extension-text-align'
 import { FontSize, TextStyle } from '@tiptap/extension-text-style'
@@ -177,8 +178,12 @@ const editor = useEditor({
     TableRow,
     TableHeader,
     TableCell,
+    Image.configure({
+      allowBase64: true,
+      resize: { enabled: true, minWidth: 120, minHeight: 80, alwaysPreserveAspectRatio: true },
+    }),
     Highlight.configure({ multicolor: true }),
-    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    TextAlign.configure({ types: ['heading', 'paragraph', 'image'] }),
     TextStyle,
     FontSize,
     createReferenceDecorations({
@@ -283,6 +288,26 @@ function runCommand(command: string, value?: string) {
     case 'blockquote':
       chain.toggleBlockquote().run()
       break
+    case 'insertTable': {
+      const [rows, cols] = (value || '3x3').split('x').map((part) => Number(part))
+      chain.insertTable({
+        rows: Number.isFinite(rows) && rows > 0 ? rows : 3,
+        cols: Number.isFinite(cols) && cols > 0 ? cols : 3,
+        withHeaderRow: true,
+      }).run()
+      break
+    }
+    case 'addRowBefore':
+    case 'addRowAfter':
+    case 'deleteRow':
+    case 'addColumnBefore':
+    case 'addColumnAfter':
+    case 'deleteColumn':
+    case 'mergeCells':
+    case 'splitCell':
+    case 'deleteTable':
+      (chain as any)[command]().run()
+      break
     case 'codeBlock':
       chain.toggleCodeBlock().run()
       break
@@ -306,6 +331,11 @@ function setLink() {
     return
   }
   instance.chain().focus().setLink({ href: url.trim() }).run()
+}
+
+function insertImage(src: string) {
+  if (!editor.value || !src.startsWith('data:image/')) return
+  editor.value.chain().focus().setImage({ src, alt: '插入的图片' }).run()
 }
 
 /** Replace the currently selected range with plain text (used when the user
@@ -377,7 +407,7 @@ function focusCitation(citationKey: string) {
   }
 }
 
-defineExpose({ replaceSelection, insertAtCursor, runCommand, setLink, focusAnnotation, focusCitation })
+defineExpose({ replaceSelection, insertAtCursor, runCommand, setLink, insertImage, focusAnnotation, focusCitation })
 
 watch(
   () => [props.chapter?.id, props.chapter?.content_json, props.chapter?.plain_text],
@@ -519,6 +549,18 @@ onBeforeUnmount(() => {
 
 .word-body :deep(.ProseMirror:focus) {
   outline: none;
+}
+
+.word-body :deep(img) {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px auto;
+}
+
+.word-body :deep(.ProseMirror-selectednode) {
+  outline: 2px solid #1677ff;
+  border-radius: 2px;
 }
 
 .word-body :deep(ul),
@@ -679,6 +721,12 @@ onBeforeUnmount(() => {
 
 .word-body :deep(.source-marker) {
   background: #1677ff;
+  max-width: min(100%, 420px);
+  padding: 2px 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  text-align: left;
 }
 
 .word-body :deep(.source-marker.active) {
