@@ -492,63 +492,6 @@
 .export-progress { height:4px; border-radius:2px; background:#e8e8e8; margin-top:8px; overflow:hidden; }
 .export-progress-bar { height:100%; border-radius:2px; background:#1677ff; transition:width .3s ease; }
 
-/* Centered export progress flow */
-.export-progress-overlay {
-    position: fixed; inset: 0; z-index: 3000;
-    display: flex; align-items: center; justify-content: center;
-    padding: 24px; background: rgba(17, 35, 61, .24);
-    animation: exportProgressOverlayIn .18s ease-out;
-}
-.export-progress-card {
-    width: min(380px, calc(100vw - 48px));
-    padding: 28px 30px 24px; text-align: center;
-    background: #fff; border: 1px solid #dbe4f0; border-radius: 12px;
-    box-shadow: 0 16px 48px rgba(17, 35, 61, .2);
-}
-.export-progress-icon {
-    display: flex; align-items: center; justify-content: center;
-    width: 42px; height: 42px; margin: 0 auto 12px;
-    border-radius: 50%; background: #eaf3ff; color: #1677ff;
-    font-size: 22px; font-weight: 700;
-    animation: exportProgressIconPulse 1.2s ease-in-out infinite;
-}
-.export-progress-title { color: #1f2d3d; font-size: 16px; font-weight: 600; }
-.export-progress-subtitle { margin-top: 5px; color: #8c98a8; font-size: 12px; }
-.export-progress-stage-label { margin-top: 20px; color: #425466; font-size: 13px; }
-.export-progress-steps { display: flex; justify-content: space-between; gap: 8px; margin: 18px 0 12px; }
-.export-progress-steps span {
-    flex: 1; padding-top: 8px; border-top: 2px solid #d9e2ef;
-    color: #8c98a8; font-size: 11px;
-}
-.export-progress-steps span.active { border-color: #1677ff; color: #1677ff; font-weight: 600; }
-.export-progress-steps span.done { border-color: #52c41a; color: #389e0d; }
-.export-progress-track { height: 4px; overflow: hidden; border-radius: 999px; background: #e8eef6; }
-.export-progress-indeterminate {
-    display: block; width: 36%; height: 100%; border-radius: inherit;
-    background: #1677ff; animation: exportProgressIndeterminate 1.2s ease-in-out infinite;
-}
-.export-progress-error {
-    margin: 16px 0; padding: 10px 12px; text-align: left; white-space: pre-line;
-    color: #cf1322; background: #fff1f0; border: 1px solid #ffccc7;
-    border-radius: 6px; font-size: 12px; line-height: 1.6;
-}
-.export-progress-close { margin-top: 4px; }
-.export-progress-overlay.is-completed .export-progress-icon { background: #f6ffed; color: #389e0d; }
-.export-progress-overlay.is-failed .export-progress-icon { background: #fff1f0; color: #cf1322; }
-.export-drop-item.is-disabled { cursor: not-allowed; opacity: .55; }
-@keyframes exportProgressOverlayIn { from { opacity: 0; } to { opacity: 1; } }
-@keyframes exportProgressIconPulse { 0%, 100% { opacity: .65; } 50% { opacity: 1; } }
-@keyframes exportProgressIndeterminate {
-    0% { transform: translateX(-110%); }
-    50% { transform: translateX(120%); }
-    100% { transform: translateX(280%); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .export-progress-overlay,
-    .export-progress-indeterminate,
-    .export-progress-icon { animation: none; }
-}
-
 /* ============================================
    Config Page Styles
    ============================================ */
