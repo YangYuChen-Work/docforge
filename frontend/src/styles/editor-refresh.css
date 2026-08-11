@@ -1,0 +1,290 @@
+/* Editor workbench refinements. Keep the route full-bleed so the shell owns
+   its scroll regions instead of leaving a second page scrollbar behind it. */
+.app > .sidebar-shell {
+  min-height: 100dvh;
+}
+
+.app > .sidebar-shell > .sidebar {
+  height: 100dvh;
+}
+
+.main-content:has(> .editor-shell) {
+  min-height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+}
+
+.main-content:has(> .editor-shell) > .editor-shell {
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  height: 100dvh;
+  margin: 0;
+}
+
+.editor-shell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--ui-canvas);
+}
+
+.editor-body {
+  height: 0;
+  min-height: 0;
+  overscroll-behavior: contain;
+}
+
+.editor-body > .editor-outline,
+.editor-body > .content-panel,
+.editor-body > .editor-ai-panel {
+  min-height: 0;
+}
+
+.content-panel {
+  height: 100%;
+}
+
+.editor-outline,
+.editor-content,
+.editor-ai-panel {
+  min-height: 0;
+  scrollbar-gutter: stable;
+}
+
+.editor-content {
+  background: #eef2f6;
+}
+
+.content-panel {
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-export-feedback {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: var(--ui-z-toast);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: min(360px, calc(100vw - 32px));
+  padding: 13px 15px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-md);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+  animation: editor-feedback-in 220ms var(--ui-ease) both;
+}
+
+.editor-export-feedback.is-success {
+  border-color: #b7dfca;
+  background: #f7fcf9;
+}
+
+.editor-export-feedback.is-error {
+  border-color: #e5bcbc;
+  background: #fffafa;
+}
+
+.editor-export-feedback-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  background: var(--ui-primary-wash);
+  color: var(--ui-primary-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.is-success .editor-export-feedback-icon {
+  background: var(--ui-success-wash);
+  color: var(--ui-success);
+}
+
+.is-error .editor-export-feedback-icon {
+  background: var(--ui-danger-wash);
+  color: var(--ui-danger);
+}
+
+.editor-export-feedback-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.editor-export-feedback-body strong,
+.editor-export-feedback-message {
+  display: block;
+}
+
+.editor-export-feedback-body strong {
+  color: var(--ui-ink);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.editor-export-feedback-message {
+  margin-top: 2px;
+  color: var(--ui-ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.editor-export-percent {
+  flex: 0 0 auto;
+  color: var(--ui-primary-strong);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.6;
+}
+
+.editor-export-spinner,
+.export-button-spinner {
+  display: inline-block;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: editor-export-spin 760ms linear infinite;
+}
+
+.editor-export-spinner {
+  width: 12px;
+  height: 12px;
+}
+
+.export-button-spinner {
+  width: 11px;
+  height: 11px;
+  margin-right: 5px;
+  vertical-align: -1px;
+}
+
+.editor-export-progress {
+  display: block;
+  height: 4px;
+  margin-top: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--ui-line);
+}
+
+.editor-export-progress-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  border-radius: inherit;
+  background: var(--ui-primary);
+  transition: transform 220ms var(--ui-ease);
+}
+
+@keyframes editor-feedback-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes editor-export-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 1024px) and (min-width: 768px) {
+  .editor-body {
+    grid-template-columns: 214px minmax(0, 1fr) 284px;
+  }
+
+  .editor-topbar,
+  .editor-toolbar {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .main-content:has(> .editor-shell) {
+    overflow: auto;
+  }
+
+  .main-content:has(> .editor-shell) > .editor-shell {
+    min-height: 100dvh;
+    height: auto;
+    padding-top: 60px;
+    overflow: visible;
+  }
+
+  .editor-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .editor-topbar-left {
+    flex-wrap: wrap;
+    gap: 7px 10px;
+  }
+
+  .editor-doc-title {
+    font-size: 17px;
+  }
+
+  .document-confirm-button {
+    align-self: flex-start;
+  }
+
+  .editor-toolbar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 8px 12px;
+    scrollbar-width: none;
+  }
+
+  .editor-toolbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .editor-body {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    overflow: visible;
+  }
+
+  .editor-outline {
+    max-height: 260px;
+    border-right: 0;
+    border-bottom: 1px solid var(--ui-line);
+  }
+
+  .content-panel {
+    min-height: 480px;
+  }
+
+  .editor-ai-panel {
+    min-height: 360px;
+    border-top: 1px solid var(--ui-line);
+    border-left: 0;
+  }
+
+  .editor-export-feedback {
+    right: 16px;
+    bottom: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .editor-export-feedback,
+  .editor-export-spinner,
+  .export-button-spinner {
+    animation: none;
+  }
+
+  .editor-export-progress-bar {
+    transition: none;
+  }
+}

@@ -5,8 +5,7 @@
       <p class="subtitle">维护项目文档模板、章节结构与启用状态</p>
     </div>
     <div class="header-right">
-      <span class="badge badge-blue">模板 {{ templates.length }}</span>
-      <span class="badge badge-green">已启用 {{ enabledCount }}</span>
+      <span class="header-note">{{ templates.length }} 个模板 · {{ enabledCount }} 个已启用</span>
     </div>
   </header>
 
@@ -20,7 +19,7 @@
           v-model="search"
           type="text"
           class="doc-search"
-          placeholder="🔍 搜索模板名称、适用阶段"
+          placeholder="搜索模板名称、适用阶段"
           style="margin-bottom: 12px"
         />
         <div v-if="categories.length > 1" class="doc-category-tabs" style="margin-bottom: 16px">

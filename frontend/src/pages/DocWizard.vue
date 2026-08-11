@@ -6,7 +6,7 @@
       <p class="subtitle">项目搜索 / 模板选择 / 关联资料确认</p>
     </div>
     <div class="header-right">
-      <span class="badge badge-blue">步骤 {{ step + 1 }}/3</span>
+      <span class="header-note">步骤 {{ step + 1 }} / {{ steps.length }}</span>
     </div>
   </header>
 
@@ -15,7 +15,7 @@
       v-for="(s, i) in steps"
       :key="i"
       class="step"
-      :class="{ active: i <= step }"
+      :class="{ active: i === step, done: i < step }"
       @click="i < step && (step = i)"
     >
       <span class="step-num">{{ i + 1 }}</span> {{ s }}
@@ -28,7 +28,7 @@
       <div v-if="step === 0" class="card">
         <h3>选择项目</h3>
         <p class="card-desc">选择需要生成文档的项目，系统会根据项目资料匹配模板章节和引用依据。</p>
-        <input type="text" class="doc-search" placeholder="输入项目编号、产品型号、项目名称" style="margin-bottom:16px" />
+        <input type="text" class="doc-search wizard-search" placeholder="输入项目编号、产品型号、项目名称" />
         <div class="project-list">
           <div
             v-for="p in projects"
@@ -76,25 +76,23 @@
         <div
           v-for="s in sources"
           :key="s.id"
-          style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid #e8e8e8;border-radius:6px;margin-bottom:6px;background:#fff"
+          class="source-file-row"
         >
           <input
             type="checkbox"
             :checked="selectedSourceIds.includes(s.id)"
             @change="toggleSource(s.id)"
           />
-          <span style="font-size:13px;flex:1">{{ s.original_name }}</span>
-          <span
-            :style="`font-size:11px;padding:2px 8px;border-radius:10px;background:${s.parse_status === 'parsed' ? '#f6ffed' : s.parse_status === 'parse_failed' ? '#fff1f0' : '#fff7e6'};color:${s.parse_status === 'parsed' ? '#52c41a' : s.parse_status === 'parse_failed' ? '#e03030' : '#fa8c16'}`"
-          >
-            {{ s.parse_status }}
+          <span class="source-file-name" :title="s.original_name">{{ s.original_name }}</span>
+          <span class="source-file-status" :class="sourceStatusClass(s.parse_status)">
+            {{ sourceStatusLabel(s.parse_status) }}
           </span>
         </div>
         <div v-if="!loadingSources && sources.length === 0" style="font-size:12px;color:#999;padding:12px 0">
           该项目暂无已关联资料，请上传
         </div>
-        <div style="margin-top:12px">
-          <label class="import-upload-area" style="padding:16px">
+        <div class="wizard-upload">
+          <label class="import-upload-area">
             <span class="import-upload-text">{{ uploading ? '上传中...' : '点击上传资料（.docx / .xlsx）' }}</span>
             <input
               type="file"
@@ -125,8 +123,7 @@
           </template>
           <div v-else style="font-size:12px;color:#999">请从左侧选择项目</div>
           <button
-            class="btn btn-primary"
-            style="width:100%;margin-top:20px"
+            class="btn btn-primary wizard-next-button"
             :disabled="!selectedProject"
             @click="step = 1"
           >
@@ -143,11 +140,10 @@
             </div>
           </template>
           <div v-else style="font-size:12px;color:#999">请从左侧选择模板</div>
-          <div style="display:flex;gap:8px;margin-top:20px">
-            <button class="btn btn-outline" style="flex:1" @click="step = 0">上一步</button>
+          <div class="wizard-actions">
+            <button class="btn btn-outline" @click="step = 0">上一步</button>
             <button
-              class="btn btn-primary"
-              style="flex:2"
+              class="btn btn-primary wizard-next-button"
               :disabled="!selectedTemplate"
               @click="step = 2"
             >
@@ -171,17 +167,16 @@
           </div>
 
           <button
-            class="btn btn-primary"
-            style="width:100%;margin-top:20px"
+            class="btn btn-primary wizard-next-button"
             :disabled="selectedSourceIds.length === 0 || generating"
             @click="generate"
           >
             {{ generating ? generatingLabel : '生成文档' }}
           </button>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn btn-outline" style="flex:1" @click="step = 1">上一步</button>
+          <div class="wizard-actions wizard-actions-back">
+            <button class="btn btn-outline" @click="step = 1">上一步</button>
           </div>
-          <div v-if="errorMsg" style="margin-top:8px;font-size:12px;color:#e03030">{{ errorMsg }}</div>
+          <div v-if="errorMsg" class="wizard-error">{{ errorMsg }}</div>
         </template>
       </div>
     </div>
@@ -256,6 +251,22 @@ function toggleSource(id: string) {
   } else {
     selectedSourceIds.value.push(id)
   }
+}
+
+function sourceStatusLabel(status: string) {
+  const map: Record<string, string> = {
+    uploaded: '待解析',
+    parsing: '解析中',
+    parsed: '已解析',
+    parse_failed: '解析失败',
+  }
+  return map[status] || '待处理'
+}
+
+function sourceStatusClass(status: string) {
+  if (status === 'parsed') return 'is-parsed'
+  if (status === 'parse_failed') return 'is-failed'
+  return 'is-pending'
 }
 
 async function uploadFiles(e: Event) {

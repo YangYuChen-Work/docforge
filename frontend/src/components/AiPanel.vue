@@ -3,12 +3,12 @@
     <div class="ai-panel-header">
       <div class="ai-panel-title-row">
         <div>
-          <h4>{{ activeTab === 'ai' ? '内容协作助手' : panelTitle }}</h4>
+          <h4>{{ activeTab === 'ai' ? '生成建议' : panelTitle }}</h4>
           <p class="ai-panel-desc">
-            {{ activeTab === 'ai' ? '选中文字、当前章节和来源资料都可以直接交给 AI 处理。' : panelDescription }}
+            {{ activeTab === 'ai' ? '针对当前章节提供润色、提取和修改建议。' : panelDescription }}
           </p>
         </div>
-        <span v-if="activeTab === 'ai'" class="ai-online-badge"><i></i>在线</span>
+        <span v-if="activeTab === 'ai'" class="ai-online-badge"><i></i>可用</span>
       </div>
     </div>
 
@@ -34,7 +34,7 @@
     <template v-if="activeTab === 'ai'">
       <div class="ai-panel-prelude">
         <div class="ai-context-summary">
-          <span class="ai-context-icon">✦</span>
+          <span class="ai-context-icon" aria-hidden="true"></span>
           <div>
             <strong>{{ selectionText ? '已锁定当前选区' : '当前章节上下文' }}</strong>
             <span>{{ selectionText ? `${selectionText.length} 字，将优先处理选中文字` : '快捷操作将作用于当前章节正文' }}</span>
@@ -83,7 +83,7 @@
 
       <div ref="chatScrollRef" class="ai-chat-scroll" aria-live="polite">
         <div v-if="messages.length === 0" class="ai-empty-state">
-          <div class="ai-empty-icon">✦</div>
+          <div class="ai-empty-icon" aria-hidden="true"></div>
           <strong>从一个动作开始</strong>
           <span>选中文字后可替换，也可以把结果插入到光标处。</span>
         </div>
@@ -94,7 +94,7 @@
           :class="m.role === 'user' ? 'user' : 'ai'"
         >
           <div class="chat-bubble-header">
-            <span>{{ m.role === 'user' ? '你的指令' : 'AI 助手' }}</span>
+            <span>{{ m.role === 'user' ? '你的指令' : '生成建议' }}</span>
             <span v-if="m.hadSelection && m.role === 'ai'" class="chat-scope">基于选区</span>
           </div>
           <div v-if="m.loading" class="ai-loading-line">
@@ -105,13 +105,13 @@
             <button
               v-if="m.hadSelection"
               class="ai-bubble-btn apply-btn"
-              title="替换调用 AI 时保存的选区"
+              title="替换生成建议时保存的选区"
               @click="$emit('replaceSelection', m.content)"
             >
-              ⇄ 替换选区
+              替换选区
             </button>
             <button class="ai-bubble-btn apply-btn" title="把结果插入当前光标位置" @click="$emit('insertAtCursor', m.content)">
-              ✓ 插入光标处
+              插入光标处
             </button>
           </div>
         </div>
@@ -176,7 +176,7 @@
           <div class="annotation-review-content">{{ annotation.content }}</div>
           <div class="annotation-review-actions" @click.stop>
             <button class="ai-bubble-btn apply-btn" type="button" @click="$emit('annotationFocus', annotation.id)">定位原文</button>
-            <button class="ai-bubble-btn comment-btn" type="button" @click="$emit('commentAiAction', annotation)">AI 修改</button>
+            <button class="ai-bubble-btn comment-btn" type="button" @click="$emit('commentAiAction', annotation)">生成修改</button>
             <button
               v-if="annotation.status === 'pending'"
               class="ai-bubble-btn apply-btn"
@@ -227,7 +227,7 @@
           </div>
           <div class="source-card-locator">定位：{{ citation.locator || '未提供定位' }}</div>
           <div class="source-card-excerpt-label">
-            {{ citation.citation_type === 'context' ? 'AI 参考上下文（未返回明确引用）' : '参考原文' }}
+            {{ citation.citation_type === 'context' ? '参考上下文（未返回明确引用）' : '参考原文' }}
           </div>
           <div class="source-card-excerpt" :class="{ expanded: expandedSources[citation.key] }">
             {{ citation.source_excerpt || '未提供参考原文' }}
@@ -245,11 +245,13 @@
     </template>
 
     <template v-else>
-      <div class="lineage-placeholder">
-        <div class="lineage-placeholder-icon">⌁</div>
-        <strong>数据链追踪</strong>
-        <span>功能预留，暂未实现</span>
-        <p>后续将在这里展示数据来源、计算过程和一致性校验结果。</p>
+      <div class="panel-tab-scroll">
+        <div class="lineage-placeholder">
+          <div class="lineage-placeholder-icon">⌁</div>
+          <strong>数据链追踪</strong>
+          <span>功能预留，暂未实现</span>
+          <p>后续将在这里展示数据来源、计算过程和一致性校验结果。</p>
+        </div>
       </div>
     </template>
   </aside>
@@ -303,8 +305,8 @@ const instruction = ref('')
 const busy = ref(false)
 const messages = ref<any[]>([])
 const chatScrollRef = ref<HTMLElement | null>(null)
-const loadingHint = ref('AI 正在分析当前内容...')
-const activeTab = ref<PanelTab>('ai')
+const loadingHint = ref('正在分析当前内容...')
+const activeTab = ref<PanelTab>('sources')
 const annotationDraft = ref('')
 const annotationError = ref('')
 const annotationSaving = ref(false)
@@ -318,29 +320,28 @@ let citationFocusRetryTimer: ReturnType<typeof setInterval> | null = null
 let citationFocusRetryAttempts = 0
 
 const tabs: Array<{ key: PanelTab; label: string; icon: string }> = [
-  { key: 'ai', label: 'AI 助手', icon: '✦' },
-  { key: 'annotations', label: '批注', icon: '▱' },
-  { key: 'sources', label: '数据来源', icon: '▤' },
-  { key: 'lineage', label: '数据链追踪', icon: '⌁' },
+  { key: 'sources', label: '数据来源', icon: '' },
+  { key: 'annotations', label: '批注', icon: '' },
+  { key: 'ai', label: '生成建议', icon: '' },
 ]
 
 const panelTitle = computed(() => tabs.find((tab) => tab.key === activeTab.value)?.label || '')
 const panelDescription = computed(() => {
   if (activeTab.value === 'annotations') return '集中查看批示内容，并联动正文原文。'
   if (activeTab.value === 'sources') {
-    if (props.citationState === 'pending') return '等待 AI 开始逐份检索本章相关资料。'
-    if (props.citationState === 'generating') return 'AI 正在逐份核对本章资料，来源卡片会随检索结果出现。'
-    if (props.citationState === 'context') return '展示 AI 实际使用的参考上下文，待补充明确引用。'
+    if (props.citationState === 'pending') return '等待生成服务检索本章相关资料。'
+    if (props.citationState === 'generating') return '正在逐份核对本章资料，来源卡片会随检索结果出现。'
+    if (props.citationState === 'context') return '展示本次生成使用的参考上下文，待补充明确引用。'
     if (props.citationState === 'failed') return '本章生成失败，请查看正文错误并重试。'
     if (props.citationState === 'missing') return '没有可核验来源时会明确标记为待补充。'
     return '只展示本章最终引用的文件和参考原文。'
   }
-  return '预留数据一致性追踪能力。'
+  return '查看当前章节的来源、批注和生成建议。'
 })
 const sourcePanelHeading = computed(() => {
   if (props.citationState === 'pending') return '本章来源等待检索'
-  if (props.citationState === 'context') return 'AI 生成参考资料（待明确引用）'
-  if (props.citationState === 'generating') return 'AI 正在检索本章资料'
+  if (props.citationState === 'context') return '生成参考资料（待明确引用）'
+  if (props.citationState === 'generating') return '正在检索本章资料'
   if (props.citationState === 'failed') return '本章生成失败'
   if (props.citationState === 'missing') return '本章来源待补充'
   return '本章最终来源'
@@ -355,10 +356,10 @@ const sourceCitationSignature = computed(() =>
     .join('|'),
 )
 const sourceStateMessage = computed(() => {
-  if (props.citationState === 'pending') return '本章已提交生成，等待 AI 开始逐份检索相关资料。'
+  if (props.citationState === 'pending') return '本章已提交生成，等待服务检索相关资料。'
   if (props.citationState === 'generating') {
-    if (discoveredSourceCount.value === 0) return 'AI 正在查找与本章相关的项目资料，来源卡片会随匹配结果出现。'
-    return `AI 正在逐份核对本章资料，已发现 ${discoveredSourceCount.value} 份参考资料；来源卡片正在逐步加载。`
+    if (discoveredSourceCount.value === 0) return '正在查找与本章相关的项目资料，来源卡片会随匹配结果出现。'
+    return `正在逐份核对本章资料，已发现 ${discoveredSourceCount.value} 份参考资料；来源卡片正在逐步加载。`
   }
   if (props.citationState === 'failed') return '本章生成失败，来源未完成确认，请重试或手动补充。'
   if (sourceCardsLoading.value) return '已找到本章来源，正在逐张加载文件定位和参考原文。'
@@ -559,9 +560,9 @@ defineExpose({
     if (value) {
       messages.value = messages.value.filter((message) => !message.loading)
       messages.value.push({ id: msgId++, role: 'ai', content: '', loading: true })
-      loadingHint.value = 'AI 正在分析当前内容...'
+      loadingHint.value = '正在分析当前内容...'
       stopLoadingTimer()
-      const hints = ['AI 正在分析当前内容...', 'AI 正在整理可执行建议...', 'AI 正在检查表达和结构...']
+      const hints = ['正在分析当前内容...', '正在整理可执行建议...', '正在检查表达和结构...']
       let index = 0
       loadingTimer = setInterval(() => {
         index = (index + 1) % hints.length

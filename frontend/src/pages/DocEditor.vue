@@ -1,11 +1,11 @@
 <template>
-  <div class="editor-shell" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+  <div class="editor-shell">
     <!-- Editor Top Bar -->
     <div class="editor-topbar">
       <div class="editor-topbar-left">
         <div v-if="!renaming" class="editor-title-view">
           <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
-          <button class="title-edit-btn" title="重命名文档" @click="startRename">✎</button>
+          <button class="title-edit-btn" title="重命名文档" @click="startRename">重命名</button>
         </div>
         <form v-else class="editor-title-form" @submit.prevent="saveRename">
           <input
@@ -19,7 +19,7 @@
           <button class="title-save-btn" type="submit" :disabled="renameSaving">保存</button>
           <button class="title-cancel-btn" type="button" @click="cancelRename">取消</button>
         </form>
-        <span class="editor-breadcrumb">AI 文档助手 / 在线编辑</span>
+        <span class="editor-breadcrumb">文档编辑 / 章节确认</span>
         <span v-if="generating" class="badge badge-blue" style="margin-left:12px" :title="generationProgress">
           {{ generationProgress }}
         </span>
@@ -39,8 +39,8 @@
 
     <!-- Editor Toolbar -->
     <div class="editor-toolbar">
-      <button class="tb-btn" title="撤销" @mousedown.prevent @click="runEditorCommand('undo')">↩</button>
-      <button class="tb-btn" title="重做" @mousedown.prevent @click="runEditorCommand('redo')">↪</button>
+      <button class="tb-btn" title="撤销" @mousedown.prevent @click="runEditorCommand('undo')">撤销</button>
+      <button class="tb-btn" title="重做" @mousedown.prevent @click="runEditorCommand('redo')">重做</button>
       <span class="tb-sep"></span>
       <select class="tb-select" aria-label="段落样式" :value="editorState.block" @change="changeBlockStyle">
         <option value="paragraph">正文</option>
@@ -59,16 +59,16 @@
       <button class="tb-btn" :class="{ active: editorState.bold }" title="加粗" @mousedown.prevent @click="runEditorCommand('bold')"><b>B</b></button>
       <button class="tb-btn" :class="{ active: editorState.italic }" title="斜体" @mousedown.prevent @click="runEditorCommand('italic')"><i>I</i></button>
       <button class="tb-btn" :class="{ active: editorState.underline }" title="下划线" @mousedown.prevent @click="runEditorCommand('underline')"><u>U</u></button>
-      <button class="tb-btn" :class="{ active: editorState.highlight }" title="高亮" @mousedown.prevent @click="runEditorCommand('highlight')">▰</button>
+      <button class="tb-btn" :class="{ active: editorState.highlight }" title="高亮" @mousedown.prevent @click="runEditorCommand('highlight')">高亮</button>
       <span class="tb-sep"></span>
-      <button class="tb-btn" :class="{ active: editorState.textAlign === 'left' }" title="左对齐" @mousedown.prevent @click="runEditorCommand('align', 'left')">≡</button>
-      <button class="tb-btn" :class="{ active: editorState.textAlign === 'center' }" title="居中" @mousedown.prevent @click="runEditorCommand('align', 'center')">≡</button>
-      <button class="tb-btn" :class="{ active: editorState.textAlign === 'right' }" title="右对齐" @mousedown.prevent @click="runEditorCommand('align', 'right')">≡</button>
-      <button class="tb-btn" :class="{ active: editorState.bulletList }" title="项目符号" @mousedown.prevent @click="runEditorCommand('bulletList')">•≡</button>
-      <button class="tb-btn" :class="{ active: editorState.orderedList }" title="编号列表" @mousedown.prevent @click="runEditorCommand('orderedList')">1≡</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'left' }" title="左对齐" @mousedown.prevent @click="runEditorCommand('align', 'left')">左对齐</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'center' }" title="居中" @mousedown.prevent @click="runEditorCommand('align', 'center')">居中</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'right' }" title="右对齐" @mousedown.prevent @click="runEditorCommand('align', 'right')">右对齐</button>
+      <button class="tb-btn" :class="{ active: editorState.bulletList }" title="项目符号" @mousedown.prevent @click="runEditorCommand('bulletList')">项目符号</button>
+      <button class="tb-btn" :class="{ active: editorState.orderedList }" title="编号列表" @mousedown.prevent @click="runEditorCommand('orderedList')">编号列表</button>
       <span class="tb-sep"></span>
-      <button class="tb-btn" :class="{ active: editorState.blockquote }" title="引用" @mousedown.prevent @click="runEditorCommand('blockquote')">❝</button>
-      <button class="tb-btn" title="插入链接" @mousedown.prevent @click="contentPanelRef?.setLink()">🔗</button>
+      <button class="tb-btn" :class="{ active: editorState.blockquote }" title="引用" @mousedown.prevent @click="runEditorCommand('blockquote')">引用</button>
+      <button class="tb-btn" title="插入链接" @mousedown.prevent @click="contentPanelRef?.setLink()">链接</button>
       <div class="toolbar-menu-group">
         <button
           class="tb-btn tb-label-btn"
@@ -95,7 +95,7 @@
           </button>
         </div>
       </div>
-      <button class="tb-btn" type="button" title="插入图片" @mousedown.prevent @click="openImagePicker">▧</button>
+      <button class="tb-btn" type="button" title="插入图片" @mousedown.prevent @click="openImagePicker">图片</button>
       <input
         ref="imageInputRef"
         class="editor-image-input"
@@ -104,7 +104,7 @@
         @change="handleImageSelected"
       />
       <button class="tb-btn" title="清除格式" @mousedown.prevent @click="runEditorCommand('clear')">Tx</button>
-      <button class="tb-btn" title="更多格式" @mousedown.prevent @click="showMoreTools = !showMoreTools">⋯</button>
+      <button class="tb-btn" title="更多格式" @mousedown.prevent @click="showMoreTools = !showMoreTools">更多</button>
       <div v-if="showMoreTools" class="toolbar-more-menu">
         <button @mousedown.prevent @click="runEditorCommand('codeBlock'); showMoreTools = false">代码块</button>
         <button @mousedown.prevent @click="runEditorCommand('horizontalRule'); showMoreTools = false">分隔线</button>
@@ -128,6 +128,7 @@
         :chapter="currentChapter"
         :hasUnsavedChanges="hasUnsavedChanges"
         :isSaving="isSaving"
+        :isExporting="exportState === 'running'"
         @save="saveCurrentChapter"
         :annotations="annotations"
         :citations="chapterCitations"
@@ -164,6 +165,29 @@
     </div>
 
     <div v-if="focusMessage" class="editor-focus-message" role="status">{{ focusMessage }}</div>
+
+    <div
+      v-if="exportState !== 'idle'"
+      class="editor-export-feedback"
+      :class="`is-${exportState}`"
+      role="status"
+      aria-live="polite"
+      :aria-busy="exportState === 'running'"
+    >
+      <span class="editor-export-feedback-icon" aria-hidden="true">
+        <span v-if="exportState === 'running'" class="editor-export-spinner" />
+        <span v-else-if="exportState === 'success'">✓</span>
+        <span v-else>!</span>
+      </span>
+      <span class="editor-export-feedback-body">
+        <strong>{{ exportState === 'running' ? `正在导出 ${exportFormat}` : exportState === 'success' ? '导出已完成' : '导出未完成' }}</strong>
+        <span class="editor-export-feedback-message">{{ exportMessage }}</span>
+        <span v-if="exportState === 'running'" class="editor-export-progress" aria-hidden="true">
+          <span class="editor-export-progress-bar" :style="{ transform: `scaleX(${exportProgress / 100})` }" />
+        </span>
+      </span>
+      <span v-if="exportState === 'running'" class="editor-export-percent">{{ exportProgress }}%</span>
+    </div>
 
     <div v-if="showRegenModal" class="modal-overlay">
       <div class="modal" style="width:420px">
@@ -255,6 +279,13 @@ const showMoreTools = ref(false)
 const showTableMenu = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let genPollTimer: ReturnType<typeof setInterval> | null = null
+type ExportState = 'idle' | 'running' | 'success' | 'error'
+const exportState = ref<ExportState>('idle')
+const exportProgress = ref(0)
+const exportFormat = ref('DOCX')
+const exportMessage = ref('')
+let exportTimer: ReturnType<typeof setInterval> | null = null
+let exportResetTimer: ReturnType<typeof setTimeout> | null = null
 type ChapterSavePayload = { plain_text: string; content_json: string }
 type RegenerationTransition = {
   chapterId: string
@@ -327,6 +358,7 @@ onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
   stopGenerationPolling()
   if (focusMessageTimer) clearTimeout(focusMessageTimer)
+  stopExportFeedback()
 })
 
 function isStillGenerating(d: any) {
@@ -708,7 +740,7 @@ async function confirmAllChapters() {
     ['generated', 'needs_material'].includes(chapter.status),
   )
   if (chapters.length === 0) {
-    showFocusMessage('当前没有可确认的 AI 生成章节')
+    showFocusMessage('当前没有可确认的自动生成章节')
     return
   }
 
@@ -861,21 +893,74 @@ async function handleCommentAiAction(annotation: any) {
 }
 
 async function doExport(format: string, includeComments: boolean) {
+  startExportFeedback(format)
   try {
     const result = await createExport(docId, format, includeComments)
     if (result.error_message) {
-      alert(`导出失败：${result.error_message}`)
+      failExportFeedback(`导出失败：${result.error_message}`)
       return
     }
+    completeExportFeedback()
     window.open(`/api/exports/${result.export_id}/download`, '_blank')
   } catch (err: any) {
     const validation = err.raw?.response?.data?.detail?.validation_report
     if (validation) {
       const msg = [...(validation.errors || []), ...(validation.warnings || [])].join('\n')
-      alert(`导出前校验未通过：\n${msg}`)
+      failExportFeedback(`导出前校验未通过：\n${msg}`)
     } else {
-      alert(`导出失败：${err.message || '未知错误'}`)
+      failExportFeedback(`导出失败：${err.message || '未知错误'}`)
     }
   }
+}
+
+function clearExportTimers() {
+  if (exportTimer) {
+    clearInterval(exportTimer)
+    exportTimer = null
+  }
+  if (exportResetTimer) {
+    clearTimeout(exportResetTimer)
+    exportResetTimer = null
+  }
+}
+
+function stopExportFeedback() {
+  clearExportTimers()
+  exportState.value = 'idle'
+}
+
+function scheduleExportReset(delay = 5200) {
+  exportResetTimer = setTimeout(() => {
+    exportState.value = 'idle'
+    exportResetTimer = null
+  }, delay)
+}
+
+function startExportFeedback(format: string) {
+  clearExportTimers()
+  exportState.value = 'running'
+  exportProgress.value = 8
+  exportFormat.value = format.toUpperCase()
+  exportMessage.value = '正在整理正文、批注和引用信息'
+  exportTimer = setInterval(() => {
+    if (exportProgress.value >= 88) return
+    exportProgress.value = Math.min(88, exportProgress.value + Math.max(2, Math.round((88 - exportProgress.value) * 0.12)))
+    if (exportProgress.value >= 64) exportMessage.value = '正在生成文件，请稍候'
+  }, 180)
+}
+
+function completeExportFeedback() {
+  clearExportTimers()
+  exportProgress.value = 100
+  exportState.value = 'success'
+  exportMessage.value = `${exportFormat.value} 文件已生成，正在打开下载`
+  scheduleExportReset()
+}
+
+function failExportFeedback(message: string) {
+  clearExportTimers()
+  exportState.value = 'error'
+  exportMessage.value = message
+  scheduleExportReset(7200)
 }
 </script>

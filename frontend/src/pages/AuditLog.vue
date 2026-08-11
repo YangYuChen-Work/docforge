@@ -36,7 +36,7 @@
         v-model="search"
         type="text"
         class="filter-input"
-        placeholder="🔍 搜索操作人 / 实体ID..."
+        placeholder="搜索操作人 / 实体 ID"
         @input="onSearchInput"
       />
     </div>
