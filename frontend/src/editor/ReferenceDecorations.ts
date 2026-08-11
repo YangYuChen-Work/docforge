@@ -13,6 +13,7 @@ export type CitationRef = {
   source_excerpt?: string | null
   fileName?: string | null
   source_document_id?: string | null
+  locator?: string | null
 }
 
 export type ReferenceDecorationOptions = {
@@ -28,6 +29,23 @@ export const referenceDecorationsKey = new PluginKey('referenceDecorations')
 export const REFERENCE_DECORATIONS_REFRESH = 'referenceDecorationsRefresh'
 
 type TextRange = { from: number; to: number }
+type NodeRange = { from: number; to: number }
+type CaptionRange = NodeRange | null
+type TableValue = {
+  raw: string
+  normalized: string
+  isMeaningful: boolean
+  isNumeric: boolean
+}
+type TableMetadata = {
+  range: NodeRange
+  markerPosition: number
+  captionRange: CaptionRange
+  cellValues: TableValue[]
+  normalizedCellValues: string[]
+}
+
+const STRUCTURED_TABLE_FIELDS = new Set(['caption', 'headers', 'rows'])
 
 function normalizeWithMap(value: string) {
   const chars: string[] = []
@@ -50,6 +68,149 @@ function normalizeWithMap(value: string) {
   }
 
   return { text: chars.join(''), map }
+}
+
+function normalizeTableValue(value: string) {
+  const normalized = value
+    .normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s\p{P}]+/gu, '')
+  const isMeaningful = normalized.length > 1
+  return {
+    raw: value,
+    normalized,
+    isMeaningful,
+    isNumeric: isMeaningful && /^\d+$/.test(normalized),
+  }
+}
+
+function isTableCaption(text: string) {
+  const normalized = text.trim().toLowerCase()
+  return normalized.startsWith('表') || normalized.startsWith('table')
+}
+
+function collectTableMetadata(doc: any): TableMetadata[] {
+  const tables: TableMetadata[] = []
+
+  doc.descendants((node: any, pos: number, parent: any, index: number) => {
+    if (node.type?.name !== 'table') return
+
+    const range = { from: pos, to: pos + node.nodeSize }
+    let markerPosition = range.to
+    let captionRange: CaptionRange = null
+
+    if (parent && typeof index === 'number' && index > 0) {
+      const previousSibling = parent.child(index - 1)
+      const previousPos = pos - previousSibling.nodeSize
+      const previousRange = { from: previousPos, to: previousPos + previousSibling.nodeSize }
+      if (previousSibling.type?.name === 'paragraph' && isTableCaption(previousSibling.textContent || '')) {
+        markerPosition = previousRange.to
+        captionRange = previousRange
+      }
+    }
+
+    const cellValues: TableValue[] = []
+    node.descendants((child: any) => {
+      if (child.type?.name === 'tableCell' || child.type?.name === 'tableHeader') {
+        cellValues.push(normalizeTableValue(child.textContent || ''))
+      }
+    })
+
+    tables.push({
+      range,
+      markerPosition,
+      captionRange,
+      cellValues,
+      normalizedCellValues: cellValues
+        .filter((value) => value.isMeaningful)
+        .map((value) => value.normalized),
+    })
+  })
+
+  return tables
+}
+
+function collectStructuredSourceScalars(
+  value: unknown,
+  values: string[],
+  withinStructuredField = false,
+) {
+  if (value == null) return
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (withinStructuredField) values.push(String(value))
+    return
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectStructuredSourceScalars(item, values, withinStructuredField)
+    return
+  }
+  if (typeof value !== 'object') return
+
+  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+    collectStructuredSourceScalars(child, values, withinStructuredField || STRUCTURED_TABLE_FIELDS.has(key))
+  }
+}
+
+function getStructuredSourceValues(sourceExcerpt: string | null | undefined) {
+  if (!sourceExcerpt) return []
+
+  try {
+    const parsed = JSON.parse(sourceExcerpt)
+    const values: string[] = []
+    collectStructuredSourceScalars(parsed, values)
+    return Array.from(
+      new Map(
+        values
+          .map((value) => normalizeTableValue(value))
+          .filter((value) => value.isMeaningful)
+          .map((value) => [value.normalized, value] as const),
+      ).values(),
+    )
+  } catch {
+    return []
+  }
+}
+
+function findStructuredTableMatch(doc: any, citation: CitationRef): TableMetadata | null {
+  const sourceValues = getStructuredSourceValues(citation.source_excerpt)
+  if (sourceValues.length === 0) return null
+
+  const tables = collectTableMetadata(doc)
+  if (tables.length === 0) return null
+
+  let bestMatch: { table: TableMetadata; score: number } | null = null
+  let hasTie = false
+
+  for (const table of tables) {
+    const matchedValues = new Set<string>()
+    let hasLongNonNumericMatch = false
+
+    for (const sourceValue of sourceValues) {
+      const matched = table.normalizedCellValues.some((cellValue) => cellValue.includes(sourceValue.normalized))
+      if (!matched) continue
+      matchedValues.add(sourceValue.normalized)
+      if (!sourceValue.isNumeric && sourceValue.normalized.length >= 8) {
+        hasLongNonNumericMatch = true
+      }
+    }
+
+    const score = matchedValues.size
+    if (score < 2 && !hasLongNonNumericMatch) continue
+
+    if (!bestMatch || score > bestMatch.score) {
+      bestMatch = { table, score }
+      hasTie = false
+      continue
+    }
+
+    if (score === bestMatch.score) {
+      hasTie = true
+    }
+  }
+
+  if (!bestMatch || hasTie) return null
+  return bestMatch.table
 }
 
 function findTextRange(doc: any, query: string): TextRange | null {
@@ -99,6 +260,16 @@ function findTextRange(doc: any, query: string): TextRange | null {
 
 export function findReferenceRange(editor: any, text: string): TextRange | null {
   return editor?.state?.doc ? findTextRange(editor.state.doc, text) : null
+}
+
+export function findCitationRange(editor: any, citation: CitationRef): TextRange | null {
+  const doc = editor?.state?.doc
+  if (!doc) return null
+
+  const tableMatch = findStructuredTableMatch(doc, citation)
+  if (tableMatch) return tableMatch.range
+
+  return findTextRange(doc, citation.source_excerpt || '')
 }
 
 function markerDecoration(
