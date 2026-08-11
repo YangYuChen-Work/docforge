@@ -1,15 +1,12 @@
 <template>
-  <div style="display:flex;flex-direction:column;overflow:hidden;min-width:0">
+  <div class="content-panel">
     <!-- Toolbar-adjacent chapter bar -->
-    <div
-      style="display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid #f0f0f0;background:#fff;flex-shrink:0"
-    >
-      <span style="font-size:14px;font-weight:600;color:#1a1a1a">{{ chapter?.title || '请选择章节' }}</span>
-      <div style="display:flex;gap:8px;align-items:center">
+    <div class="chapter-actionbar">
+      <span class="chapter-actionbar-title">{{ chapter?.title || '请选择章节' }}</span>
+      <div class="chapter-actions">
         <button
           v-if="chapter"
           class="btn btn-primary"
-          style="margin-top:0;padding:6px 14px"
           :disabled="!hasUnsavedChanges || isSaving"
           :title="hasUnsavedChanges ? '保存当前章节' : '当前章节已是最新版本'"
           @click="emit('save')"
@@ -20,7 +17,6 @@
           v-if="chapter && chapter.status !== 'confirmed'"
           @click="$emit('confirm')"
           class="btn btn-outline"
-          style="margin-top:0;padding:6px 14px"
         >
           确认章节
         </button>
@@ -28,7 +24,6 @@
           v-if="chapter"
           @click="$emit('regenerate')"
           class="btn btn-outline"
-          style="margin-top:0;padding:6px 14px"
         >
           重新生成
         </button>
@@ -38,8 +33,10 @@
             class="btn btn-primary"
             style="margin-top:0;padding:6px 14px"
             :disabled="isExporting"
+            :aria-busy="isExporting"
           >
-            导出 ▾
+            <span class="export-button-spinner" v-if="isExporting" aria-hidden="true" />
+            {{ isExporting ? '导出中…' : '导出 ▾' }}
           </button>
           <div v-if="showExport" class="export-dropdown">
             <template v-if="!selectedExportFormat">
@@ -79,14 +76,14 @@
     </div>
 
     <!-- Word-like page area -->
-    <div class="editor-content" style="flex:1">
-      <div v-if="!chapter" style="color:#999;font-size:13px;text-align:center;padding-top:60px">
-        ← 从左侧选择章节
+    <div class="editor-content">
+      <div v-if="!chapter" class="editor-empty-state">
+        从左侧目录选择章节
       </div>
       <template v-else>
         <div class="word-page">
           <div v-if="chapter.status === 'failed'" class="alert-error">
-            ⚠ 生成失败：{{ chapter.error_message || '未知错误' }}
+            生成失败：{{ chapter.error_message || '未知错误' }}
           </div>
           <div v-if="conflictItems.length > 0" class="alert-conflict">
             <div style="font-weight:600;margin-bottom:6px">内容冲突</div>
@@ -191,15 +188,34 @@ function toggleExportMenu() {
   if (!showExport.value) selectedExportFormat.value = ''
 }
 
+function normalizeFormalCopy(value: string) {
+  return value
+    .replace(/【Mock生成】/g, '')
+    .replace(
+      /（此为 Mock 模式生成内容，仅用于流程验证。切换至 AI_PROVIDER=deepseek 可获得真实内容。）/g,
+      '（本内容来自本地验证结果，仅用于流程核对，请结合引用资料确认。没有来源依据的内容请标记为待补充。）',
+    )
+    .replace(/（Mock示例）/g, '')
+    .replace(/示例列[12]/g, '待补充字段')
+    .replace(/示例数据[A-D]/g, '待补充')
+}
+
+function normalizeContentNode(value: any): any {
+  if (typeof value === 'string') return normalizeFormalCopy(value)
+  if (Array.isArray(value)) return value.map(normalizeContentNode)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, normalizeContentNode(entry)]))
+}
+
 function parseContent(chapter: any) {
   if (!chapter?.content_json)
     return chapter?.plain_text
-      ? { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: chapter.plain_text }] }] }
+      ? { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: normalizeFormalCopy(chapter.plain_text) }] }] }
       : ''
   try {
-    return JSON.parse(chapter.content_json)
+    return normalizeContentNode(JSON.parse(chapter.content_json))
   } catch {
-    return chapter.plain_text || ''
+    return normalizeFormalCopy(chapter.plain_text || '')
   }
 }
 

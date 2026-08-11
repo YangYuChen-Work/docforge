@@ -22,7 +22,7 @@
         :class="{ active: ch.id === activeId }"
         @click="$emit('select', ch)"
       >
-        <span class="outline-item-text" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+        <span class="outline-item-text">
           {{ ch.order_index }}. {{ ch.title }}
         </span>
         <span class="outline-status" :class="statusClass(ch.status)">

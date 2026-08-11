@@ -1,11 +1,11 @@
 <template>
-  <div class="editor-shell" style="display:flex;flex-direction:column;height:100vh;overflow:hidden">
+  <div class="editor-shell">
     <!-- Editor Top Bar -->
     <div class="editor-topbar">
       <div class="editor-topbar-left">
         <div v-if="!renaming" class="editor-title-view">
           <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
-          <button class="title-edit-btn" title="重命名文档" @click="startRename">✎</button>
+          <button class="title-edit-btn" title="重命名文档" @click="startRename">重命名</button>
         </div>
         <form v-else class="editor-title-form" @submit.prevent="saveRename">
           <input
@@ -19,7 +19,7 @@
           <button class="title-save-btn" type="submit" :disabled="renameSaving">保存</button>
           <button class="title-cancel-btn" type="button" @click="cancelRename">取消</button>
         </form>
-        <span class="editor-breadcrumb">AI 文档助手 / 在线编辑</span>
+        <span class="editor-breadcrumb">文档编辑 / 章节确认</span>
         <span v-if="generating" class="badge badge-blue" style="margin-left:12px" :title="generationProgress">
           {{ generationProgress }}
         </span>
@@ -39,8 +39,8 @@
 
     <!-- Editor Toolbar -->
     <div class="editor-toolbar">
-      <button class="tb-btn" title="撤销" @mousedown.prevent @click="runEditorCommand('undo')">↩</button>
-      <button class="tb-btn" title="重做" @mousedown.prevent @click="runEditorCommand('redo')">↪</button>
+      <button class="tb-btn" title="撤销" @mousedown.prevent @click="runEditorCommand('undo')">撤销</button>
+      <button class="tb-btn" title="重做" @mousedown.prevent @click="runEditorCommand('redo')">重做</button>
       <span class="tb-sep"></span>
       <select class="tb-select" aria-label="段落样式" :value="editorState.block" @change="changeBlockStyle">
         <option value="paragraph">正文</option>
@@ -59,16 +59,16 @@
       <button class="tb-btn" :class="{ active: editorState.bold }" title="加粗" @mousedown.prevent @click="runEditorCommand('bold')"><b>B</b></button>
       <button class="tb-btn" :class="{ active: editorState.italic }" title="斜体" @mousedown.prevent @click="runEditorCommand('italic')"><i>I</i></button>
       <button class="tb-btn" :class="{ active: editorState.underline }" title="下划线" @mousedown.prevent @click="runEditorCommand('underline')"><u>U</u></button>
-      <button class="tb-btn" :class="{ active: editorState.highlight }" title="高亮" @mousedown.prevent @click="runEditorCommand('highlight')">▰</button>
+      <button class="tb-btn" :class="{ active: editorState.highlight }" title="高亮" @mousedown.prevent @click="runEditorCommand('highlight')">高亮</button>
       <span class="tb-sep"></span>
-      <button class="tb-btn" :class="{ active: editorState.textAlign === 'left' }" title="左对齐" @mousedown.prevent @click="runEditorCommand('align', 'left')">≡</button>
-      <button class="tb-btn" :class="{ active: editorState.textAlign === 'center' }" title="居中" @mousedown.prevent @click="runEditorCommand('align', 'center')">≡</button>
-      <button class="tb-btn" :class="{ active: editorState.textAlign === 'right' }" title="右对齐" @mousedown.prevent @click="runEditorCommand('align', 'right')">≡</button>
-      <button class="tb-btn" :class="{ active: editorState.bulletList }" title="项目符号" @mousedown.prevent @click="runEditorCommand('bulletList')">•≡</button>
-      <button class="tb-btn" :class="{ active: editorState.orderedList }" title="编号列表" @mousedown.prevent @click="runEditorCommand('orderedList')">1≡</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'left' }" title="左对齐" @mousedown.prevent @click="runEditorCommand('align', 'left')">左对齐</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'center' }" title="居中" @mousedown.prevent @click="runEditorCommand('align', 'center')">居中</button>
+      <button class="tb-btn" :class="{ active: editorState.textAlign === 'right' }" title="右对齐" @mousedown.prevent @click="runEditorCommand('align', 'right')">右对齐</button>
+      <button class="tb-btn" :class="{ active: editorState.bulletList }" title="项目符号" @mousedown.prevent @click="runEditorCommand('bulletList')">项目符号</button>
+      <button class="tb-btn" :class="{ active: editorState.orderedList }" title="编号列表" @mousedown.prevent @click="runEditorCommand('orderedList')">编号列表</button>
       <span class="tb-sep"></span>
-      <button class="tb-btn" :class="{ active: editorState.blockquote }" title="引用" @mousedown.prevent @click="runEditorCommand('blockquote')">❝</button>
-      <button class="tb-btn" title="插入链接" @mousedown.prevent @click="contentPanelRef?.setLink()">🔗</button>
+      <button class="tb-btn" :class="{ active: editorState.blockquote }" title="引用" @mousedown.prevent @click="runEditorCommand('blockquote')">引用</button>
+      <button class="tb-btn" title="插入链接" @mousedown.prevent @click="contentPanelRef?.setLink()">链接</button>
       <div class="toolbar-menu-group">
         <button
           class="tb-btn tb-label-btn"
@@ -95,7 +95,7 @@
           </button>
         </div>
       </div>
-      <button class="tb-btn" type="button" title="插入图片" @mousedown.prevent @click="openImagePicker">▧</button>
+      <button class="tb-btn" type="button" title="插入图片" @mousedown.prevent @click="openImagePicker">图片</button>
       <input
         ref="imageInputRef"
         class="editor-image-input"
@@ -104,7 +104,7 @@
         @change="handleImageSelected"
       />
       <button class="tb-btn" title="清除格式" @mousedown.prevent @click="runEditorCommand('clear')">Tx</button>
-      <button class="tb-btn" title="更多格式" @mousedown.prevent @click="showMoreTools = !showMoreTools">⋯</button>
+      <button class="tb-btn" title="更多格式" @mousedown.prevent @click="showMoreTools = !showMoreTools">更多</button>
       <div v-if="showMoreTools" class="toolbar-more-menu">
         <button @mousedown.prevent @click="runEditorCommand('codeBlock'); showMoreTools = false">代码块</button>
         <button @mousedown.prevent @click="runEditorCommand('horizontalRule'); showMoreTools = false">分隔线</button>
@@ -812,7 +812,7 @@ async function confirmAllChapters() {
     ['generated', 'needs_material'].includes(chapter.status),
   )
   if (chapters.length === 0) {
-    showFocusMessage('当前没有可确认的 AI 生成章节')
+    showFocusMessage('当前没有可确认的自动生成章节')
     return
   }
 
