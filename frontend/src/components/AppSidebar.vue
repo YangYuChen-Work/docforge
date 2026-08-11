@@ -15,12 +15,8 @@
 
     <aside class="sidebar" :class="{ collapsed, 'mobile-open': mobileOpen }">
       <div class="sidebar-header">
-        <h1 class="nav-text brand-lockup" aria-label="项目文档工作台">
-          <span class="brand-mark" aria-hidden="true">DF</span>
-          <span class="brand-copy">
-            <strong>DOCFORGE</strong>
-            <small>项目文档工作台</small>
-          </span>
+        <h1 class="nav-text brand-lockup" aria-label="徐工重型">
+          <span class="brand-name">徐工重型</span>
         </h1>
         <button
           v-if="!collapsed"
@@ -118,12 +114,6 @@
         </span>
         <span class="theme-toggle-short" aria-hidden="true">{{ props.theme === 'dark' ? '浅' : '深' }}</span>
       </button>
-      <div class="sidebar-provider">
-        <span class="provider-status"><span class="provider-dot" aria-hidden="true" />运行环境</span>
-        <span class="provider-name nav-text">{{ providerLabel }}</span>
-        <span class="provider-detail nav-text">{{ providerDetail }}</span>
-          <span class="provider-short" aria-hidden="true">服务</span>
-      </div>
     </aside>
     <div v-if="placeholderMessage" class="sidebar-toast" role="status" aria-live="polite">
       <span>{{ placeholderMessage }}</span>
@@ -133,9 +123,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
 
 type Theme = 'light' | 'dark'
 
@@ -143,25 +132,11 @@ const props = defineProps<{ theme: Theme }>()
 const emit = defineEmits<{ (event: 'toggle-theme'): void }>()
 
 const route = useRoute()
-const aiProvider = ref('...')
 const collapsed = ref(false)
 const mobileOpen = ref(false)
 const placeholderMessage = ref('')
 const SIDEBAR_STORAGE_KEY = 'doc-workbench.sidebar-collapsed'
 let placeholderTimer: number | undefined
-
-const providerLabel = computed(() => {
-  if (aiProvider.value === 'mock') return '本地验证模式'
-  if (aiProvider.value === 'deepseek') return '真实模型服务'
-  if (aiProvider.value === '离线') return '后端暂不可用'
-  return '读取运行状态…'
-})
-
-const providerDetail = computed(() => {
-  if (aiProvider.value === 'mock') return '不调用外部模型，仅用于本地验收'
-  if (aiProvider.value === '离线') return '请检查本地服务'
-  return '已连接本地文档生成服务'
-})
 
 function showPlaceholder(label: string) {
   placeholderMessage.value = `${label}暂未接入当前 POC`
@@ -184,17 +159,11 @@ watch(() => route.path, () => {
   mobileOpen.value = false
 })
 
-onMounted(async () => {
+onMounted(() => {
   try {
     collapsed.value = window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true'
   } catch {
     collapsed.value = false
-  }
-  try {
-    const r = await axios.get('/health')
-    aiProvider.value = r.data.ai_provider
-  } catch {
-    aiProvider.value = '离线'
   }
 })
 
