@@ -16,6 +16,7 @@
     <aside class="sidebar" :class="{ collapsed, 'mobile-open': mobileOpen }">
       <div class="sidebar-header">
         <h1 class="nav-text brand-lockup" aria-label="徐工重型">
+          <img class="brand-emblem" :src="brandEmblemUrl" alt="" aria-hidden="true" />
           <span class="brand-name">徐工重型</span>
         </h1>
         <button
@@ -125,6 +126,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import brandEmblemUrl from '../assets/xcmg-emblem.png'
 
 type Theme = 'light' | 'dark'
 

@@ -191,7 +191,16 @@ textarea {
 .brand-lockup {
   display: flex;
   align-items: center;
+  gap: 10px;
   min-width: 0;
+}
+
+.brand-emblem {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 8px rgba(20, 91, 132, 0.22));
 }
 
 .brand-name {
@@ -204,6 +213,24 @@ textarea {
   line-height: 1;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar.collapsed .brand-lockup {
+  justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-header h1.brand-lockup {
+  display: flex;
+}
+
+.sidebar.collapsed .brand-name {
+  display: none;
+}
+
+.sidebar.collapsed .brand-emblem {
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
 }
 
 .sidebar-collapse-toggle,
