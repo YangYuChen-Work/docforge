@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - 转换规则</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="page-rules.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>DEMO演示平台</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-label">功能导航</div>
+                    <a href="index.html" class="nav-item">
+                        <span class="nav-icon">🧪</span>
+                        <span>AI 测试用例生成</span>
+                    </a>
+                    <a href="doc-assistant.html" class="nav-item">
+                        <span class="nav-icon">📄</span>
+                        <span>AI 文档助手</span>
+                    </a>
+                    <a href="module-select.html" class="nav-item">
+                        <span class="nav-icon">⚙️</span>
+                        <span>产品模块智能选配</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">系统配置</div>
+                    <a href="rules-config.html" class="nav-item sub active">
+                        <span class="nav-icon">•</span>
+                        <span>转换规则</span>
+                    </a>
+                    <a href="audit.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>日志审计</span>
+                    </a>
+                    <a href="doc-config.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>文档助手配置</span>
+                    </a>
+                    <a href="module-rules.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>模块配置规则库</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-left">
+                    <h2>转换规则管理</h2>
+                    <p class="subtitle">管理中文描述到测试代码的映射规则库，支持规则的增删改查和批量导入。</p>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-outline" onclick="openImportModal()">📥 导入规则</button>
+                    <button class="btn btn-primary" onclick="openAddRuleModal()">+ 新增规则</button>
+                </div>
+            </header>
+
+            <!-- Stats Overview -->
+            <div class="rules-stats">
+                <div class="stat-card">
+                    <div class="stat-number">128</div>
+                    <div class="stat-label">规则总数</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">5</div>
+                    <div class="stat-label">规则分类</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">96.5%</div>
+                    <div class="stat-label">平均置信度</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">3</div>
+                    <div class="stat-label">待审核</div>
+                </div>
+            </div>
+
+            <!-- Rule Categories Tabs -->
+            <div class="rules-category-tabs">
+                <button class="cat-tab active" onclick="filterRulesByCategory('all', this)">全部 (128)</button>
+                <button class="cat-tab" onclick="filterRulesByCategory('state', this)">状态映射 (32)</button>
+                <button class="cat-tab" onclick="filterRulesByCategory('action', this)">操作映射 (45)</button>
+                <button class="cat-tab" onclick="filterRulesByCategory('assert', this)">结果断言 (28)</button>
+                <button class="cat-tab" onclick="filterRulesByCategory('timing', this)">时序映射 (15)</button>
+                <button class="cat-tab" onclick="filterRulesByCategory('param', this)">参数设置 (8)</button>
+            </div>
+
+            <!-- Rules Table -->
+            <div class="rules-table-wrapper">
+                <div class="rules-search-bar">
+                    <input type="text" class="rules-search-input" placeholder="🔍 搜索中文描述或代码变量..." id="ruleSearchInput" oninput="searchRules()">
+                    <select class="filter-select" style="width:120px">
+                        <option>按置信度</option>
+                        <option>按使用次数</option>
+                        <option>按创建时间</option>
+                    </select>
+                </div>
+                <table class="rules-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>中文描述（触发）</th>
+                            <th></th>
+                            <th>代码输出（映射）</th>
+                            <th>规则类型</th>
+                            <th>置信度</th>
+                            <th>使用次数</th>
+                            <th>状态</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="rulesTableBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="audit-pagination">
+                <span class="page-info">共 128 条规则</span>
+                <div class="page-buttons">
+                    <button class="page-btn" disabled>← 上一页</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <span class="page-ellipsis">...</span>
+                    <button class="page-btn">7</button>
+                    <button class="page-btn">下一页 →</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Rule Modal -->
+    <div class="modal-overlay" id="ruleModal" style="display:none;">
+        <div class="modal" style="max-width:640px;">
+            <div class="modal-header">
+                <h3 id="ruleModalTitle">新增转换规则</h3>
+                <button class="modal-close" onclick="closeRuleModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="rule-form">
+                    <div class="edit-mapping-preview">
+                        <div class="edit-mapping-from">
+                            <span class="edit-map-label">中文描述</span>
+                            <span class="edit-map-val" id="editPreviewZh">—</span>
+                        </div>
+                        <div class="edit-mapping-arrow">→</div>
+                        <div class="edit-mapping-to">
+                            <span class="edit-map-label">代码输出</span>
+                            <span class="edit-map-val" id="editPreviewCode">—</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>中文触发描述 <span class="required">*</span></label>
+                        <input type="text" class="form-input" id="editRuleZh" placeholder="例如：按下拆装工况按键" oninput="updateEditPreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>代码输出映射 <span class="required">*</span></label>
+                        <input type="text" class="form-input code-input" id="editRuleCode" placeholder="例如：SetUp_bus_bPanel=1" oninput="updateEditPreview()">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group" style="flex:1">
+                            <label>规则类型</label>
+                            <select class="form-input" id="editRuleType">
+                                <option value="state">状态映射</option>
+                                <option value="action">操作映射</option>
+                                <option value="assert">结果断言</option>
+                                <option value="timing">时序映射</option>
+                                <option value="param">参数设置</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>置信度 (%)</label>
+                            <input type="number" class="form-input" id="editRuleConf" value="85" min="0" max="100">
+                        </div>
+                        <div class="form-group" style="flex:1">
+                            <label>状态</label>
+                            <select class="form-input" id="editRuleStatus">
+                                <option value="active">生效中</option>
+                                <option value="review">待审核</option>
+                                <option value="disabled">已禁用</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>转换逻辑说明</label>
+                        <textarea class="form-textarea" id="editRuleExplanation" rows="3" placeholder="描述转换逻辑，例如：&quot;按下&quot; 映射到值 1，&quot;拆装工况按键&quot; 映射到变量 SetUp_bus_bPanel"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>适用范围</label>
+                        <input type="text" class="form-input" id="editRuleScope" placeholder="例如：EN13000 拆装工况 相关用例">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeRuleModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitRule()" id="ruleSubmitBtn">保存规则</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Rules Modal -->
+    <div class="modal-overlay" id="importModal" style="display:none;">
+        <div class="modal" style="max-width:520px;">
+            <div class="modal-header">
+                <h3>导入转换规则</h3>
+                <button class="modal-close" onclick="closeImportModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="import-section">
+                    <h4>① 下载导入模板</h4>
+                    <p class="import-desc">请先下载模板文件，按格式填写规则数据后再上传。</p>
+                    <div class="template-downloads">
+                        <a href="#" class="template-item" onclick="alert('已下载：规则导入模板.xlsx')">
+                            <span class="template-icon">📄</span>
+                            <div class="template-info">
+                                <span class="template-name">规则导入模板.xlsx</span>
+                                <span class="template-meta">Excel 格式 · 含示例数据</span>
+                            </div>
+                            <span class="template-dl">⬇ 下载</span>
+                        </a>
+                        <a href="#" class="template-item" onclick="alert('已下载：规则导入模板.json')">
+                            <span class="template-icon">📄</span>
+                            <div class="template-info">
+                                <span class="template-name">规则导入模板.json</span>
+                                <span class="template-meta">JSON 格式 · 适合批量导入</span>
+                            </div>
+                            <span class="template-dl">⬇ 下载</span>
+                        </a>
+                    </div>
+                </div>
+                <div class="import-section">
+                    <h4>② 上传规则文件</h4>
+                    <p class="import-desc">支持 .xlsx 或 .json 格式，单次最多导入 500 条规则。</p>
+                    <div class="import-upload-area" id="importDropZone" onclick="document.getElementById('importFileInput').click()">
+                        <input type="file" id="importFileInput" style="display:none" accept=".xlsx,.json" onchange="handleImportFile(this)">
+                        <div class="import-upload-icon">📁</div>
+                        <p>点击选择文件，或将文件拖拽到此处</p>
+                        <span class="import-upload-hint">支持 .xlsx、.json</span>
+                    </div>
+                    <div class="import-file-selected" id="importFileSelected" style="display:none;">
+                        <span class="import-file-icon">✅</span>
+                        <span class="import-file-name" id="importFileName">-</span>
+                        <button class="import-file-remove" onclick="removeImportFile()">✕</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeImportModal()">取消</button>
+                <button class="btn btn-primary" id="importSubmitBtn" onclick="submitImport()" disabled>开始导入</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rule Detail Modal -->
+    <div class="modal-overlay" id="ruleDetailModal" style="display:none;">
+        <div class="modal" style="max-width:640px;">
+            <div class="modal-header">
+                <h3 id="ruleDetailTitle">规则详情</h3>
+                <button class="modal-close" onclick="closeRuleDetailModal()">✕</button>
+            </div>
+            <div class="modal-body" id="ruleDetailBody">
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeRuleDetailModal()">关闭</button>
+                <button class="btn btn-primary" onclick="alert('进入编辑模式')">编辑规则</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // Conversion rules fake data
+    var RULES_DATA = [
+        { id: 1, zh: "手柄处于非中位状态", code: "JoyR_swtPlt_IN=1", type: "state", typeName: "状态映射", confidence: 95, usageCount: 12, status: "active", creator: "张工", createTime: "2026-05-20", explanation: "\"手柄\" 映射到变量 JoyR_swtPlt_IN\n\"非中位\" 映射到值 1（中位为 0）", scope: "EN13000 拆装工况" },
+        { id: 2, zh: "按下拆装工况按键", code: "SetUp_bus_bPanel=1", type: "action", typeName: "操作映射", confidence: 98, usageCount: 24, status: "active", creator: "张工", createTime: "2026-05-18", explanation: "\"按下\" 映射到值 1\n\"拆装工况按键\" 映射到变量 SetUp_bus_bPanel", scope: "通用 - SetUp 相关" },
+        { id: 3, zh: "松开拆装工况按键", code: "SetUp_bus_bPanel=0", type: "action", typeName: "操作映射", confidence: 98, usageCount: 24, status: "active", creator: "张工", createTime: "2026-05-18", explanation: "\"松开\" 映射到值 0（与\"按下\"相反）\n\"拆装工况按键\" 映射到变量 SetUp_bus_bPanel", scope: "通用 - SetUp 相关" },
+        { id: 4, zh: "拆装工况未激活", code: "b_SetUp_Valid==0", type: "assert", typeName: "结果断言", confidence: 96, usageCount: 8, status: "active", creator: "李工", createTime: "2026-05-22", explanation: "\"拆装工况\" 映射到变量 b_SetUp_Valid\n\"未激活\" 映射到断言值 ==0", scope: "EN13000 拆装工况" },
+        { id: 5, zh: "拆装工况激活", code: "b_SetUp_Valid==1", type: "assert", typeName: "结果断言", confidence: 96, usageCount: 6, status: "active", creator: "李工", createTime: "2026-05-22", explanation: "\"拆装工况\" 映射到变量 b_SetUp_Valid\n\"激活\" 映射到断言值 ==1", scope: "EN13000 拆装工况" },
+        { id: 6, zh: "等待500ms", code: "Wait 2000 ms", type: "timing", typeName: "时序映射", confidence: 90, usageCount: 16, status: "active", creator: "张工", createTime: "2026-05-25", explanation: "中文描述的 500ms 为用户操作间隔\n实际测试需要 2000ms 等待系统响应\n（系统延时配置：x4 倍率）", scope: "通用" },
+        { id: 7, zh: "力限器传感器故障", code: "LMIFault_Code1=4359", type: "state", typeName: "状态映射", confidence: 92, usageCount: 5, status: "active", creator: "王工", createTime: "2026-05-28", explanation: "\"力限器传感器\" 映射到 LMIFault_Code1\n\"故障\" 对应故障码 4359", scope: "LMI 力限器系统" },
+        { id: 8, zh: "断开主传感器信号线", code: "LMI_Sensor1_Signal=0xFFFF", type: "action", typeName: "操作映射", confidence: 92, usageCount: 3, status: "active", creator: "王工", createTime: "2026-06-01", explanation: "\"断开\" 映射到信号值 0xFFFF（表示无效/断线）\n\"主传感器\" 映射到 LMI_Sensor1_Signal", scope: "LMI 力限器系统" },
+        { id: 9, zh: "验证紧急停机", code: "EmergencyStop==1", type: "assert", typeName: "结果断言", confidence: 88, usageCount: 2, status: "review", creator: "王工", createTime: "2026-06-05", explanation: "\"紧急停机\" 映射到变量 EmergencyStop\n\"验证\" 表示断言，值为 1 表示已激活", scope: "安全保护通用" },
+        { id: 10, zh: "接通钥匙开关", code: "KeySwitch=1", type: "action", typeName: "操作映射", confidence: 97, usageCount: 10, status: "active", creator: "张工", createTime: "2026-05-15", explanation: "\"接通\" 映射到值 1\n\"钥匙开关\" 映射到 KeySwitch 变量", scope: "通用 - 电源管理" },
+        { id: 11, zh: "发动机转速=0", code: "w_Engine_Speed=0", type: "param", typeName: "参数设置", confidence: 99, usageCount: 7, status: "active", creator: "张工", createTime: "2026-05-16", explanation: "直接参数赋值，中文描述即为代码逻辑", scope: "通用" },
+        { id: 12, zh: "验证制动激活", code: "Swing_Brake==1", type: "assert", typeName: "结果断言", confidence: 94, usageCount: 4, status: "active", creator: "张工", createTime: "2026-06-02", explanation: "\"制动\" 映射到 Swing_Brake\n\"激活\" 映射到值 1\n\"验证\" 表示断言", scope: "回转系统" },
+        { id: 13, zh: "释放回转手柄", code: "Swing_Cmd=0", type: "action", typeName: "操作映射", confidence: 93, usageCount: 3, status: "active", creator: "张工", createTime: "2026-06-02", explanation: "\"释放\" 映射到值 0\n\"回转手柄\" 映射到 Swing_Cmd", scope: "回转系统" },
+        { id: 14, zh: "尝试起升动作", code: "HoistUp_Cmd=1", type: "action", typeName: "操作映射", confidence: 95, usageCount: 3, status: "active", creator: "王工", createTime: "2026-06-04", explanation: "\"起升\" 映射到 HoistUp 相关变量\n\"尝试\" 表示发送指令，Cmd=1", scope: "起升系统" },
+        { id: 15, zh: "验证起升被禁止", code: "HoistUp_Valve==0", type: "assert", typeName: "结果断言", confidence: 92, usageCount: 2, status: "active", creator: "王工", createTime: "2026-06-04", explanation: "\"被禁止\" 表示阀输出为 0\n\"起升\" 映射到 HoistUp_Valve", scope: "起升系统" },
+        { id: 16, zh: "变幅至接近限位角度", code: "Luff_Angle=78", type: "param", typeName: "参数设置", confidence: 88, usageCount: 1, status: "review", creator: "李工", createTime: "2026-06-06", explanation: "\"接近限位角度\" 使用系统配置值 80° 减去安全余量 2°", scope: "变幅系统" },
+        { id: 17, zh: "验证变幅停止", code: "Luff_Stop==1", type: "assert", typeName: "结果断言", confidence: 93, usageCount: 1, status: "active", creator: "李工", createTime: "2026-06-06", explanation: "\"变幅停止\" 映射到 Luff_Stop 变量\n值为 1 表示已停止", scope: "变幅系统" },
+        { id: 18, zh: "手柄中位", code: "JoyR_swtPlt_IN=0", type: "state", typeName: "状态映射", confidence: 97, usageCount: 18, status: "active", creator: "张工", createTime: "2026-05-15", explanation: "\"手柄\" 映射到 JoyR_swtPlt_IN\n\"中位\" 映射到值 0", scope: "通用" },
+        { id: 19, zh: "验证低压报警", code: "LowVoltage_Alarm==1", type: "assert", typeName: "结果断言", confidence: 90, usageCount: 2, status: "review", creator: "张工", createTime: "2026-06-07", explanation: "\"低压\" 映射到 LowVoltage\n\"报警\" 映射到 Alarm 后缀\n\"验证\" 表示断言值为 1", scope: "电源管理" },
+        { id: 20, zh: "起升至接近限位", code: "HoistHeight=LimitHeight-0.5", type: "param", typeName: "参数设置", confidence: 85, usageCount: 1, status: "active", creator: "李工", createTime: "2026-06-06", explanation: "\"接近限位\" 使用系统参数 LimitHeight 减去安全余量 0.5", scope: "起升系统" }
+    ];
+
+    function renderRules(rules) {
+        var tbody = document.getElementById('rulesTableBody');
+        var html = '';
+        rules.forEach(function(rule) {
+            var statusLabels = { active: '生效中', review: '待审核', disabled: '已禁用' };
+            var statusColors = { active: 'green', review: 'orange', disabled: 'gray' };
+            var confColor = rule.confidence >= 95 ? '#52c41a' : (rule.confidence >= 85 ? '#1890ff' : '#fa8c16');
+            html += '<tr class="rule-row" ondblclick="showRuleDetail(' + rule.id + ')">';
+            html += '<td class="rule-id">' + rule.id + '</td>';
+            html += '<td class="rule-zh">' + rule.zh + '</td>';
+            html += '<td class="rule-arrow">→</td>';
+            html += '<td class="rule-code"><code>' + rule.code + '</code></td>';
+            html += '<td><span class="rule-type-tag">' + rule.typeName + '</span></td>';
+            html += '<td><span class="rule-confidence" style="color:' + confColor + '">' + rule.confidence + '%</span></td>';
+            html += '<td class="rule-usage">' + rule.usageCount + '</td>';
+            html += '<td><span class="rule-status ' + statusColors[rule.status] + '">' + statusLabels[rule.status] + '</span></td>';
+            html += '<td class="rule-actions"><button class="action-btn" onclick="showRuleDetail(' + rule.id + ')" title="查看">👁</button><button class="action-btn" onclick="openEditRule(' + rule.id + ')" title="编辑">✏️</button><button class="action-btn danger" onclick="confirmDeleteRule(' + rule.id + ')" title="删限">🗑</button></td>';
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    function filterRulesByCategory(category, btn) {
+        document.querySelectorAll('.cat-tab').forEach(function(t) { t.classList.remove('active'); });
+        btn.classList.add('active');
+        if (category === 'all') {
+            renderRules(RULES_DATA);
+        } else {
+            renderRules(RULES_DATA.filter(function(r) { return r.type === category; }));
+        }
+    }
+
+    function searchRules() {
+        var keyword = document.getElementById('ruleSearchInput').value.trim().toLowerCase();
+        if (!keyword) { renderRules(RULES_DATA); return; }
+        var filtered = RULES_DATA.filter(function(r) {
+            return r.zh.toLowerCase().indexOf(keyword) > -1 || r.code.toLowerCase().indexOf(keyword) > -1;
+        });
+        renderRules(filtered);
+    }
+
+    function showRuleDetail(id) {
+        var rule = RULES_DATA.find(function(r) { return r.id === id; });
+        if (!rule) return;
+        document.getElementById('ruleDetailTitle').textContent = '规则 #' + rule.id + ' 详情';
+        var html = '';
+        html += '<div class="detail-mapping-card">';
+        html += '<div class="detail-from"><span class="detail-label">中文触发</span><span class="detail-value">"' + rule.zh + '"</span></div>';
+        html += '<div class="detail-arrow">→</div>';
+        html += '<div class="detail-to"><span class="detail-label">代码输出</span><code class="detail-code">' + rule.code + '</code></div>';
+        html += '</div>';
+        html += '<div class="detail-info-grid">';
+        html += '<div class="detail-info-item"><span class="detail-info-label">规则类型</span><span>' + rule.typeName + '</span></div>';
+        html += '<div class="detail-info-item"><span class="detail-info-label">置信度</span><span style="font-weight:600">' + rule.confidence + '%</span></div>';
+        html += '<div class="detail-info-item"><span class="detail-info-label">使用次数</span><span>' + rule.usageCount + ' 次</span></div>';
+        html += '<div class="detail-info-item"><span class="detail-info-label">创建人</span><span>' + rule.creator + '</span></div>';
+        html += '<div class="detail-info-item"><span class="detail-info-label">创建时间</span><span>' + rule.createTime + '</span></div>';
+        html += '<div class="detail-info-item"><span class="detail-info-label">适用范围</span><span>' + rule.scope + '</span></div>';
+        html += '</div>';
+        html += '<div class="detail-explanation"><h4>转换逻辑说明</h4><pre>' + rule.explanation + '</pre></div>';
+        document.getElementById('ruleDetailBody').innerHTML = html;
+        document.getElementById('ruleDetailTitle').textContent = '规则 #' + rule.id + ' 详情';
+        // Store current rule id for edit button
+        document.getElementById('ruleDetailModal').setAttribute('data-rule-id', rule.id);
+        document.getElementById('ruleDetailModal').style.display = 'flex';
+    }
+
+    function closeRuleDetailModal() {
+        document.getElementById('ruleDetailModal').style.display = 'none';
+    }
+
+    function openAddRuleModal() {
+        editingRuleId = null;
+        document.getElementById('ruleModalTitle').textContent = '新增转换规则';
+        document.getElementById('ruleSubmitBtn').textContent = '保存规则';
+        document.getElementById('editRuleZh').value = '';
+        document.getElementById('editRuleCode').value = '';
+        document.getElementById('editRuleType').value = 'action';
+        document.getElementById('editRuleConf').value = '85';
+        document.getElementById('editRuleStatus').value = 'review';
+        document.getElementById('editRuleExplanation').value = '';
+        document.getElementById('editRuleScope').value = '';
+        updateEditPreview();
+        document.getElementById('ruleModal').style.display = 'flex';
+    }
+
+    var editingRuleId = null;
+
+    function openEditRule(id) {
+        var rule = RULES_DATA.find(function(r) { return r.id === id; });
+        if (!rule) return;
+        editingRuleId = id;
+        document.getElementById('ruleModalTitle').textContent = '编辑规则 #' + id;
+        document.getElementById('ruleSubmitBtn').textContent = '保存修改';
+        document.getElementById('editRuleZh').value = rule.zh;
+        document.getElementById('editRuleCode').value = rule.code;
+        document.getElementById('editRuleType').value = rule.type;
+        document.getElementById('editRuleConf').value = rule.confidence;
+        document.getElementById('editRuleStatus').value = rule.status;
+        document.getElementById('editRuleExplanation').value = rule.explanation;
+        document.getElementById('editRuleScope').value = rule.scope;
+        updateEditPreview();
+        document.getElementById('ruleModal').style.display = 'flex';
+    }
+
+    function updateEditPreview() {
+        var zh = document.getElementById('editRuleZh').value || '—';
+        var code = document.getElementById('editRuleCode').value || '—';
+        document.getElementById('editPreviewZh').textContent = zh;
+        document.getElementById('editPreviewCode').textContent = code;
+    }
+
+    function closeRuleModal() {
+        document.getElementById('ruleModal').style.display = 'none';
+        editingRuleId = null;
+    }
+
+    function submitRule() {
+        var zh = document.getElementById('editRuleZh').value.trim();
+        var code = document.getElementById('editRuleCode').value.trim();
+        if (!zh || !code) { alert('请填写中文描述和代码输出'); return; }
+        if (editingRuleId) {
+            alert('规则 #' + editingRuleId + ' 已保存修改！\n\n中文：' + zh + '\n代码：' + code);
+        } else {
+            alert('新规则已创建，将进入审核队列。\n\n中文：' + zh + '\n代码：' + code);
+        }
+        closeRuleModal();
+    }
+
+    function confirmDeleteRule(id) {
+        var rule = RULES_DATA.find(function(r) { return r.id === id; });
+        if (!rule) return;
+        if (confirm('确认删除规则 #' + id + '？\n\n中文：' + rule.zh + '\n代码：' + rule.code + '\n\n删除后不可恢复。')) {
+            alert('规则 #' + id + ' 已删除');
+        }
+    }
+
+    // ========== Import Modal ==========
+    function openImportModal() {
+        document.getElementById('importModal').style.display = 'flex';
+    }
+
+    function closeImportModal() {
+        document.getElementById('importModal').style.display = 'none';
+        removeImportFile();
+    }
+
+    function handleImportFile(input) {
+        if (input.files && input.files.length > 0) {
+            var file = input.files[0];
+            document.getElementById('importFileName').textContent = file.name + ' (' + (file.size / 1024).toFixed(1) + 'KB)';
+            document.getElementById('importFileSelected').style.display = 'flex';
+            document.getElementById('importDropZone').style.display = 'none';
+            document.getElementById('importSubmitBtn').disabled = false;
+        }
+    }
+
+    function removeImportFile() {
+        document.getElementById('importFileInput').value = '';
+        document.getElementById('importFileSelected').style.display = 'none';
+        document.getElementById('importDropZone').style.display = '';
+        document.getElementById('importSubmitBtn').disabled = true;
+    }
+
+    function submitImport() {
+        var btn = document.getElementById('importSubmitBtn');
+        btn.disabled = true;
+        btn.textContent = '导入中...';
+        setTimeout(function() {
+            btn.textContent = '开始导入';
+            btn.disabled = false;
+            alert('✅ 导入成功！\n\n新增 12 条规则\n更新 3 条规则\n跳过 0 条（重复）\n\n新规则已进入审核队列。');
+            closeImportModal();
+        }, 1500);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderRules(RULES_DATA);
+
+        // Modal overlay click to close
+        document.getElementById('ruleModal').addEventListener('click', function(e) {
+            if (e.target === this) closeRuleModal();
+        });
+        document.getElementById('ruleDetailModal').addEventListener('click', function(e) {
+            if (e.target === this) closeRuleDetailModal();
+        });
+        document.getElementById('importModal').addEventListener('click', function(e) {
+            if (e.target === this) closeImportModal();
+        });
+
+        // Import drag-and-drop
+        var importDrop = document.getElementById('importDropZone');
+        if (importDrop) {
+            importDrop.addEventListener('dragover', function(e) { e.preventDefault(); importDrop.style.borderColor = '#1890ff'; importDrop.style.background = '#f0f7ff'; });
+            importDrop.addEventListener('dragleave', function() { importDrop.style.borderColor = '#d9d9d9'; importDrop.style.background = ''; });
+            importDrop.addEventListener('drop', function(e) {
+                e.preventDefault(); importDrop.style.borderColor = '#d9d9d9'; importDrop.style.background = '';
+                if (e.dataTransfer.files.length > 0) {
+                    document.getElementById('importFileInput').files = e.dataTransfer.files;
+                    handleImportFile(document.getElementById('importFileInput'));
+                }
+            });
+        }
+    });
+    </script>
+</body>
+</html>

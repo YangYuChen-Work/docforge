@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - 日志审计</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="page-audit.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>DEMO演示平台</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-label">功能导航</div>
+                    <a href="index.html" class="nav-item">
+                        <span class="nav-icon">🧪</span>
+                        <span>AI 测试用例生成</span>
+                    </a>
+                    <a href="doc-assistant.html" class="nav-item">
+                        <span class="nav-icon">📄</span>
+                        <span>AI 文档助手</span>
+                    </a>
+                    <a href="module-select.html" class="nav-item">
+                        <span class="nav-icon">⚙️</span>
+                        <span>产品模块智能选配</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">系统配置</div>
+                    <a href="rules-config.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>转换规则</span>
+                    </a>
+                    <a href="audit.html" class="nav-item sub active">
+                        <span class="nav-icon">•</span>
+                        <span>日志审计</span>
+                    </a>
+                    <a href="doc-config.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>文档助手配置</span>
+                    </a>
+                    <a href="module-rules.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>模块配置规则库</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-left">
+                    <h2>日志审计</h2>
+                    <p class="subtitle">查看系统操作记录、测试用例生成记录和规则变更历史。</p>
+                </div>
+                <div class="header-right">
+                    <button class="btn btn-outline" onclick="alert('导出日志 CSV')">📥 导出日志</button>
+                </div>
+            </header>
+
+            <!-- Stats Cards -->
+            <div class="audit-stats">
+                <div class="stat-card">
+                    <div class="stat-number">156</div>
+                    <div class="stat-label">今日操作</div>
+                    <div class="stat-trend up">↑ 12%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">23</div>
+                    <div class="stat-label">生成记录</div>
+                    <div class="stat-trend up">↑ 8%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">7</div>
+                    <div class="stat-label">规则变更</div>
+                    <div class="stat-trend down">↓ 3%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">2</div>
+                    <div class="stat-label">异常告警</div>
+                    <div class="stat-trend neutral">—</div>
+                </div>
+            </div>
+
+            <!-- Filter Bar -->
+            <div class="audit-filter-bar">
+                <div class="filter-group">
+                    <label>日志类型</label>
+                    <select class="filter-select" id="logTypeFilter" onchange="filterLogs()">
+                        <option value="all">全部类型</option>
+                        <option value="operation">操作日志</option>
+                        <option value="generate">生成记录</option>
+                        <option value="rule">规则变更</option>
+                        <option value="system">系统事件</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>时间范围</label>
+                    <select class="filter-select">
+                        <option value="today">今天</option>
+                        <option value="week" selected>最近7天</option>
+                        <option value="month">最近30天</option>
+                        <option value="all">全部</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label>操作人</label>
+                    <select class="filter-select">
+                        <option value="all">全部</option>
+                        <option value="zhangsan">张工</option>
+                        <option value="lisi">李工</option>
+                        <option value="wangwu">王工</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <input type="text" class="filter-input" placeholder="🔍 搜索关键词...">
+                </div>
+            </div>
+
+            <!-- Log Table -->
+            <div class="audit-table-wrapper">
+                <table class="audit-table">
+                    <thead>
+                        <tr>
+                            <th style="width:160px">时间</th>
+                            <th style="width:90px">类型</th>
+                            <th style="width:80px">操作人</th>
+                            <th>操作内容</th>
+                            <th style="width:100px">关联任务</th>
+                            <th style="width:80px">结果</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditLogBody">
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="audit-pagination">
+                <span class="page-info">共 156 条记录，第 1/16 页</span>
+                <div class="page-buttons">
+                    <button class="page-btn" disabled>← 上一页</button>
+                    <button class="page-btn active">1</button>
+                    <button class="page-btn">2</button>
+                    <button class="page-btn">3</button>
+                    <span class="page-ellipsis">...</span>
+                    <button class="page-btn">16</button>
+                    <button class="page-btn">下一页 →</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // Audit log fake data
+    var AUDIT_LOGS = [
+        { time: "2026-06-08 15:32:18", type: "generate", user: "张工", action: "生成测试用例代码", detail: "EN13000 拆装工况 → 生成 7 条测试代码，耗时 3.2s", task: "TC-2026-021", result: "success" },
+        { time: "2026-06-08 15:30:45", type: "operation", user: "张工", action: "确认规则映射", detail: "确认规则「手柄处于非中位状态 → JoyR_swtPlt_IN=1」", task: "TC-2026-021", result: "success" },
+        { time: "2026-06-08 15:28:10", type: "operation", user: "张工", action: "上传测试用例文件", detail: "上传文件 EN13000_拆装工况_v2.xlsx (245KB)", task: "TC-2026-021", result: "success" },
+        { time: "2026-06-08 14:55:33", type: "generate", user: "李工", action: "生成测试用例代码", detail: "力限器传感器故障 → 生成 3 条测试代码，耗时 2.1s", task: "TC-2026-022", result: "success" },
+        { time: "2026-06-08 14:50:12", type: "rule", user: "李工", action: "新增转换规则", detail: "新增规则「断开主传感器信号线 → LMI_Sensor1_Signal=0xFFFF」", task: "TC-2026-022", result: "success" },
+        { time: "2026-06-08 14:45:00", type: "operation", user: "李工", action: "导出测试用例", detail: "导出 LMI_Sensor_v0.3.xlsx，共 4 条用例", task: "TC-2026-022", result: "success" },
+        { time: "2026-06-08 14:20:55", type: "system", user: "系统", action: "自动重跑验证", detail: "规则变更触发重新验证，影响 3 个任务节点", task: "-", result: "success" },
+        { time: "2026-06-08 13:40:22", type: "generate", user: "王工", action: "生成测试用例代码", detail: "发动机低转速保护 → 生成 2 条测试代码，耗时 1.8s", task: "TC-2026-024", result: "success" },
+        { time: "2026-06-08 13:35:10", type: "operation", user: "王工", action: "上传测试用例文件", detail: "上传文件 Engine_LowRPM_v1.xlsx (180KB)", task: "TC-2026-024", result: "success" },
+        { time: "2026-06-08 11:22:08", type: "rule", user: "张工", action: "修改转换规则", detail: "修改规则「等待500ms → Wait 2000 ms」时序倍率从 x2 改为 x4", task: "-", result: "success" },
+        { time: "2026-06-08 10:15:00", type: "generate", user: "张工", action: "生成测试用例代码", detail: "电源管理记忆 → 生成 2 条测试代码，耗时 1.5s", task: "TC-2026-023", result: "success" },
+        { time: "2026-06-08 10:00:33", type: "operation", user: "张工", action: "导出测试用例", detail: "导出 PowerMgmt_v2.0.xlsx，共 5 条用例", task: "TC-2026-023", result: "success" },
+        { time: "2026-06-08 09:45:10", type: "system", user: "系统", action: "定时备份", detail: "规则库自动备份完成，共 128 条规则", task: "-", result: "success" },
+        { time: "2026-06-08 09:10:25", type: "generate", user: "张工", action: "生成测试用例代码", detail: "回转制动系统 → 生成 1 条测试代码，耗时 0.9s", task: "TC-2026-026", result: "success" },
+        { time: "2026-06-08 09:00:00", type: "operation", user: "张工", action: "导出测试用例", detail: "导出 SwingBrake_v2.1.xlsx，共 1 条用例", task: "TC-2026-026", result: "success" },
+        { time: "2026-06-07 17:30:55", type: "generate", user: "李工", action: "生成测试用例代码（失败）", detail: "高度限位器校验 → 解析失败：模板结构不匹配", task: "TC-2026-025", result: "failed" },
+        { time: "2026-06-07 17:25:00", type: "operation", user: "李工", action: "上传测试用例文件", detail: "上传文件 HeightLimit_v0.9.xlsx (120KB)", task: "TC-2026-025", result: "success" },
+        { time: "2026-06-07 16:20:30", type: "rule", user: "王工", action: "审核通过规则", detail: "审核通过「验证紧急停机 → EmergencyStop==1」规则", task: "TC-2026-022", result: "success" },
+        { time: "2026-06-07 15:10:44", type: "system", user: "系统", action: "异常告警", detail: "规则冲突检测：「松开按键」存在 2 条重复映射规则", task: "-", result: "warning" },
+        { time: "2026-06-07 14:00:00", type: "operation", user: "王工", action: "创建新任务", detail: "创建任务「变幅安全限位」，分配编号 TC-2026-027", task: "TC-2026-027", result: "success" }
+    ];
+
+    function renderLogs(logs) {
+        var tbody = document.getElementById('auditLogBody');
+        var html = '';
+        logs.forEach(function(log) {
+            var typeLabels = { operation: '操作', generate: '生成', rule: '规则', system: '系统' };
+            var typeColors = { operation: 'blue', generate: 'green', rule: 'orange', system: 'purple' };
+            var resultLabels = { success: '成功', failed: '失败', warning: '告警' };
+            var resultColors = { success: 'green', failed: 'red', warning: 'orange' };
+            html += '<tr class="log-row log-type-' + log.type + '">';
+            html += '<td class="log-time">' + log.time + '</td>';
+            html += '<td><span class="log-type-badge ' + typeColors[log.type] + '">' + typeLabels[log.type] + '</span></td>';
+            html += '<td>' + log.user + '</td>';
+            html += '<td><div class="log-action">' + log.action + '</div><div class="log-detail">' + log.detail + '</div></td>';
+            html += '<td><span class="log-task">' + log.task + '</span></td>';
+            html += '<td><span class="log-result ' + resultColors[log.result] + '">' + resultLabels[log.result] + '</span></td>';
+            html += '</tr>';
+        });
+        tbody.innerHTML = html;
+    }
+
+    function filterLogs() {
+        var type = document.getElementById('logTypeFilter').value;
+        if (type === 'all') {
+            renderLogs(AUDIT_LOGS);
+        } else {
+            renderLogs(AUDIT_LOGS.filter(function(l) { return l.type === type; }));
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        renderLogs(AUDIT_LOGS);
+    });
+    </script>
+</body>
+</html>

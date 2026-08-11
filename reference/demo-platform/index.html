@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - AI 测试用例生成</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>DEMO演示平台</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-label">功能导航</div>
+                    <a href="index.html" class="nav-item active">
+                        <span class="nav-icon">🧪</span>
+                        <span>AI 测试用例生成</span>
+                    </a>
+                    <a href="doc-assistant.html" class="nav-item">
+                        <span class="nav-icon">📄</span>
+                        <span>AI 文档助手</span>
+                    </a>
+                    <a href="module-select.html" class="nav-item">
+                        <span class="nav-icon">⚙️</span>
+                        <span>产品模块智能选配</span>
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">系统配置</div>
+                    <a href="rules-config.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>转换规则</span>
+                    </a>
+                    <a href="audit.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>日志审计</span>
+                    </a>
+                    <a href="doc-config.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>文档助手配置</span>
+                    </a>
+                    <a href="module-rules.html" class="nav-item sub">
+                        <span class="nav-icon">•</span>
+                        <span>模块配置规则库</span>
+                    </a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Page Header -->
+            <header class="page-header" style="border-bottom:none; padding-bottom:8px;">
+                <div class="header-left">
+                    <h2>AI 测试用例生成</h2>
+                    <p class="subtitle">上传中文测试用例 Excel，完成结构识别、规则补全、转换预览与可导出状态流转。</p>
+                </div>
+            </header>
+
+            <div class="content-full">
+                <!-- Status Cards -->
+                <div class="status-cards">
+                    <div class="stat-card">
+                        <div class="stat-label">处理中</div>
+                        <div class="stat-number">4</div>
+                        <div class="stat-icon blue"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">待补全</div>
+                        <div class="stat-number">3</div>
+                        <div class="stat-icon yellow"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">审核中</div>
+                        <div class="stat-number">2</div>
+                        <div class="stat-icon purple"></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">可导出</div>
+                        <div class="stat-number">8</div>
+                        <div class="stat-icon green"></div>
+                    </div>
+                </div>
+
+                <!-- Main Body: Task List + Upload Panel -->
+                <div class="list-layout">
+                    <!-- Left: Task Table -->
+                    <div class="list-main">
+                        <div class="card">
+                            <div class="list-header">
+                                <div>
+                                    <h3 class="card-title" style="margin-bottom:4px;">测试用例处理任务</h3>
+                                    <p class="card-desc" style="margin-bottom:0;">任务状态统一为处理中、待补全、审核中、待确认、可导出，按最近更新时间排序。</p>
+                                </div>
+                                <div class="search-box">
+                                    <span class="search-icon">🔍</span>
+                                    <input type="text" placeholder="搜索任务" class="search-input">
+                                </div>
+                            </div>
+
+                            <!-- Task List Table Header -->
+                            <div class="task-table-header">
+                                <span class="col-name">任务名称</span>
+                                <span class="col-file">上传文件</span>
+                                <span class="col-status">任务状态</span>
+                                <span class="col-time">最近更新</span>
+                                <span class="col-action">操作</span>
+                            </div>
+
+                            <!-- Task Items -->
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-021&status=confirm'">
+                                <div class="col-name">
+                                    <strong>EN13000 拆装工况</strong>
+                                    <span class="task-id">任务编号 TC-2026-021</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-confirm">待确认</span></span>
+                                <span class="col-time">05-24 10:32</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-021&tab=preview" class="action-link">结束预览</a></span>
+                            </div>
+
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-022&status=rule'">
+                                <div class="col-name">
+                                    <strong>力限器传感器故障</strong>
+                                    <span class="task-id">任务编号 TC-2026-022</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-pending">待补全</span></span>
+                                <span class="col-time">05-23 17:12</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-022&tab=rule" class="action-link link-orange">补全规则</a></span>
+                            </div>
+
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-023&status=export'">
+                                <div class="col-name">
+                                    <strong>电源管理记忆</strong>
+                                    <span class="task-id">任务编号 TC-2026-023</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-export">可导出</span></span>
+                                <span class="col-time">05-23 14:20</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-023&tab=export" class="action-link link-green">下载 Excel</a></span>
+                            </div>
+
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-024&status=processing'">
+                                <div class="col-name">
+                                    <strong>发动机低转速保护</strong>
+                                    <span class="task-id">任务编号 TC-2026-024</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-processing">处理中</span></span>
+                                <span class="col-time">05-22 16:05</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-024&tab=preview" class="action-link">查看进度</a></span>
+                            </div>
+
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-025&status=review'">
+                                <div class="col-name">
+                                    <strong>高度限位器校验</strong>
+                                    <span class="task-id">任务编号 TC-2026-025</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-review">审核中</span></span>
+                                <span class="col-time">05-21 09:40</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-025&tab=rule" class="action-link link-purple">查看审核</a></span>
+                            </div>
+
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-026&status=export'">
+                                <div class="col-name">
+                                    <strong>回转制动系统</strong>
+                                    <span class="task-id">任务编号 TC-2026-026</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-export">可导出</span></span>
+                                <span class="col-time">05-20 11:28</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-026&tab=export" class="action-link link-green">下载 Excel</a></span>
+                            </div>
+
+                            <div class="task-item" onclick="location.href='detail.html?task=TC-2026-027&status=processing'">
+                                <div class="col-name">
+                                    <strong>变幅安全限位</strong>
+                                    <span class="task-id">任务编号 TC-2026-027</span>
+                                </div>
+                                <span class="col-file">中文用例</span>
+                                <span class="col-status"><span class="status-tag tag-processing">处理中</span></span>
+                                <span class="col-time">05-19 15:33</span>
+                                <span class="col-action"><a href="detail.html?task=TC-2026-027&tab=preview" class="action-link">查看进度</a></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Upload Panel -->
+                    <div class="list-aside">
+                        <div class="card">
+                            <h3 class="card-title">上传测试用例</h3>
+                            <p class="card-desc">上传后进入处理中；规则缺口会转为待补全或审核中，全匹配后进入待确认。</p>
+                            <button class="btn btn-primary" style="width:100%; margin-top:8px;" onclick="openUploadModal()">
+                                ⬆ 上传用例
+                            </button>
+                        </div>
+
+                        <div class="card" style="margin-top:12px;">
+                            <div class="upload-area" onclick="openUploadModal()">
+                                <div class="upload-icon">📋</div>
+                                <p>上传中文测试用例</p>
+                            </div>
+                        </div>
+
+                        <div class="card" style="margin-top:12px;">
+                            <h3 class="card-title">状态说明</h3>
+                            <div class="flow-desc">
+                                <div class="flow-path">
+                                    <div class="flow-path-header">
+                                        <span class="flow-icon">⚡</span>
+                                        <strong>无规则问题路径</strong>
+                                    </div>
+                                    <p class="flow-steps">处理中 → 待确认 → 可导出</p>
+                                </div>
+                                <div class="flow-path">
+                                    <div class="flow-path-header">
+                                        <span class="flow-icon">🔗</span>
+                                        <strong>有规则缺口路径</strong>
+                                    </div>
+                                    <p class="flow-steps">待补全 → 审核中 → 待确认</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <!-- Upload Modal -->
+    <div class="modal-overlay" id="uploadModal" style="display:none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>上传中文测试用例</h3>
+                <button class="modal-close" onclick="closeUploadModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="upload-form">
+                    <div class="form-group">
+                        <label>任务名称</label>
+                        <input type="text" id="newTaskName" class="form-input" placeholder="例如：EN13000 拆装工况">
+                    </div>
+                    <div class="form-group">
+                        <label>上传文件</label>
+                        <div class="file-upload-area" id="fileDropZone">
+                            <div class="file-upload-icon">📁</div>
+                            <p class="file-upload-text">点击或拖拽文件到此处</p>
+                            <p class="file-upload-hint">支持 .xlsx、.xls、.csv 格式</p>
+                            <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                        </div>
+                        <div class="file-selected" id="fileSelected" style="display:none;">
+                            <span class="file-icon">📄</span>
+                            <span class="file-name" id="fileName"></span>
+                            <button class="file-remove" onclick="removeFile()">✕</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>备注说明（可选）</label>
+                        <textarea class="form-textarea" placeholder="描述测试用例的范围或备注信息..."></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" style="margin:0" onclick="closeUploadModal()">取消</button>
+                <button class="btn btn-primary" style="margin:0" onclick="submitUpload()">开始上传</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

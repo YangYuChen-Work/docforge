@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - 子平台推荐</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="module.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header"><h1>DEMO演示平台</h1></div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-label">功能导航</div>
+                <a href="index.html" class="nav-item"><span class="nav-icon">🧪</span><span>AI 测试用例生成</span></a>
+                <a href="doc-assistant.html" class="nav-item"><span class="nav-icon">📄</span><span>AI 文档助手</span></a>
+                <a href="module-select.html" class="nav-item active"><span class="nav-icon">⚙️</span><span>产品模块智能选配</span></a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-label">系统配置</div>
+                <a href="rules-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>转换规则</span></a>
+                <a href="audit.html" class="nav-item sub"><span class="nav-icon">•</span><span>日志审计</span></a>
+                <a href="doc-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>文档助手配置</span></a>
+                <a href="module-rules.html" class="nav-item sub"><span class="nav-icon">•</span><span>模块配置规则库</span></a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header" style="border-bottom:none; padding-bottom:8px;">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <a href="module-select.html" class="breadcrumb-link">产品模块智能选配</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <a href="module-platform.html" class="breadcrumb-link">产品平台推荐</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current">子平台推荐</span>
+                </div>
+                <p class="subtitle">一级平台确认后，分别推荐上车平台和下车平台；确认后形成两个独立BOM，本次演示进入上车平台BOM。</p>
+            </div>
+            <div class="header-right">
+                <span class="step-tag step-tag-green">需求已获取</span>
+                <span class="step-tag step-tag-green">一级平台已选</span>
+                <span class="step-tag step-tag-orange">子平台待确认</span>
+            </div>
+        </header>
+
+        <div class="subsystem-layout">
+            <!-- Main: sub-platform recommendations -->
+            <div class="platform-main">
+                <div class="mod-section-title" style="margin-bottom:4px;">子平台推荐</div>
+                <div class="mod-section-desc">需求由外部系统一次性获取，这里按上车/下车分别展示关联需求和推荐方案。</div>
+
+                <!-- Upper platform -->
+                <div class="sub-plat-section" id="upperSection" onclick="switchSidebarBomTab('upper')" style="cursor:pointer;">
+                    <div class="sub-plat-section-title">
+                        <span>上车平台推荐</span>
+                        <span class="module-badge badge-orange" id="upperStatus">待选择</span>
+                    </div>
+                    <div class="sub-plat-section-desc">选择上车平台后，将形成上车平台BOM；后续工作台演示基于这样BOM。</div>
+                    <div class="sub-plat-inner">
+                        <div class="sub-param-box">
+                            <div class="sub-param-title">关联需求参数</div>
+                            <div id="upperParams"></div>
+                        </div>
+                        <div>
+                            <div class="sub-param-title" style="padding-left:4px; color:#888; font-size:12px;">推荐方案</div>
+                            <div class="sub-solutions-box" id="upperSolutions"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lower platform -->
+                <div class="sub-plat-section" id="lowerSection" onclick="switchSidebarBomTab('lower')" style="cursor:pointer;">
+                    <div class="sub-plat-section-title">
+                        <span>下车平台推荐</span>
+                        <span class="module-badge badge-orange" id="lowerStatus">待选择</span>
+                    </div>
+                    <div class="sub-plat-section-desc">下车平台单独形成下车平台BOM；本次演示不进入下车BOM维护。</div>
+                    <div class="sub-plat-inner">
+                        <div class="sub-param-box">
+                            <div class="sub-param-title">关联需求参数</div>
+                            <div id="lowerParams"></div>
+                        </div>
+                        <div>
+                            <div class="sub-param-title" style="padding-left:4px; color:#888; font-size:12px;">推荐方案</div>
+                            <div class="sub-solutions-box" id="lowerSolutions"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bottom nav -->
+                <div class="page-bottom-bar" style="padding:14px 0; background:transparent; border:none;">
+                    <a href="module-platform.html" style="color:#666; font-size:13px; cursor:pointer;">返回平台推荐</a>
+                    <button class="btn btn-primary" style="padding:12px 32px; font-size:14px;" onclick="window.location.href='module-bom.html?from=subsystem'">下一步</button>
+                </div>
+            </div>
+
+            <!-- Right sidebar: BOM preview -->
+            <div class="platform-sidebar">
+                <div class="info-card">
+                    <!-- Tab switcher -->
+                    <div style="display:flex; gap:6px; margin-bottom:12px;">
+                        <button id="sidebarTab-upper" onclick="switchSidebarBomTab('upper')" style="flex:1; padding:6px 0; font-size:12px; border-radius:6px; border:1.5px solid #10a060; background:#e8f7ef; color:#10a060; cursor:pointer; font-weight:600;">上车平台BOM</button>
+                        <button id="sidebarTab-lower" onclick="switchSidebarBomTab('lower')" style="flex:1; padding:6px 0; font-size:12px; border-radius:6px; border:1.5px solid #e0e0e0; background:#f7f7f7; color:#888; cursor:pointer;">下车平台BOM</button>
+                    </div>
+                    <div class="info-card-title" id="sidebarBomTitle">上车平台BOM预览</div>
+                    <div class="info-card-desc" id="sidebarBomDesc">当前展示上车平台BOM DEMO；上下车平台确认后会分别形成两个独立BOM。</div>
+                    <div style="background:#f0f5ff; color:#1a6cff; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:12px;" id="bomPreviewLabel">
+                        <strong>上车平台BOM - SUP-A</strong>
+                    </div>
+                    <div class="mod-section-title" style="font-size:13px; margin-bottom:8px;">预览BOM结构</div>
+                    <div id="bomPreviewTree"></div>
+                </div>
+                <div class="info-card confirm-after-box">
+                    <div style="font-weight:600; font-size:13px; margin-bottom:6px;">确认后</div>
+                    系统生成上车平台BOM与下车平台BOM。
+                </div>
+                <button class="btn btn-primary" style="width:100%; padding:10px;" onclick="window.location.href='module-bom.html?from=subsystem'">确定</button>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="module-data.js"></script>
+<script src="module-app.js"></script>
+<script>
+    initSubsystemPage();
+</script>
+</body>
+</html>

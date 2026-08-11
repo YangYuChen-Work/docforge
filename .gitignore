@@ -3,8 +3,9 @@
 .env.*
 !.env.example
 
-# Local runtime data may contain source documents, generated documents, and the database
-data/
+# Local runtime data may contain source documents, generated documents, and the database.
+/data/
+/backend/data/
 *.db
 
 # Python environments and caches
@@ -12,9 +13,27 @@ data/
 venv/
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Frontend dependencies and build artifacts
+/frontend/node_modules/
+/frontend/dist/
+/frontend/*.tsbuildinfo
+
+# Local agent/worktree state and optional demo recordings
+/.superpowers/
+/docs/superpowers/
+/.worktrees/
+/worktrees/
+/docs/media/
 
 # Local editor and OS files
 .idea/
 .vscode/
+.DS_Store
 Thumbs.db
 *.log

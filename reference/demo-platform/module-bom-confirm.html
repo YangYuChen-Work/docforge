@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - BOM生成确认</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="module.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header"><h1>DEMO演示平台</h1></div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-label">功能导航</div>
+                <a href="index.html" class="nav-item"><span class="nav-icon">🧪</span><span>AI 测试用例生成</span></a>
+                <a href="doc-assistant.html" class="nav-item"><span class="nav-icon">📄</span><span>AI 文档助手</span></a>
+                <a href="module-select.html" class="nav-item active"><span class="nav-icon">⚙️</span><span>产品模块智能选配</span></a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-label">系统配置</div>
+                <a href="rules-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>转换规则</span></a>
+                <a href="audit.html" class="nav-item sub"><span class="nav-icon">•</span><span>日志审计</span></a>
+                <a href="doc-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>文档助手配置</span></a>
+                <a href="module-rules.html" class="nav-item sub"><span class="nav-icon">•</span><span>模块配置规则库</span></a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header" style="border-bottom:none; padding-bottom:8px;">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <a href="module-select.html" class="breadcrumb-link">产品模块智能选配</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <a href="module-bom.html" class="breadcrumb-link">BOM节点维护</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current">BOM生成确认</span>
+                </div>
+                <p class="subtitle">所有节点维护完成后，在设计导航中生成上车平台配置BOM；不提供独立导出动作。</p>
+            </div>
+            <div class="header-right">
+                <span class="step-tag step-tag-green">可生成</span>
+                <span class="step-tag step-tag-blue">设计导航</span>
+            </div>
+        </header>
+
+        <div class="platform-layout">
+            <!-- Main -->
+            <div class="platform-main">
+                <div class="mod-section-title" style="margin-bottom:4px;" id="confirmTitle"></div>
+                <div class="mod-section-desc" id="confirmDesc"></div>
+
+                <!-- Change summary box -->
+                <div style="border:1.5px solid #e8e8e8; border-radius:10px; padding:16px; margin-bottom:20px;" id="changeSummaryBox"></div>
+
+                <!-- BOM preview tree -->
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+                    <div class="mod-section-title">配置BOM层级预览</div>
+                    <div style="display:flex; gap:12px; font-size:12px;">
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10a060;margin-right:4px;"></span>已确认</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#1a6cff;margin-right:4px;"></span>变更</span>
+                    </div>
+                </div>
+                <div class="mod-section-desc">按生成后的BOM层级展示，上车平台为本次演示BOM；标签标识本次配置产生的变化。</div>
+                <div style="border:1.5px solid #e0e8ff; border-radius:10px; padding:16px; margin-top:12px; background:#fafcff;" id="bomConfirmTree"></div>
+
+                <!-- Calc note -->
+                <div class="calc-note" id="calcNote"></div>
+
+                <!-- Bottom actions -->
+                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:20px;">
+                    <a href="module-bom.html" class="btn btn-outline" style="padding:10px 20px;">返回维护</a>
+                    <button class="btn btn-outline" style="padding:10px 20px;" onclick="alert('已保存草稿')">保存草稿</button>
+                </div>
+            </div>
+
+            <!-- Right sidebar -->
+            <div class="platform-sidebar">
+                <div class="info-card">
+                    <div class="info-card-title">生成前确认</div>
+                    <div class="info-card-desc">确认后在设计导航内生成配置BOM并沉淀变更记录；维护页不会直接生成最终BOM</div>
+                    <div id="confirmChecklist"></div>
+                </div>
+                <div class="info-card">
+                    <div class="info-card-title">操作</div>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:12px;">
+                        <a href="module-bom.html" style="color:#666; font-size:13px; cursor:pointer;">返回维护</a>
+                        <span style="color:#666; font-size:13px; cursor:pointer;" onclick="alert('草稿已保存')">保存草稿</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+<script src="module-data.js"></script>
+<script src="module-app.js"></script>
+<script>
+    initBomConfirmPage();
+</script>
+</body>
+</html>

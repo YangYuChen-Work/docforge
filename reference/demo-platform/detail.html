@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - 任务详情</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>DEMO演示平台</h1>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-label">功能导航</div>
+                    <a href="index.html" class="nav-item active">
+                        <span class="nav-icon">🧪</span>
+                        <span>AI 测试用例生成</span>
+                    </a>
+                    <a href="doc-assistant.html" class="nav-item">
+                        <span class="nav-icon">📄</span>
+                        <span>AI 文档助手</span>
+                    </a>
+                    <a href="module-select.html" class="nav-item"><span class="nav-icon">⚙️</span><span>产品模块智能选配</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">系统配置</div>
+                    <a href="rules-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>转换规则</span></a>
+                    <a href="audit.html" class="nav-item sub"><span class="nav-icon">•</span><span>日志审计</span></a>
+                    <a href="doc-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>文档助手配置</span></a>
+                    <a href="module-rules.html" class="nav-item sub"><span class="nav-icon">•</span><span>模块配置规则库</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="page-header">
+                <div class="header-left">
+                    <div class="breadcrumb">
+                        <a href="index.html" class="breadcrumb-link">AI 测试用例生成</a>
+                        <span class="breadcrumb-sep">/</span>
+                        <span class="breadcrumb-current" id="taskTitle">加载中...</span>
+                    </div>
+                    <p class="subtitle" id="taskSubtitle">任务编号加载中...</p>
+                </div>
+                <div class="header-right" id="headerBadges">
+                    <a href="index.html" class="btn btn-outline" style="margin:0; padding:6px 14px; font-size:13px;">← 返回列表</a>
+                </div>
+            </header>
+
+            <!-- Flow Progress Indicator -->
+            <div class="flow-stepper" id="flowStepper">
+                <div class="flow-step active" data-step="preview" onclick="switchTab('preview')">
+                    <div class="flow-step-dot"><span>1</span></div>
+                    <div class="flow-step-label">转换预览</div>
+                </div>
+                <div class="flow-step-line" id="flowLine1"></div>
+                <div class="flow-step" data-step="rule" onclick="switchTab('rule')">
+                    <div class="flow-step-dot"><span>2</span></div>
+                    <div class="flow-step-label">规则补全</div>
+                    <div class="flow-step-skip" id="ruleSkipBadge" style="display:none;">可跳过</div>
+                </div>
+                <div class="flow-step-line" id="flowLine2"></div>
+                <div class="flow-step" data-step="export" onclick="switchTab('export')">
+                    <div class="flow-step-dot"><span>3</span></div>
+                    <div class="flow-step-label">确认导出</div>
+                </div>
+            </div>
+
+            <!-- Tabs (hidden, replaced by stepper) -->
+            <div class="tabs" style="display:none;">
+                <a href="#" class="tab active" data-tab="preview" onclick="switchTab('preview')">转换预览</a>
+                <a href="#" class="tab" data-tab="rule" onclick="switchTab('rule')">规则补全</a>
+                <a href="#" class="tab" data-tab="export" onclick="switchTab('export')">可导出</a>
+            </div>
+
+            <!-- ===================== TAB: 转换预览 ===================== -->
+            <div class="tab-content" id="tab-preview" style="display:block;">
+                <!-- Flow guidance banner -->
+                <div class="flow-guidance" id="previewGuidance"></div>
+                <div class="preview-layout">
+                    <!-- Left: Tree Navigation -->
+                    <div class="preview-tree-panel">
+                        <div class="card" style="height:100%">
+                            <h3 class="card-title">用例结构树</h3>
+                            <p class="card-desc">点击叶子节点查看中文→代码对照</p>
+                            <div class="tree-view" id="treeView"></div>
+                        </div>
+                    </div>
+                    <!-- Right: Step Detail (Chinese vs Code comparison) -->
+                    <div class="preview-detail-panel">
+                        <div class="card" id="previewDetailCard">
+                            <div class="preview-empty" id="previewEmpty">
+                                <div style="text-align:center; padding:40px 20px; color:#999;">
+                                    <div style="font-size:40px; margin-bottom:12px;">👈</div>
+                                    <p style="font-size:15px;">请点击左侧树节点查看对照详情</p>
+                                    <p style="font-size:13px; margin-top:4px;">选中具体测试用例后，将显示中文描述与生成代码的逐行对照</p>
+                                </div>
+                            </div>
+                            <div id="previewContent" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tab-content" id="tab-rule" style="display:none;">
+                <!-- Flow guidance banner -->
+                <div class="flow-guidance" id="ruleGuidance"></div>
+                <div class="rule-layout">
+                    <!-- Left: Pending items list -->
+                    <div class="rule-list-panel">
+                        <div class="card" style="height:100%">
+                            <h3 class="card-title">待处理映射规则</h3>
+                            <p class="card-desc">点击查看中文→代码的映射解析详情</p>
+                            <div id="rulePendingList"></div>
+                        </div>
+                    </div>
+                    <!-- Right: Rule detail -->
+                    <div class="rule-detail-panel">
+                        <div class="card" id="ruleDetailCard">
+                            <div class="rule-empty" id="ruleEmpty">
+                                <div style="text-align:center; padding:40px 20px; color:#999;">
+                                    <div style="font-size:40px; margin-bottom:12px;">👈</div>
+                                    <p style="font-size:15px;">请点击左侧待处理项查看映射详情</p>
+                                    <p style="font-size:13px; margin-top:4px;">将显示中文描述如何转换为测试代码，以及候选规则和影响范围</p>
+                                </div>
+                            </div>
+                            <div id="ruleDetailContent" style="display:none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===================== TAB: 可导出 ===================== -->
+            <div class="tab-content" id="tab-export" style="display:none;">
+                <div class="content-full">
+                    <div class="card" style="margin-bottom:16px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <h3 style="font-size:16px; margin-bottom:4px;">导出设置</h3>
+                                <p style="font-size:13px; color:#666;">选择导出格式和范围，生成符合规范的测试用例文件</p>
+                            </div>
+                            <div style="display:flex; gap:8px;">
+                                <button class="btn btn-outline" style="margin:0" onclick="alert('预览导出内容...')">预览</button>
+                                <div class="export-btn-wrap" style="position:relative;">
+                                    <button class="btn btn-primary" style="margin:0" onclick="toggleDetailExportMenu(event)">一键导出 &#x25be;</button>
+                                    <div id="detailExportDropdown" class="export-dropdown" style="display:none;">
+                                        <div class="export-drop-title">选择导出格式</div>
+                                        <div class="export-drop-item" onclick="doExport('excel')">
+                                            <span class="export-fmt-icon" style="background:#1e7e45;">E</span>
+                                            <div>
+                                                <div class="export-fmt-name">Excel (.xlsx)</div>
+                                                <div class="export-fmt-desc">标准测试用例表格，适合管理跟踪</div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="export-grid" style="margin-bottom:16px;" id="exportModules">
+                        <!-- Rendered by JS -->
+                    </div>
+                    <div class="card">
+                        <h3 class="card-title">导出历史</h3>
+                        <p class="card-desc">最近的导出记录</p>
+                        <table class="test-table">
+                            <thead><tr><th>时间</th><th>文件名</th><th>格式</th><th>用例数</th><th>操作人</th><th>操作</th></tr></thead>
+                            <tbody id="exportHistory"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <!-- Bottom Navigation Bar -->
+            <div class="step-bottom-bar" id="stepBottomBar">
+                <button class="btn btn-outline" id="prevStepBtn" onclick="goPrevStep()" style="min-width:100px;">← 上一步</button>
+                <div class="step-bottom-info" id="stepBottomInfo">步骤 1 / 3：转换预览</div>
+                <button class="btn btn-primary" id="nextStepBtn" onclick="goNextStep()" style="min-width:100px;">下一步 →</button>
+            </div>
+        </main>
+    </div>
+    <script src="data.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - 平台实例AI推荐</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="module.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header"><h1>DEMO演示平台</h1></div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-label">功能导航</div>
+                <a href="index.html" class="nav-item"><span class="nav-icon">🧪</span><span>AI 测试用例生成</span></a>
+                <a href="doc-assistant.html" class="nav-item"><span class="nav-icon">📄</span><span>AI 文档助手</span></a>
+                <a href="module-select.html" class="nav-item active"><span class="nav-icon">⚙️</span><span>产品模块智能选配</span></a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-label">系统配置</div>
+                <a href="rules-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>转换规则</span></a>
+                <a href="audit.html" class="nav-item sub"><span class="nav-icon">•</span><span>日志审计</span></a>
+                <a href="doc-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>文档助手配置</span></a>
+                <a href="module-rules.html" class="nav-item sub"><span class="nav-icon">•</span><span>模块配置规则库</span></a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header" style="border-bottom:none; padding-bottom:8px;">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <a href="module-select.html" class="breadcrumb-link">产品模块智能选配</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current">产品平台推荐</span>
+                </div>
+                <p class="subtitle">选择产品大类后，调用外部系统一次性获取整机需求；确认平台级参数后推荐一级平台。</p>
+            </div>
+            <div class="header-right" id="pageStatusBar" style="display:none;">
+                <span class="step-tag step-tag-green">需求已获取</span>
+                <span class="step-tag step-tag-blue">平台推荐</span>
+                <span class="step-tag step-tag-orange">子平台待确认</span>
+            </div>
+        </header>
+
+        <div class="platform-layout">
+            <!-- Main area -->
+            <div class="platform-main">
+                <!-- Section 1: Platform & requirement selection -->
+                <div style="border:1.5px solid #e0e8ff; border-radius:10px; padding:20px; margin-bottom:20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:14px;">
+                        <div>
+                            <div class="mod-section-title">平台与需求选择</div>
+                            <div class="mod-section-desc">需求由接口一次性获取，平台级参数可在推荐前调整；后续下级节点只展示与节点关联的参数。</div>
+                        </div>
+                        <button class="btn btn-primary" style="padding:5px 12px; font-size:12px; white-space:nowrap;" onclick="fetchRequirements()">获取需求</button>
+                    </div>
+                    <!-- Product category -->
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                        <div>
+                            <div style="font-size:12px; color:#888; margin-bottom:8px;">产品大类</div>
+                            <div style="display:flex; gap:8px;" id="categoryBtns"></div>
+                        </div>
+                        <!-- <div>
+                            <div style="font-size:12px; color:#888; margin-bottom:6px;">需求来源</div>
+                            <div style="font-size:13px; color:#333;" id="reqSourceText"></div>
+                            <div style="font-size:12px; color:#888; margin-top:4px;">包含平台、上车平台、下车平台及下级BOM节点需求</div>
+                        </div> -->
+                    </div>
+                </div>
+
+                <!-- Section 2: Platform params -->
+                <div style="margin-bottom:20px; display:none;" id="sectionParams">
+                    <div class="mod-section-title">平台需求参数</div>
+                    <div class="mod-section-desc">以下为与产品大类关联的平台级需求，字段支持修改，修改后重新触发平台推荐。</div>
+                    <div class="param-grid" id="paramGrid"></div>
+                </div>
+
+                <!-- Section 3: Platform recommendations -->
+                <div id="sectionPlatforms" style="display:none;">
+                    <div class="mod-section-title">平台推荐</div>
+                    <div class="mod-section-desc">AI根据当前平台级需求生成候选平台，用户选择后进入上车/下车子平台推荐。</div>
+                    <div class="platform-cards" id="platformCards"></div>
+                    <div class="flow-note" id="platformNote">确认一级平台后，系统继续分别推荐上车平台与下车平台；两个子平台会形成两个独立BOM。</div>
+                </div>
+
+                <!-- Confirm button -->
+                <div style="margin-top:20px; display:none; justify-content:flex-end;" id="sectionConfirm">
+                    <button class="btn btn-primary" style="padding:12px 32px; font-size:14px;" onclick="window.location.href='module-subsystem.html'">确认平台并进入子平台推荐</button>
+                </div>
+            </div>
+
+            <!-- Right sidebar -->
+            <div class="platform-sidebar" id="rightSidebar" style="display:none;">
+                <div class="info-card">
+                    <div class="info-card-title">需求包概览</div>
+                    <div class="info-card-desc">接口获取的是整机需求总包，平台页只展开平台关联参数。</div>
+                    <div id="reqSummaryPanel"></div>
+                </div>
+                <!-- <div class="info-card">
+                    <div class="info-card-title">推荐依据</div>
+                    <div class="weight-bar" id="weightBar"></div>
+                </div> -->
+
+            </div>
+        </div>
+    </main>
+</div>
+<script src="module-data.js"></script>
+<script src="module-app.js"></script>
+<script>
+    initPlatformPage();
+</script>
+</body>
+</html>

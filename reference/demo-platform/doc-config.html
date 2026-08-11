@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - 文档助手配置</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="page-doc.css">
+</head>
+<body>
+    <div class="app">
+        <aside class="sidebar">
+            <div class="sidebar-header"><h1>DEMO演示平台</h1></div>
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-label">功能导航</div>
+                    <a href="index.html" class="nav-item"><span class="nav-icon">🧪</span><span>AI 测试用例生成</span></a>
+                    <a href="doc-assistant.html" class="nav-item"><span class="nav-icon">📄</span><span>AI 文档助手</span></a>
+                    <a href="module-select.html" class="nav-item"><span class="nav-icon">⚙️</span><span>产品模块智能选配</span></a>
+                </div>
+                <div class="nav-section">
+                    <div class="nav-label">系统配置</div>
+                    <a href="rules-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>转换规则</span></a>
+                    <a href="audit.html" class="nav-item sub"><span class="nav-icon">•</span><span>日志审计</span></a>
+                    <a href="doc-config.html" class="nav-item sub active"><span class="nav-icon">•</span><span>文档助手配置</span></a>
+                    <a href="module-rules.html" class="nav-item sub"><span class="nav-icon">•</span><span>模块配置规则库</span></a>
+                </div>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <header class="page-header">
+                <div class="header-left">
+                    <h2>系统配置 / 文档助手配置</h2>
+                    <p class="subtitle">维护徐工重型产品项目文档模板、资料匹配规则和导出规范</p>
+                </div>
+                <div class="header-right">
+                    <span class="badge badge-blue">模板 24</span>
+                    <span class="badge badge-orange">规则 36</span>
+                </div>
+            </header>
+
+            <div class="config-layout">
+                <!-- Left: Template List -->
+                <div class="config-left">
+                    <div class="card">
+                        <h3>产品文档模板库</h3>
+                        <p class="card-desc">业务侧新建文档时只从这里选择模板。不再上传已有文档。</p>
+                        <input type="text" class="doc-search" placeholder="🔍 搜索模板名称、适用阶段、产品线" style="margin-bottom:12px;">
+                        <div class="doc-category-tabs" style="margin-bottom:16px;">
+                            <button class="cat-tab active">全部</button>
+                            <button class="cat-tab">设计类</button>
+                            <button class="cat-tab">分析类</button>
+                            <button class="cat-tab">验证类</button>
+                        </div>
+                        <div class="config-template-list">
+                            <!-- Dynamic rendering by doc-app.js -->
+                        </div>
+                        <div style="margin-top:16px; display:flex; gap:8px;">
+                            <button class="btn btn-primary" id="addTemplateBtn">新增模板</button>
+                            <button class="btn btn-outline" id="importTemplateBtn">导入模板</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Template Detail / Rules -->
+                <div class="config-right">
+                    <div class="card">
+                        <!-- Dynamic rendering by doc-app.js -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Template Modal -->
+    <div class="modal-overlay" id="addTemplateModal" style="display:none;">
+        <div class="modal" style="max-width:560px;">
+            <div class="modal-header">
+                <h3 id="tplModalTitle">新增模板</h3>
+                <button class="modal-close" onclick="closeAddTemplateModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>模板名称</label>
+                    <input type="text" id="tplName" class="form-input" placeholder="例：总体设计方案">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>适用阶段</label>
+                        <input type="text" id="tplPhase" class="form-input" placeholder="方案设计 / 详细设计">
+                    </div>
+                    <div class="form-group">
+                        <label>章节数</label>
+                        <input type="number" id="tplChapters" class="form-input" placeholder="9">
+                    </div>
+                    <div class="form-group">
+                        <label>类别</label>
+                        <select id="tplCategory" class="form-input">
+                            <option value="设计类">设计类</option>
+                            <option value="分析类">分析类</option>
+                            <option value="验证类">验证类</option>
+                            <option value="评审类">评审类</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>默认章节结构</label>
+                    <textarea id="tplStructure" class="form-textarea" rows="2" placeholder="项目背景、市场需求、方案..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>AI 支撑资料</label>
+                    <textarea id="tplAiSupport" class="form-textarea" rows="2" placeholder="关联项目信息、前序文件..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>段落生成规则</label>
+                    <textarea id="tplGenRule" class="form-textarea" rows="2" placeholder="每段引用..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>导出格式</label>
+                    <input type="text" id="tplExportFormat" class="form-input" placeholder="Word、PDF">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeAddTemplateModal()">取消</button>
+                <button class="btn btn-primary" onclick="submitAddTemplate()">确认保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Template Modal -->
+    <div class="modal-overlay" id="importTemplateModal" style="display:none;">
+        <div class="modal" style="max-width:520px;">
+            <div class="modal-header">
+                <h3>导入模板</h3>
+                <button class="modal-close" onclick="closeImportTplModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="import-section">
+                    <div class="import-section-title">① 下载导入模板</div>
+                    <p class="import-section-desc">请先下载标准模板文件，按格式填写后上传。</p>
+                    <div class="import-templates">
+                        <div class="import-tpl-item" onclick="downloadTpl('xlsx')">
+                            <span class="import-tpl-icon">📄</span>
+                            <div class="import-tpl-info">
+                                <div class="import-tpl-name">模板配置表.xlsx</div>
+                                <div class="import-tpl-desc">Excel 格式，含字段说明和示例</div>
+                            </div>
+                            <span class="import-tpl-action">下载</span>
+                        </div>
+                        <div class="import-tpl-item" onclick="downloadTpl('json')">
+                            <span class="import-tpl-icon">📁</span>
+                            <div class="import-tpl-info">
+                                <div class="import-tpl-name">模板配置样例.json</div>
+                                <div class="import-tpl-desc">JSON 格式，可直接编辑导入</div>
+                            </div>
+                            <span class="import-tpl-action">下载</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="import-section" style="margin-top:20px;">
+                    <div class="import-section-title">② 上传模板文件</div>
+                    <p class="import-section-desc">支持 .xlsx 或 .json 格式，单次可导入多个模板。</p>
+                    <div class="import-upload-area" id="importTplUploadArea">
+                        <div class="import-upload-icon">⬆️</div>
+                        <div class="import-upload-text">点击或拖拽文件到此处</div>
+                        <div class="import-upload-hint">支持 .xlsx / .json，单文件不超过 5MB</div>
+                        <input type="file" id="importTplFileInput" style="display:none" accept=".xlsx,.json" onchange="handleImportTplFile(this)">
+                    </div>
+                    <div class="import-file-selected" id="importTplFileInfo" style="display:none;">
+                        <span class="import-file-name" id="importTplFileName"></span>
+                        <button class="import-file-remove" onclick="removeImportTplFile()">&times;</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeImportTplModal()">取消</button>
+                <button class="btn btn-primary" id="importTplSubmitBtn" onclick="submitImportTpl()" disabled>开始导入</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="doc-data.js"></script>
+    <script src="doc-app.js"></script>
+</body>
+</html>

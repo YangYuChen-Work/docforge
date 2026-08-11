@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMO演示平台 - BOM节点维护工作台</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="module.css">
+</head>
+<body>
+<div class="app">
+    <aside class="sidebar">
+        <div class="sidebar-header"><h1>DEMO演示平台</h1></div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-label">功能导航</div>
+                <a href="index.html" class="nav-item"><span class="nav-icon">🧪</span><span>AI 测试用例生成</span></a>
+                <a href="doc-assistant.html" class="nav-item"><span class="nav-icon">📄</span><span>AI 文档助手</span></a>
+                <a href="module-select.html" class="nav-item active"><span class="nav-icon">⚙️</span><span>产品模块智能选配</span></a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-label">系统配置</div>
+                <a href="rules-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>转换规则</span></a>
+                <a href="audit.html" class="nav-item sub"><span class="nav-icon">•</span><span>日志审计</span></a>
+                <a href="doc-config.html" class="nav-item sub"><span class="nav-icon">•</span><span>文档助手配置</span></a>
+                <a href="module-rules.html" class="nav-item sub"><span class="nav-icon">•</span><span>模块配置规则库</span></a>
+            </div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="page-header" style="border-bottom:none; padding-bottom:6px;">
+            <div class="header-left">
+                <div class="breadcrumb">
+                    <a href="module-select.html" class="breadcrumb-link">产品模块智能选配</a>
+                    <span class="breadcrumb-sep">/</span>
+                    <span class="breadcrumb-current" id="workbenchTitle">BOM节点维护工作台</span>
+                </div>
+                <p class="subtitle" id="workbenchSubtitle">平台方案确认后，上车平台BOM已载入。当前节点需求与基线BOM冲突，系统直接推荐可解决冲突的候选方案。</p>
+            </div>
+            <div class="header-right" id="workbenchStats"></div>
+        </header>
+
+        <div class="workbench-layout">
+            <!-- Left: BOM tree -->
+            <div class="workbench-col">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                    <div class="mod-section-title" style="margin-bottom:0;">上车平台BOM树</div>
+
+                </div>
+                <div class="mod-section-desc" style="margin-bottom:10px;">同一棵平台基线BOM树；下拉切换演示状态可聚焦不同节点场景。</div>
+                <!-- Legend -->
+                <div class="legend-row" style="margin-bottom:12px;">
+                    <div class="legend-item"><span class="dot dot-green"></span>100%匹配</div>
+                    <div class="legend-item"><span class="dot dot-blue"></span>多方案</div>
+                    <div class="legend-item"><span class="dot dot-gray"></span>未匹配</div>
+                    <div class="legend-item"><span class="dot dot-red"></span>冲突</div>
+                </div>
+                <div class="bom-tree" id="bomTreePanel"></div>
+                <div class="selection-hint" id="treeHint"></div>
+            </div>
+
+            <!-- Center: node detail -->
+            <div class="workbench-col" id="centerPanel">
+                <div style="text-align:center; padding:60px 20px; color:#999;">
+                    <div style="font-size:36px; margin-bottom:12px;">👈</div>
+                    <p>请点击左侧树节点查看详情</p>
+                </div>
+            </div>
+
+            <!-- Right: impact preview -->
+            <div class="workbench-col" id="rightPanel">
+                <div style="text-align:center; padding:60px 20px; color:#ccc;">
+                    <p style="font-size:12px;">选中节点后显示方案影响预览</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom action bar -->
+        <div class="page-bottom-bar" id="bomBottomBar" style="display:none;">
+            <div style="font-size:13px; color:#666;" id="bomBottomLeft"></div>
+            <div style="display:flex; gap:10px;" id="bomBottomRight"></div>
+        </div>
+    </main>
+</div>
+<script src="module-data.js"></script>
+<script src="module-app.js"></script>
+<script>
+    initBomPage();
+</script>
+</body>
+</html>
