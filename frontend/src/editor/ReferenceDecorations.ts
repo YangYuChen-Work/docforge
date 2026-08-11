@@ -156,7 +156,8 @@ function getStructuredSourceValues(sourceExcerpt: string | null | undefined) {
   if (!sourceExcerpt) return []
 
   try {
-    const parsed = JSON.parse(sourceExcerpt)
+    const excerpt = sourceExcerpt
+    const parsed = JSON.parse(excerpt)
     const values: string[] = []
     collectStructuredSourceScalars(parsed, values)
     return Array.from(
@@ -172,11 +173,14 @@ function getStructuredSourceValues(sourceExcerpt: string | null | undefined) {
   }
 }
 
-function findStructuredTableMatch(doc: any, citation: CitationRef): TableMetadata | null {
+function findStructuredTableMatch(
+  doc: any,
+  citation: CitationRef,
+  tables: TableMetadata[] = collectTableMetadata(doc),
+): TableMetadata | null {
   const sourceValues = getStructuredSourceValues(citation.source_excerpt)
   if (sourceValues.length === 0) return null
 
-  const tables = collectTableMetadata(doc)
   if (tables.length === 0) return null
 
   let bestMatch: { table: TableMetadata; score: number } | null = null
@@ -303,6 +307,24 @@ function buildDecorations(state: any, options: ReferenceDecorationOptions) {
   const decorations: any[] = []
   const annotations = options.getAnnotations() || []
   const citations = options.getCitations() || []
+  const activeCitationKey = options.getActiveCitationKey()
+  const tables = collectTableMetadata(state.doc)
+  const tableMarkers = new Map<
+    string,
+    {
+      table: TableMetadata
+      fileName: string
+      citationKey: string
+      active: boolean
+    }
+  >()
+  const tableHighlights = new Map<
+    string,
+    {
+      table: TableMetadata
+      active: boolean
+    }
+  >()
   let annotationNumber = 0
 
   for (const annotation of annotations) {
@@ -326,9 +348,37 @@ function buildDecorations(state: any, options: ReferenceDecorationOptions) {
   }
 
   for (const citation of citations) {
+    const tableMatch = findStructuredTableMatch(state.doc, citation, tables)
+    if (tableMatch) {
+      const active = citation.key === activeCitationKey
+      const fileName = citation.fileName || `来源资料 ${citation.source_document_id || citation.key}`
+      const tableId = `${tableMatch.range.from}:${tableMatch.range.to}`
+      const tableSourceId = citation.source_document_id || citation.fileName || citation.key
+      const markerId = `${tableId}:${tableSourceId}`
+      const existingMarker = tableMarkers.get(markerId)
+      if (existingMarker) {
+        existingMarker.active ||= active
+      } else {
+        tableMarkers.set(markerId, {
+          table: tableMatch,
+          fileName,
+          citationKey: citation.key,
+          active,
+        })
+      }
+
+      const existingHighlight = tableHighlights.get(tableId)
+      if (existingHighlight) {
+        existingHighlight.active ||= active
+      } else {
+        tableHighlights.set(tableId, { table: tableMatch, active })
+      }
+      continue
+    }
+
     const range = findTextRange(state.doc, citation.source_excerpt || '')
     if (!range) continue
-    const active = citation.key === options.getActiveCitationKey()
+    const active = citation.key === activeCitationKey
     const fileName = citation.fileName || `来源资料 ${citation.source_document_id || citation.key}`
     const label = `来源：${fileName}`
     decorations.push(
@@ -342,6 +392,25 @@ function buildDecorations(state: any, options: ReferenceDecorationOptions) {
         active ? 'source-marker active' : 'source-marker',
         label,
         () => options.onCitationClick(citation.key),
+      ),
+    )
+  }
+
+  for (const { table, active } of tableHighlights.values()) {
+    decorations.push(
+      Decoration.node(table.range.from, table.range.to, {
+        class: active ? 'source-table-highlight active' : 'source-table-highlight',
+      }),
+    )
+  }
+
+  for (const { table, fileName, citationKey, active } of tableMarkers.values()) {
+    decorations.push(
+      markerDecoration(
+        table.markerPosition,
+        active ? 'source-marker source-table-marker active' : 'source-marker source-table-marker',
+        `来源：${fileName}`,
+        () => options.onCitationClick(citationKey),
       ),
     )
   }

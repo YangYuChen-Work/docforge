@@ -130,6 +130,7 @@ import { TextAlign } from '@tiptap/extension-text-align'
 import { FontSize, TextStyle } from '@tiptap/extension-text-style'
 import {
   createReferenceDecorations,
+  findCitationRange,
   findReferenceRange,
   REFERENCE_DECORATIONS_REFRESH,
   type AnnotationRef,
@@ -397,7 +398,16 @@ function refreshReferenceDecorations() {
 function scrollToRange(range: { from: number; to: number }) {
   const instance = editor.value
   if (!instance) return
-  instance.chain().focus().setTextSelection(range).scrollIntoView().run()
+  const selectedNode = instance.state.doc.nodeAt(range.from)
+  const isNodeRange =
+    !!selectedNode && !selectedNode.isText && selectedNode.nodeSize === range.to - range.from
+
+  if (isNodeRange) {
+    instance.chain().focus().setNodeSelection(range.from).scrollIntoView().run()
+  } else {
+    instance.chain().focus().setTextSelection(range).scrollIntoView().run()
+  }
+
   nextTick(() => {
     const node = instance.view.nodeDOM(range.from)
     const element = node instanceof HTMLElement ? node : node?.parentElement
@@ -427,7 +437,7 @@ function focusAnnotation(annotationId: string) {
 function focusCitation(citationKey: string) {
   const citation = (props.citations || []).find((item) => item.key === citationKey)
   if (!citation) return
-  const range = findReferenceRange(editor.value, citation.source_excerpt || '')
+  const range = findCitationRange(editor.value, citation)
   if (range) {
     scrollToRange(range)
   } else {
@@ -761,5 +771,28 @@ onBeforeUnmount(() => {
 .word-body :deep(.source-marker.active) {
   background: #0958d9;
   box-shadow: 0 0 0 2px #dbeafe;
+}
+
+.word-body :deep(.source-table-marker) {
+  display: block;
+  min-width: 0;
+  min-height: 28px;
+  height: auto;
+  margin: 8px 0 12px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.word-body :deep(.source-table-highlight) {
+  outline: 2px solid #bfdbfe;
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
+.word-body :deep(.source-table-highlight.active) {
+  outline-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.16);
 }
 </style>
