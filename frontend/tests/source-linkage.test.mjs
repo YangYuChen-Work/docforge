@@ -7,6 +7,7 @@ import test from 'node:test'
 const testDir = dirname(fileURLToPath(import.meta.url))
 const decorations = readFileSync(join(testDir, '../src/editor/ReferenceDecorations.ts'), 'utf8')
 const editor = readFileSync(join(testDir, '../src/pages/DocEditor.vue'), 'utf8')
+const panel = readFileSync(join(testDir, '../src/components/AiPanel.vue'), 'utf8')
 
 test('renders the concrete source filename on inline citation markers', () => {
   assert.match(decorations, /fileName\?: string \| null/)
@@ -15,4 +16,12 @@ test('renders the concrete source filename on inline citation markers', () => {
   assert.match(decorations, /const fileName = citation\.fileName/)
   assert.match(decorations, /const label = `来源：\$\{fileName\}`/)
   assert.match(editor, /sourceDetails\.value\[citation\.source_document_id\][\s\S]*original_name/)
+})
+
+test('focuses and flashes the matching source card from a citation selection', () => {
+  assert.match(panel, /data-citation-key="citation\.key"/)
+  assert.match(panel, /function focusCitationCard\(citationKey: string\)/)
+  assert.match(panel, /scrollIntoView\(/)
+  assert.match(panel, /classList\.add\('source-card-flash'\)/)
+  assert.match(editor, /focusCitationCard\(citationKey\)/)
 })

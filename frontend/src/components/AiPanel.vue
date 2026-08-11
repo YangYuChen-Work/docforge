@@ -32,51 +32,53 @@
     </div>
 
     <template v-if="activeTab === 'ai'">
-      <div class="ai-context-summary">
-        <span class="ai-context-icon">✦</span>
-        <div>
-          <strong>{{ selectionText ? '已锁定当前选区' : '当前章节上下文' }}</strong>
-          <span>{{ selectionText ? `${selectionText.length} 字，将优先处理选中文字` : '快捷操作将作用于当前章节正文' }}</span>
-        </div>
-      </div>
-
-      <div v-if="selectionText" class="selection-banner">
-        <div class="selection-banner-label">当前选区</div>
-        <div class="selection-banner-text">{{ truncatedSelection }}</div>
-      </div>
-
-      <div v-if="annotations.length" class="ai-suggestions-section">
-        <div class="ai-section-title">
-          智能建议
-          <span class="ai-count-badge">{{ annotations.length }}</span>
-        </div>
-        <div v-for="(a, index) in annotations" :key="a.id" class="ai-suggestion-card">
-          <div class="ai-suggestion-meta">
-            <span>批注{{ index + 1 }}</span>
-            <span>{{ a.created_by || '系统' }}</span>
+      <div class="ai-panel-prelude">
+        <div class="ai-context-summary">
+          <span class="ai-context-icon">✦</span>
+          <div>
+            <strong>{{ selectionText ? '已锁定当前选区' : '当前章节上下文' }}</strong>
+            <span>{{ selectionText ? `${selectionText.length} 字，将优先处理选中文字` : '快捷操作将作用于当前章节正文' }}</span>
           </div>
-          <p>{{ a.content }}</p>
-          <div v-if="a.status === 'pending'" class="ai-suggestion-actions">
-            <button class="ai-bubble-btn apply-btn" @click="$emit('updateAnnotation', a.id, 'applied')">标记已处理</button>
-            <button class="ai-bubble-btn comment-btn" @click="$emit('updateAnnotation', a.id, 'dismissed')">忽略</button>
-          </div>
-          <div v-else class="anno-action">{{ a.status === 'applied' ? '已处理' : '已忽略' }}</div>
         </div>
-      </div>
 
-      <div class="ai-section-title ai-actions-title">快捷操作</div>
-      <div class="ai-quick-actions">
-        <button
-          v-for="action in quickActions"
-          :key="action.key"
-          class="ai-quick-action"
-          :disabled="busy"
-          :title="action.hint"
-          @click="doAction(action.key)"
-        >
-          <span class="ai-quick-action-icon">{{ action.icon }}</span>
-          <span>{{ action.label }}</span>
-        </button>
+        <div v-if="selectionText" class="selection-banner">
+          <div class="selection-banner-label">当前选区</div>
+          <div class="selection-banner-text">{{ truncatedSelection }}</div>
+        </div>
+
+        <div v-if="annotations.length" class="ai-suggestions-section">
+          <div class="ai-section-title">
+            智能建议
+            <span class="ai-count-badge">{{ annotations.length }}</span>
+          </div>
+          <div v-for="(a, index) in annotations" :key="a.id" class="ai-suggestion-card">
+            <div class="ai-suggestion-meta">
+              <span>批注{{ index + 1 }}</span>
+              <span>{{ a.created_by || '系统' }}</span>
+            </div>
+            <p>{{ a.content }}</p>
+            <div v-if="a.status === 'pending'" class="ai-suggestion-actions">
+              <button class="ai-bubble-btn apply-btn" @click="$emit('updateAnnotation', a.id, 'applied')">标记已处理</button>
+              <button class="ai-bubble-btn comment-btn" @click="$emit('updateAnnotation', a.id, 'dismissed')">忽略</button>
+            </div>
+            <div v-else class="anno-action">{{ a.status === 'applied' ? '已处理' : '已忽略' }}</div>
+          </div>
+        </div>
+
+        <div class="ai-section-title ai-actions-title">快捷操作</div>
+        <div class="ai-quick-actions">
+          <button
+            v-for="action in quickActions"
+            :key="action.key"
+            class="ai-quick-action"
+            :disabled="busy"
+            :title="action.hint"
+            @click="doAction(action.key)"
+          >
+            <span class="ai-quick-action-icon">{{ action.icon }}</span>
+            <span>{{ action.label }}</span>
+          </button>
+        </div>
       </div>
 
       <div ref="chatScrollRef" class="ai-chat-scroll" aria-live="polite">
@@ -215,6 +217,7 @@
           v-for="citation in citationCards"
           :key="citation.key"
           class="source-card"
+          :data-citation-key="citation.key"
           :class="{ active: activeCitationKey === citation.key, context: citation.citation_type === 'context' }"
           @click="$emit('citationFocus', citation.key)"
         >
@@ -310,6 +313,7 @@ const visibleCitationCount = ref(0)
 let msgId = 0
 let loadingTimer: ReturnType<typeof setInterval> | null = null
 let sourceRevealTimer: ReturnType<typeof setInterval> | null = null
+let citationFlashTimer: ReturnType<typeof setTimeout> | null = null
 
 const tabs: Array<{ key: PanelTab; label: string; icon: string }> = [
   { key: 'ai', label: 'AI 助手', icon: '✦' },
@@ -416,6 +420,26 @@ const quickActions = [
 
 function openTab(tab: PanelTab) {
   activeTab.value = tab
+}
+
+function focusCitationCard(citationKey: string) {
+  activeTab.value = 'sources'
+  visibleCitationCount.value = props.citations.length
+  nextTick(() => {
+    const card = Array.from(document.querySelectorAll<HTMLElement>('.source-card'))
+      .find((item) => item.dataset.citationKey === citationKey)
+    if (!card) return
+
+    card.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    card.classList.remove('source-card-flash')
+    void card.offsetWidth
+    card.classList.add('source-card-flash')
+    if (citationFlashTimer) clearTimeout(citationFlashTimer)
+    citationFlashTimer = setTimeout(() => {
+      card.classList.remove('source-card-flash')
+      citationFlashTimer = null
+    }, 1000)
+  })
 }
 
 watch(
@@ -530,6 +554,7 @@ defineExpose({
     scrollToBottom()
   },
   openTab,
+  focusCitationCard,
   annotationCreated() {
     annotationDraft.value = ''
     annotationError.value = ''
@@ -545,6 +570,7 @@ defineExpose({
 onBeforeUnmount(() => {
   stopLoadingTimer()
   stopSourceRevealTimer()
+  if (citationFlashTimer) clearTimeout(citationFlashTimer)
 })
 </script>
 

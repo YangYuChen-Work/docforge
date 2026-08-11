@@ -831,6 +831,7 @@ function onCitationSelect(citationKey: string) {
   activeCitationKey.value = citationKey
   activeAnnotationId.value = ''
   aiPanelRef.value?.openTab('sources')
+  aiPanelRef.value?.focusCitationCard(citationKey)
 }
 
 function focusAnnotation(annotationId: string) {
