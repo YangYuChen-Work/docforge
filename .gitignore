@@ -32,6 +32,12 @@ htmlcov/
 /.agents
 /.playwright-cli
 /skills-lock.json
+/output/playwright
+/reference/demo-platform
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+WINDOWS_SETUP.md
 
 # Local editor and OS files
 .idea/
