@@ -1,26 +1,29 @@
 /* Docforge visual system: cool steel surfaces for an industrial document workbench. */
 :root {
-  --ui-canvas: #e8eef1;
-  --ui-surface: #f8fafb;
-  --ui-surface-muted: #dfe7ea;
-  --ui-surface-accent: #d9e8ee;
-  --ui-ink: #152229;
-  --ui-ink-soft: #5f7079;
-  --ui-ink-faint: #87969d;
-  --ui-line: #c7d2d7;
-  --ui-line-strong: #aebec5;
-  --ui-primary: #1e647b;
-  --ui-primary-strong: #15495b;
-  --ui-primary-wash: #dceaf0;
+  --ui-canvas: #eef3f6;
+  --ui-surface: #ffffff;
+  --ui-surface-muted: #f5f8fa;
+  --ui-surface-accent: #e5f3f8;
+  --ui-ink: #132a35;
+  --ui-ink-soft: #58707c;
+  --ui-ink-faint: #81939c;
+  --ui-line: #cbd8de;
+  --ui-line-strong: #afc1ca;
+  --ui-nav: #086783;
+  --ui-nav-strong: #07546b;
+  --ui-primary: #2e8eae;
+  --ui-primary-strong: #176d8a;
+  --ui-primary-wash: #e5f3f8;
+  --ui-paper: #fffdf8;
+  --ui-paper-ink: #17252b;
   --ui-success: #3f6f61;
   --ui-success-wash: #e5f0ec;
   --ui-warning: #a66d2a;
   --ui-warning-wash: #f3e9d8;
   --ui-danger: #a34f4f;
   --ui-danger-wash: #f3e2e2;
-  --ui-nav: #dce5e8;
-  --ui-nav-muted: #687b84;
-  --ui-nav-line: #c3d0d5;
+  --ui-nav-muted: #b9d7e1;
+  --ui-nav-line: rgba(255, 255, 255, 0.2);
   --ui-shadow-soft: 0 1px 2px rgba(20, 39, 48, 0.06);
   --ui-shadow-float: 0 10px 24px rgba(20, 39, 48, 0.14);
   --ui-radius-xs: 2px;
@@ -38,27 +41,30 @@
 
 /* Dark mode keeps the same cool steel grammar, with a focused paper plane for the document. */
 [data-theme="dark"] {
-  --ui-canvas: #10171b;
-  --ui-surface: #172126;
-  --ui-surface-muted: #202f36;
-  --ui-surface-accent: #233b45;
-  --ui-ink: #e7eef1;
-  --ui-ink-soft: #a8b8be;
-  --ui-ink-faint: #71858e;
-  --ui-line: #30434b;
-  --ui-line-strong: #46606b;
-  --ui-primary: #69b4c9;
-  --ui-primary-strong: #9ad1df;
-  --ui-primary-wash: #1f3c47;
+  --ui-canvas: #0d171d;
+  --ui-surface: #16242b;
+  --ui-surface-muted: #1d3039;
+  --ui-surface-accent: #1c3c48;
+  --ui-ink: #e7f0f3;
+  --ui-ink-soft: #a8bcc5;
+  --ui-ink-faint: #718893;
+  --ui-line: #2b424d;
+  --ui-line-strong: #3b5864;
+  --ui-nav: #083f53;
+  --ui-nav-strong: #062f3e;
+  --ui-primary: #61b6d2;
+  --ui-primary-strong: #8bcce0;
+  --ui-primary-wash: #1c3c48;
+  --ui-paper: #e9e6de;
+  --ui-paper-ink: #18262c;
   --ui-success: #70ad96;
   --ui-success-wash: #1f3931;
   --ui-warning: #d4a267;
   --ui-warning-wash: #3d3020;
   --ui-danger: #df8888;
   --ui-danger-wash: #402629;
-  --ui-nav: #141f24;
-  --ui-nav-muted: #8297a0;
-  --ui-nav-line: #2b3c44;
+  --ui-nav-muted: #a8ceda;
+  --ui-nav-line: rgba(255, 255, 255, 0.18);
   --ui-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.18);
   --ui-shadow-float: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
@@ -91,7 +97,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid rgba(30, 100, 123, 0.46);
+  outline: 2px solid var(--ui-primary);
   outline-offset: 2px;
 }
 
@@ -166,7 +172,7 @@ textarea {
   z-index: var(--ui-z-nav);
   border-right: 1px solid var(--ui-nav-line);
   background: var(--ui-nav);
-  color: var(--ui-ink);
+  color: var(--ui-surface);
   transition: width 220ms var(--ui-ease), transform 220ms var(--ui-ease);
 }
 
@@ -181,7 +187,7 @@ textarea {
 }
 
 .sidebar-header h1 {
-  color: var(--ui-ink);
+  color: var(--ui-surface);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -205,7 +211,7 @@ textarea {
 
 .brand-name {
   overflow: hidden;
-  color: var(--ui-ink);
+  color: var(--ui-surface);
   font-family: 'STKaiti', 'KaiTi', 'BiauKai', serif;
   font-size: 20px;
   font-weight: 600;
@@ -235,10 +241,10 @@ textarea {
 
 .sidebar-collapse-toggle,
 .sidebar-restore-toggle {
-  border: 1px solid var(--ui-line-strong);
+  border: 1px solid var(--ui-nav-line);
   border-radius: var(--ui-radius-sm);
   background: transparent;
-  color: var(--ui-ink-soft);
+  color: var(--ui-surface);
   transition: transform 180ms var(--ui-ease), background 180ms var(--ui-ease), color 180ms var(--ui-ease);
 }
 
@@ -286,22 +292,28 @@ textarea {
   margin: 3px 0;
   padding: 8px 10px;
   border-radius: var(--ui-radius-xs);
-  color: var(--ui-ink-soft);
+  color: var(--ui-surface);
   text-decoration: none;
   text-align: left;
   transition: transform 180ms var(--ui-ease), background 180ms var(--ui-ease), color 180ms var(--ui-ease);
 }
 
 .nav-item:hover {
-  background: rgba(248, 250, 251, 0.56);
-  color: var(--ui-ink);
-  transform: translateX(2px);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ui-surface);
 }
 
 .nav-item.active {
-  background: #cddde2;
-  color: var(--ui-ink);
+  background: var(--ui-surface);
+  color: var(--ui-nav-strong);
   font-weight: 700;
+}
+
+.sidebar .nav-item:focus-visible,
+.sidebar .theme-toggle:focus-visible,
+.sidebar .sidebar-collapse-toggle:focus-visible,
+.sidebar .sidebar-restore-toggle:focus-visible {
+  outline-color: var(--ui-surface);
 }
 
 .nav-item.active::before {
@@ -317,7 +329,7 @@ textarea {
 
 .nav-module-item {
   margin-bottom: 8px;
-  color: var(--ui-ink);
+  color: var(--ui-surface);
   font-weight: 700;
 }
 
@@ -330,7 +342,7 @@ textarea {
 
 .nav-item.sub {
   padding-left: 12px;
-  color: var(--ui-ink-soft);
+  color: var(--ui-nav-muted);
   font-size: 12px;
 }
 
@@ -353,7 +365,7 @@ textarea {
 .nav-item.sub .nav-icon {
   width: 8px;
   flex-basis: 8px;
-  color: var(--ui-ink-faint);
+  color: currentColor;
 }
 
 .sidebar-provider {
@@ -394,13 +406,13 @@ textarea {
   border: 0;
   border-top: 1px solid var(--ui-nav-line);
   background: transparent;
-  color: var(--ui-ink-soft);
+  color: var(--ui-surface);
   text-align: left;
   cursor: pointer;
 }
 
 .theme-toggle:hover {
-  color: var(--ui-primary);
+  color: var(--ui-surface);
 }
 
 .theme-toggle-icon {
@@ -409,10 +421,10 @@ textarea {
   height: 25px;
   flex: 0 0 25px;
   place-items: center;
-  border: 1px solid var(--ui-line-strong);
+  border: 1px solid var(--ui-nav-line);
   border-radius: var(--ui-radius-xs);
-  background: var(--ui-surface);
-  color: var(--ui-primary);
+  background: var(--ui-nav-strong);
+  color: var(--ui-surface);
 }
 
 .theme-toggle-icon svg {
@@ -434,7 +446,7 @@ textarea {
 
 .theme-toggle-copy strong {
   overflow: hidden;
-  color: var(--ui-ink);
+  color: var(--ui-surface);
   font-size: 11px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -443,7 +455,7 @@ textarea {
 
 .theme-toggle-copy small {
   overflow: hidden;
-  color: var(--ui-ink-faint);
+  color: var(--ui-nav-muted);
   font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -454,8 +466,8 @@ textarea {
 }
 
 .theme-toggle[aria-pressed="true"] .theme-toggle-icon {
-  border-color: var(--ui-primary);
-  background: var(--ui-primary-wash);
+  border-color: var(--ui-surface);
+  background: var(--ui-nav-strong);
 }
 
 .sidebar.collapsed .theme-toggle {
@@ -478,7 +490,7 @@ textarea {
 
 .sidebar.collapsed .theme-toggle-short {
   display: block;
-  color: var(--ui-primary);
+  color: var(--ui-surface);
   font-size: 10px;
   font-weight: 700;
 }
@@ -874,8 +886,8 @@ textarea {
 .modal { border: 1px solid var(--ui-line); border-radius: var(--ui-radius-md); background: var(--ui-surface); box-shadow: var(--ui-shadow-float); }
 
 /* Hard-coded legacy accents need a dark counterpart so the transition remains coherent. */
-[data-theme="dark"] .nav-item:hover { background: rgba(45, 70, 79, 0.72); }
-[data-theme="dark"] .nav-item.active { background: #21414d; }
+[data-theme="dark"] .nav-item:hover { background: rgba(255, 255, 255, 0.12); }
+[data-theme="dark"] .nav-item.active { background: var(--ui-surface); }
 [data-theme="dark"] .app .word-page,
 .app[data-theme="dark"] .word-page { border-color: #50616a; background: #f5f8f9; color: #152229; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.26); }
 [data-theme="dark"] .word-body,
