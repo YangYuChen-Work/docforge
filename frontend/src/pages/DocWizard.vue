@@ -1,7 +1,7 @@
 <template>
   <header class="page-header">
     <div class="header-left">
-      <RouterLink to="/" style="color:#1a5ccc;text-decoration:none;font-size:12px;display:inline-block;margin-bottom:6px">← 返回</RouterLink>
+      <RouterLink to="/" class="page-back-link">← 返回</RouterLink>
       <h2>新建文档</h2>
       <p class="subtitle">项目搜索 / 模板选择 / 关联资料确认</p>
     </div>
@@ -41,7 +41,7 @@
             <div class="project-item-meta">{{ p.code }} · {{ p.model }} · {{ p.phase }}</div>
           </div>
         </div>
-        <div v-if="!loadingProjects && projects.length === 0" style="font-size:12px;color:#999;padding:12px 0">
+        <div v-if="!loadingProjects && projects.length === 0" class="workbench-empty-state">
           暂无项目
         </div>
       </div>
@@ -64,7 +64,7 @@
             </div>
           </div>
         </div>
-        <div v-if="!loadingTemplates && templates.length === 0" style="font-size:12px;color:#999;padding:12px 0">
+        <div v-if="!loadingTemplates && templates.length === 0" class="workbench-empty-state">
           暂无可用模板
         </div>
       </div>
@@ -88,7 +88,7 @@
             {{ sourceStatusLabel(s.parse_status) }}
           </span>
         </div>
-        <div v-if="!loadingSources && sources.length === 0" style="font-size:12px;color:#999;padding:12px 0">
+        <div v-if="!loadingSources && sources.length === 0" class="workbench-empty-state">
           该项目暂无已关联资料，请上传
         </div>
         <div class="wizard-upload">
@@ -98,7 +98,7 @@
               type="file"
               accept=".docx,.xlsx"
               multiple
-              style="display:none"
+              class="visually-hidden-input"
               @change="uploadFiles"
               :disabled="uploading"
             />
@@ -109,7 +109,7 @@
 
     <!-- Right: Confirmation Panel -->
     <div class="doc-new-side">
-      <div class="card">
+      <div class="wizard-confirm-panel">
         <h3>生成前确认</h3>
         <p class="side-desc">确认项目、模板和资料匹配后生成初稿。</p>
 
@@ -121,7 +121,7 @@
               <div class="confirm-meta">{{ selectedProject.code }} · {{ selectedProject.phase }}</div>
             </div>
           </template>
-          <div v-else style="font-size:12px;color:#999">请从左侧选择项目</div>
+          <div v-else class="workbench-empty-state">请从左侧选择项目</div>
           <button
             class="btn btn-primary wizard-next-button"
             :disabled="!selectedProject"
@@ -139,7 +139,7 @@
               <div class="confirm-meta">{{ selectedTemplate.chapter_count }} 个章节 · {{ selectedTemplate.phase }}</div>
             </div>
           </template>
-          <div v-else style="font-size:12px;color:#999">请从左侧选择模板</div>
+          <div v-else class="workbench-empty-state">请从左侧选择模板</div>
           <div class="wizard-actions">
             <button class="btn btn-outline" @click="step = 0">上一步</button>
             <button
@@ -159,7 +159,7 @@
             <div class="confirm-meta">{{ selectedProject?.code }} · {{ selectedTemplate?.chapter_count }} 个章节</div>
           </div>
 
-          <h4 class="side-subtitle" style="margin-top:20px">资料匹配</h4>
+          <h4 class="side-subtitle wizard-match-title">资料匹配</h4>
           <div class="match-item">已选资料 {{ selectedSourceIds.length }} 份</div>
 
           <div v-if="selectedSourceIds.length === 0" class="pending-card">

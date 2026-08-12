@@ -18,11 +18,10 @@
         <input
           v-model="search"
           type="text"
-          class="doc-search"
+          class="doc-search config-search"
           placeholder="搜索模板名称、适用阶段"
-          style="margin-bottom: 12px"
         />
-        <div v-if="categories.length > 1" class="doc-category-tabs" style="margin-bottom: 16px">
+        <div v-if="categories.length > 1" class="doc-category-tabs config-category-tabs">
           <button
             v-for="c in categories"
             :key="c"
@@ -34,7 +33,7 @@
           </button>
         </div>
         <div class="config-template-list">
-          <div v-if="!loading && filteredTemplates.length === 0" class="card-desc" style="text-align: center; padding: 20px 0">
+          <div v-if="!loading && filteredTemplates.length === 0" class="workbench-empty-state">
             {{ templates.length === 0 ? '暂无模板数据，请先运行种子数据脚本' : '没有匹配的模板' }}
           </div>
           <div
@@ -84,20 +83,20 @@
               <div class="config-value">暂无章节</div>
             </template>
             <template v-else>
-              <div v-for="c in chapters" :key="c.id" class="config-value" style="margin-bottom: 8px">
+              <div v-for="c in chapters" :key="c.id" class="config-value config-chapter-row">
                 {{ c.order_index }}. {{ c.title }}（{{ c.required ? '必填' : '选填' }}）
                 <span v-if="c.material_types"> · 资料类型：{{ c.material_types.split(',').join('、') }}</span>
               </div>
             </template>
           </div>
 
-          <div style="display: flex; gap: 8px; margin-top: 20px">
+          <div class="config-actions">
             <button class="btn btn-outline" :disabled="toggling" @click="toggleEnabled">
               {{ toggling ? '处理中...' : selectedTemplate.enabled ? '停用模板' : '启用模板' }}
             </button>
           </div>
         </template>
-        <div v-else class="card-desc" style="text-align: center; padding: 40px 0">请选择一个模板</div>
+        <div v-else class="config-detail-empty">请选择一个模板</div>
       </div>
     </div>
   </div>

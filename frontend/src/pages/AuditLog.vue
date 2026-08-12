@@ -44,50 +44,52 @@
 
   <!-- Log Table -->
   <div class="audit-table-wrapper">
-    <table class="audit-table">
-      <thead>
-        <tr>
-          <th style="width: 160px">时间</th>
-          <th style="width: 100px">操作人</th>
-          <th>操作</th>
-          <th style="width: 140px">实体类型</th>
-          <th style="width: 140px">实体ID</th>
-          <th style="width: 80px">结果</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-if="!loading && logs.length === 0">
-          <td colspan="6" style="text-align: center; padding: 40px; color: #999; font-size: 13px">
-            暂无操作记录
-          </td>
-        </tr>
-        <tr v-for="log in logs" :key="log.id" class="log-row">
-          <td class="log-time">{{ formatTime(log.created_at) }}</td>
-          <td>{{ log.actor }}</td>
-          <td><div class="log-action">{{ log.action }}</div></td>
-          <td>{{ log.entity_type }}</td>
-          <td><span class="log-task">{{ log.entity_id }}</span></td>
-          <td>
-            <span
-              class="log-result"
-              :class="log.result === 'success' ? 'green' : 'red'"
-              :style="resultStyle(log.result)"
-              :title="log.error_message || ''"
-            >
-              {{ log.result === 'success' ? '成功' : '失败' }}
-            </span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+    <div class="audit-table-scroll" tabindex="0" role="region" aria-label="日志审计记录">
+      <table class="audit-table">
+        <thead>
+          <tr>
+            <th style="width: 160px">时间</th>
+            <th style="width: 100px">操作人</th>
+            <th>操作</th>
+            <th style="width: 140px">实体类型</th>
+            <th style="width: 140px">实体ID</th>
+            <th style="width: 80px">结果</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="!loading && logs.length === 0">
+            <td colspan="6" style="text-align: center; padding: 40px; color: #999; font-size: 13px">
+              暂无操作记录
+            </td>
+          </tr>
+          <tr v-for="log in logs" :key="log.id" class="log-row">
+            <td class="log-time">{{ formatTime(log.created_at) }}</td>
+            <td>{{ log.actor }}</td>
+            <td><div class="log-action">{{ log.action }}</div></td>
+            <td>{{ log.entity_type }}</td>
+            <td><span class="log-task">{{ log.entity_id }}</span></td>
+            <td>
+              <span
+                class="log-result"
+                :class="log.result === 'success' ? 'green' : 'red'"
+                :style="resultStyle(log.result)"
+                :title="log.error_message || ''"
+              >
+                {{ log.result === 'success' ? '成功' : '失败' }}
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
-  <!-- Pagination -->
-  <div class="audit-pagination">
-    <span class="page-info">第 {{ page }} 页 · 共 {{ totalPages }} 页 · {{ total }} 条</span>
-    <div class="page-buttons">
-      <button class="page-btn" :disabled="page <= 1" @click="prevPage">← 上一页</button>
-      <button class="page-btn" :disabled="page >= totalPages" @click="nextPage">下一页 →</button>
+    <!-- Pagination -->
+    <div class="audit-pagination">
+      <span class="page-info">第 {{ page }} 页 · 共 {{ totalPages }} 页 · {{ total }} 条</span>
+      <div class="page-buttons">
+        <button class="page-btn" :disabled="page <= 1" @click="prevPage">← 上一页</button>
+        <button class="page-btn" :disabled="page >= totalPages" @click="nextPage">下一页 →</button>
+      </div>
     </div>
   </div>
 </template>
