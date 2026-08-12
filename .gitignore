@@ -4,7 +4,6 @@
 !.env.example
 
 # Local runtime data may contain source documents, generated documents, and the database.
-/data/
 /backend/data/
 *.db
 
@@ -30,6 +29,8 @@ htmlcov/
 /.worktrees/
 /worktrees/
 /docs/media/
+/.agents
+/.playwright-cli
 
 # Local editor and OS files
 .idea/
