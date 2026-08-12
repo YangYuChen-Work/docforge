@@ -7,6 +7,22 @@ const root = resolve(import.meta.dirname, '..')
 const page = readFileSync(resolve(root, 'src/pages/DocList.vue'), 'utf8')
 const css = readFileSync(resolve(root, 'src/styles/visual-system.css'), 'utf8')
 
+function extractCssBlock(source, prelude) {
+  const blockStart = source.indexOf(`${prelude} {`)
+  assert.notEqual(blockStart, -1, `missing CSS block: ${prelude}`)
+
+  const openingBrace = source.indexOf('{', blockStart)
+  let depth = 0
+
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1
+    if (source[index] === '}') depth -= 1
+    if (depth === 0) return source.slice(openingBrace + 1, index)
+  }
+
+  assert.fail(`unterminated CSS block: ${prelude}`)
+}
+
 test('document table owns horizontal scrolling and exposes a named region', () => {
   assert.match(page, /class="doc-table-scroll"[^>]*tabindex="0"/)
   assert.match(page, /class="doc-table-scroll"[^>]*role="region"/)
@@ -32,6 +48,22 @@ test('document work surface keeps its layout, scroll, and action contracts', () 
   assert.match(css, /\.doc-table-scroll\s*\{[\s\S]*scrollbar-gutter:\s*stable;/)
   assert.match(css, /\.doc-table-scroll:focus-visible\s*\{[\s\S]*outline:\s*2px solid var\(--ui-primary\);/)
   assert.match(css, /\.doc-table-scroll \.doc-actions-header,\s*\.doc-table-scroll \.doc-actions-cell\s*\{[\s\S]*position:\s*sticky;[\s\S]*right:\s*0;/)
+})
+
+test('compact desktop document list gives the table a full row and keeps side cards in two columns', () => {
+  const compactDesktop = extractCssBlock(
+    css,
+    '@media (min-width: 768px) and (max-width: 1279px)',
+  )
+
+  assert.match(
+    compactDesktop,
+    /\.doc-main-layout\s*\{[^{}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/,
+  )
+  assert.match(
+    compactDesktop,
+    /\.doc-side-panel\s*\{[^{}]*display:\s*grid;[^{}]*grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\);/,
+  )
 })
 
 test('document metric labels remain muted supporting text', () => {
