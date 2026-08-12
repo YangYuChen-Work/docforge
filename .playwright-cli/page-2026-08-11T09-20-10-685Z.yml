@@ -1,0 +1,140 @@
+- generic [ref=f3e3]:
+  - complementary [ref=f3e5]:
+    - generic [ref=f3e6]:
+      - heading "徐工重型" [level=1] [ref=f3e7]
+      - button "收起系统菜单" [expanded] [ref=f3e172] [cursor=pointer]: ‹
+    - navigation "主导航" [ref=f3e10]:
+      - generic [ref=f3e11]:
+        - generic [ref=f3e173]: 工作区
+        - button "测试用例" [ref=f3e174] [cursor=pointer]
+        - link "项目文档工作台" [ref=f3e16] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=f3e176]: 项目文档
+        - link "文档列表" [ref=f3e20] [cursor=pointer]:
+          - /url: "#/"
+        - link "新建文档" [ref=f3e24] [cursor=pointer]:
+          - /url: "#/doc/new"
+        - button "模块选配" [ref=f3e179] [cursor=pointer]
+      - generic [ref=f3e32]:
+        - generic [ref=f3e181]: 配置与记录
+        - button "转换规则" [ref=f3e182] [cursor=pointer]
+        - link "日志审计" [ref=f3e37] [cursor=pointer]:
+          - /url: "#/audit"
+        - link "文档助手配置" [ref=f3e41] [cursor=pointer]:
+          - /url: "#/config"
+        - button "模块配置规则库" [ref=f3e186] [cursor=pointer]
+    - button "切换到深色模式" [ref=f3e49] [cursor=pointer]:
+      - generic [ref=f3e188]:
+        - strong [ref=f3e189]: 浅色模式
+        - generic [ref=f3e190]: 日间工作环境
+  - link "跳转到主要内容" [ref=f3e55] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f3e56]:
+    - generic [ref=f3e57]:
+      - generic [ref=f3e58]:
+        - generic [ref=f3e59]:
+          - heading "项目文档工作台" [level=2] [ref=f3e60]
+          - paragraph [ref=f3e61]: 从项目资料到可确认文档的本地生产流程
+        - generic [ref=f3e62]:
+          - generic [ref=f3e63]: 3 份文档正在编辑
+          - link "新建文档" [ref=f3e64] [cursor=pointer]:
+            - /url: "#/doc/new"
+      - region "文档摘要" [ref=f3e65]:
+        - generic [ref=f3e66]:
+          - generic [ref=f3e67]: 当前工作区
+          - strong [ref=f3e68]: 3 份项目文档
+          - paragraph [ref=f3e69]: 从来源资料到可确认章节的工作进度
+        - generic [ref=f3e70]:
+          - strong [ref=f3e71]: "0"
+          - generic [ref=f3e72]: 待生成
+        - generic [ref=f3e73]:
+          - strong [ref=f3e74]: "3"
+          - generic [ref=f3e75]: 编辑中
+        - generic [ref=f3e76]:
+          - strong [ref=f3e77]: "0"
+          - generic [ref=f3e78]: 已归档
+      - generic [ref=f3e79]:
+        - generic [ref=f3e81]:
+          - generic [ref=f3e82]:
+            - heading "项目文档" [level=3] [ref=f3e83]
+            - paragraph [ref=f3e84]: 按项目维度管理设计任务书、总体方案、验证方案和评审材料
+            - textbox "搜索项目 / 型号 / 文档" [ref=f3e85]
+          - generic [ref=f3e86]:
+            - button "全部" [ref=f3e87] [cursor=pointer]
+            - button "设计类" [ref=f3e88] [cursor=pointer]
+            - button "分析类" [ref=f3e89] [cursor=pointer]
+            - button "评审类" [ref=f3e90] [cursor=pointer]
+          - generic [ref=f3e91]:
+            - generic [ref=f3e92] [cursor=pointer]:
+              - checkbox "全选当前列表文档" [ref=f3e93]
+              - generic [ref=f3e94]: 全选
+            - button "批量删除" [disabled] [ref=f3e95]
+          - table [ref=f3e110]:
+            - rowgroup [ref=f3e111]:
+              - row [ref=f3e112]:
+                - columnheader "选择" [ref=f3e113]
+                - columnheader "项目文档" [ref=f3e114]
+                - columnheader "项目" [ref=f3e115]
+                - columnheader "状态" [ref=f3e116]
+                - columnheader "更新时间" [ref=f3e117]
+                - columnheader "操作" [ref=f3e118]
+            - rowgroup [ref=f3e119]:
+              - row [ref=f3e120] [cursor=pointer]:
+                - cell [ref=f3e121]:
+                  - checkbox "选择 生成文档 - P001" [ref=f3e122]
+                - cell "生成文档 - P001 产品开发立项暨设计和开发输入报告" [ref=f3e123]:
+                  - generic [ref=f3e124]: 生成文档 - P001
+                  - generic [ref=f3e125]: 产品开发立项暨设计和开发输入报告
+                - cell "P001" [ref=f3e126]
+                - cell "编辑中" [ref=f3e127]
+                - cell "2026-08-11 05:29:14" [ref=f3e129]
+                - cell [ref=f3e130]:
+                  - button "删除" [ref=f3e131]
+              - row [ref=f3e132] [cursor=pointer]:
+                - cell [ref=f3e133]:
+                  - checkbox "选择 生成文档 - P001" [ref=f3e134]
+                - cell "生成文档 - P001 产品开发立项暨设计和开发输入报告" [ref=f3e135]:
+                  - generic [ref=f3e136]: 生成文档 - P001
+                  - generic [ref=f3e137]: 产品开发立项暨设计和开发输入报告
+                - cell "P001" [ref=f3e138]
+                - cell "编辑中" [ref=f3e139]
+                - cell "2026-08-11 05:12:47" [ref=f3e141]
+                - cell [ref=f3e142]:
+                  - button "删除" [ref=f3e143]
+              - row [ref=f3e144] [cursor=pointer]:
+                - cell [ref=f3e145]:
+                  - checkbox "选择 TEST1" [ref=f3e146]
+                - cell "TEST1 产品开发立项暨设计和开发输入报告" [ref=f3e147]:
+                  - generic [ref=f3e148]: TEST1
+                  - generic [ref=f3e149]: 产品开发立项暨设计和开发输入报告
+                - cell "P001" [ref=f3e150]
+                - cell "编辑中" [ref=f3e151]
+                - cell "2026-08-11 08:42:27" [ref=f3e153]
+                - cell [ref=f3e154]:
+                  - button "删除" [ref=f3e155]
+        - generic [ref=f3e97]:
+          - generic [ref=f3e98]:
+            - heading "新建项目文档" [level=3] [ref=f3e99]
+            - paragraph [ref=f3e100]: 选择项目、模板和来源资料，生成一份可追溯的章节初稿。
+            - link "新建文档" [ref=f3e101] [cursor=pointer]:
+              - /url: "#/doc/new"
+          - generic [ref=f3e102]:
+            - heading "项目搜索" [level=4] [ref=f3e103]
+            - textbox "项目编号、名称、产品型号" [ref=f3e104]
+            - generic [ref=f3e156]:
+              - generic [ref=f3e157]: 推荐项目
+              - generic [ref=f3e158]:
+                - generic [ref=f3e159]: 80t 汽车起重机臂架优化项目
+                - generic [ref=f3e160]: XG-ZX-2026-042 · 方案设计
+          - generic [ref=f3e106]:
+            - heading "常用模板" [level=4] [ref=f3e107]
+            - generic [ref=f3e161]:
+              - generic [ref=f3e162] [cursor=pointer]:
+                - generic [ref=f3e163]: 总体设计方案
+                - generic [ref=f3e164]: ↗
+              - generic [ref=f3e165] [cursor=pointer]:
+                - generic [ref=f3e166]: 产品设计任务书
+                - generic [ref=f3e167]: ↗
+              - generic [ref=f3e168] [cursor=pointer]:
+                - generic [ref=f3e169]: 结构设计说明书
+                - generic [ref=f3e170]: ↗

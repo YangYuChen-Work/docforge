@@ -120,6 +120,66 @@
   min-width: min-content;
 }
 
+.word-page-zoom-frame {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.word-page-zoom-frame > .word-page {
+  flex: 0 0 auto;
+  transform-origin: top center;
+}
+
+.editor-zoom-controls {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid var(--ui-line-strong);
+  border-radius: 4px;
+  background: var(--ui-surface);
+}
+
+.editor-zoom-button,
+.editor-zoom-value {
+  min-width: 30px;
+  height: 30px;
+  border: 0;
+  color: var(--ui-ink-soft);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.editor-zoom-value {
+  min-width: 50px;
+  border-right: 1px solid var(--ui-line);
+  border-left: 1px solid var(--ui-line);
+  color: var(--ui-ink);
+  font-size: 11px;
+}
+
+.editor-zoom-button:hover:not(:disabled),
+.editor-zoom-value:hover {
+  color: var(--ui-primary-strong);
+  background: var(--ui-primary-wash);
+}
+
+.editor-zoom-button:disabled {
+  color: var(--ui-ink-faint);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.editor-zoom-button:focus-visible,
+.editor-zoom-value:focus-visible {
+  outline: 2px solid var(--ui-primary);
+  outline-offset: -2px;
+}
+
 .word-body {
   min-width: 0;
 }
@@ -133,8 +193,8 @@
 }
 
 @keyframes editor-chapter-enter {
-  from { opacity: 0.4; transform: translateY(4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0.4; }
+  to { opacity: 1; }
 }
 
 .editor-toolbar,
@@ -214,6 +274,15 @@
     min-height: 560px;
     overflow: visible;
     scrollbar-gutter: auto;
+  }
+
+  .word-page-zoom-frame {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .editor-zoom-controls {
+    order: -1;
   }
 
   .editor-operation-feedback {

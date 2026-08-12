@@ -1,0 +1,40 @@
+- generic [ref=e3]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - heading "项目文档工作台" [level=1] [ref=e7]:
+        - generic [ref=e8]: DF
+        - generic [ref=e9]:
+          - strong [ref=e10]: DOCFORGE
+          - generic [ref=e11]: 项目文档工作台
+      - button "收起系统菜单" [expanded] [ref=e12] [cursor=pointer]: ‹
+    - navigation "主导航" [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: 工作区
+        - button "测试用例" [ref=e16] [cursor=pointer]
+        - link "项目文档工作台" [ref=e21] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=e25]: 项目文档
+        - link "文档列表" [ref=e26] [cursor=pointer]:
+          - /url: "#/"
+        - link "新建文档" [ref=e31] [cursor=pointer]:
+          - /url: "#/doc/new"
+        - button "模块选配" [ref=e36] [cursor=pointer]
+      - generic [ref=e41]:
+        - generic [ref=e42]: 配置与记录
+        - button "转换规则" [ref=e43] [cursor=pointer]
+        - link "日志审计" [ref=e48] [cursor=pointer]:
+          - /url: "#/audit"
+        - link "文档助手配置" [ref=e53] [cursor=pointer]:
+          - /url: "#/config"
+        - button "模块配置规则库" [ref=e58] [cursor=pointer]
+    - button "切换到深色模式" [ref=e63] [cursor=pointer]:
+      - generic [ref=e68]:
+        - strong [ref=e69]: 浅色模式
+        - generic [ref=e70]: 日间工作环境
+    - generic [ref=e71]:
+      - generic [ref=e72]: 运行环境
+      - generic [ref=e74]: 真实模型服务
+      - generic [ref=e75]: 已连接本地文档生成服务
+  - link "跳转到主要内容" [ref=e76] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=e77]

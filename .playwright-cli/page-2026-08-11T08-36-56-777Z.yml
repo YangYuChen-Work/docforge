@@ -1,0 +1,98 @@
+- generic [ref=e3]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - heading "项目文档工作台" [level=1] [ref=e7]:
+        - generic [ref=e8]: DF
+        - generic [ref=e9]:
+          - strong [ref=e10]: DOCFORGE
+          - generic [ref=e11]: 项目文档工作台
+      - button "收起系统菜单" [expanded] [ref=e12] [cursor=pointer]: ‹
+    - navigation "主导航" [ref=e13]:
+      - generic [ref=e14]:
+        - generic [ref=e15]: 工作区
+        - button "测试用例" [ref=e16] [cursor=pointer]
+        - link "项目文档工作台" [ref=e21] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=e25]: 项目文档
+        - link "文档列表" [ref=e26] [cursor=pointer]:
+          - /url: "#/"
+        - link "新建文档" [ref=e31] [cursor=pointer]:
+          - /url: "#/doc/new"
+        - button "模块选配" [ref=e36] [cursor=pointer]
+      - generic [ref=e41]:
+        - generic [ref=e42]: 配置与记录
+        - button "转换规则" [ref=e43] [cursor=pointer]
+        - link "日志审计" [ref=e48] [cursor=pointer]:
+          - /url: "#/audit"
+        - link "文档助手配置" [active] [ref=e53] [cursor=pointer]:
+          - /url: "#/config"
+        - button "模块配置规则库" [ref=e58] [cursor=pointer]
+    - button "切换到深色模式" [ref=e63] [cursor=pointer]:
+      - generic [ref=e68]:
+        - strong [ref=e69]: 浅色模式
+        - generic [ref=e70]: 日间工作环境
+    - generic [ref=e71]:
+      - generic [ref=e72]: 运行环境
+      - generic [ref=e74]: 真实模型服务
+      - generic [ref=e75]: 已连接本地文档生成服务
+  - link "跳转到主要内容" [ref=e76] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=e77]:
+    - generic [ref=e302]:
+      - generic [ref=e303]:
+        - heading "系统配置 / 文档助手配置" [level=2] [ref=e304]
+        - paragraph [ref=e305]: 维护项目文档模板、章节结构与启用状态
+      - generic [ref=e306]: 8 个模板 · 8 个已启用
+    - generic [ref=e308]:
+      - generic [ref=e310]:
+        - heading "产品文档模板库" [level=3] [ref=e311]
+        - paragraph [ref=e312]: 业务侧新建文档时只从这里选择模板。
+        - textbox "搜索模板名称、适用阶段" [ref=e313]
+        - generic [ref=e314]:
+          - button "全部" [ref=e315] [cursor=pointer]
+          - button "设计类" [ref=e316] [cursor=pointer]
+          - button "分析类" [ref=e317] [cursor=pointer]
+          - button "验证类" [ref=e318] [cursor=pointer]
+          - button "评审类" [ref=e319] [cursor=pointer]
+        - generic [ref=e320]:
+          - generic [ref=e321] [cursor=pointer]:
+            - generic [ref=e322]:
+              - generic [ref=e323]: 总体设计方案
+              - generic [ref=e324]: 启用 · 方案设计 · 0 章
+            - generic [ref=e325]: 设计类
+          - generic [ref=e326] [cursor=pointer]:
+            - generic [ref=e327]:
+              - generic [ref=e328]: 产品设计任务书
+              - generic [ref=e329]: 启用 · 立项/需求冻结 · 0 章
+            - generic [ref=e330]: 设计类
+          - generic [ref=e331] [cursor=pointer]:
+            - generic [ref=e332]:
+              - generic [ref=e333]: 结构设计说明书
+              - generic [ref=e334]: 启用 · 详细设计 · 0 章
+            - generic [ref=e335]: 设计类
+          - generic [ref=e336] [cursor=pointer]:
+            - generic [ref=e337]:
+              - generic [ref=e338]: 液压系统设计说明书
+              - generic [ref=e339]: 启用 · 详细设计 · 0 章
+            - generic [ref=e340]: 设计类
+          - generic [ref=e341] [cursor=pointer]:
+            - generic [ref=e342]:
+              - generic [ref=e343]: 市场需求分析报告
+              - generic [ref=e344]: 启用 · 前期调研 · 0 章
+            - generic [ref=e345]: 分析类
+          - generic [ref=e346] [cursor=pointer]:
+            - generic [ref=e347]:
+              - generic [ref=e348]: 试制验证方案
+              - generic [ref=e349]: 启用 · 样机试制 · 0 章
+            - generic [ref=e350]: 验证类
+          - generic [ref=e351] [cursor=pointer]:
+            - generic [ref=e352]:
+              - generic [ref=e353]: 设计评审材料
+              - generic [ref=e354]: 启用 · 评审归档 · 0 章
+            - generic [ref=e355]: 评审类
+          - generic [ref=e356] [cursor=pointer]:
+            - generic [ref=e357]:
+              - generic [ref=e358]: 产品开发立项暨设计和开发输入报告
+              - generic [ref=e359]: 启用 · 方案设计 · 22 章
+            - generic [ref=e360]: 设计类
+      - generic [ref=e361]: 请选择一个模板

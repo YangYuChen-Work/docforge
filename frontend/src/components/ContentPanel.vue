@@ -4,6 +4,38 @@
     <div class="chapter-actionbar">
       <span class="chapter-actionbar-title">{{ chapter?.title || '请选择章节' }}</span>
       <div class="chapter-actions">
+        <div v-if="chapter" class="editor-zoom-controls" aria-label="正文页面缩放">
+          <button
+            class="editor-zoom-button"
+            type="button"
+            :disabled="!canZoomOut"
+            aria-label="缩小正文页面"
+            title="缩小正文页面"
+            @click="changeContentZoom(-1)"
+          >
+            −
+          </button>
+          <button
+            class="editor-zoom-value"
+            type="button"
+            aria-live="polite"
+            aria-label="重置正文页面缩放"
+            title="重置为 100%"
+            @click="resetContentZoom"
+          >
+            {{ zoomLabel }}
+          </button>
+          <button
+            class="editor-zoom-button"
+            type="button"
+            :disabled="!canZoomIn"
+            aria-label="放大正文页面"
+            title="放大正文页面"
+            @click="changeContentZoom(1)"
+          >
+            +
+          </button>
+        </div>
         <button
           v-if="chapter"
           class="btn btn-primary"
@@ -84,34 +116,43 @@
         从左侧目录选择章节
       </div>
       <template v-else>
-        <div class="word-page">
-          <div v-if="chapter.status === 'failed'" class="alert-error">
-            生成失败：{{ chapter.error_message || '未知错误' }}
-          </div>
-          <div v-if="conflictItems.length > 0" class="alert-conflict">
-            <div style="font-weight:600;margin-bottom:6px">内容冲突</div>
-            <div v-for="c in conflictItems" :key="c.description">• {{ c.description }}</div>
-          </div>
-
-          <editor-content :editor="editor" class="word-body" />
-
-          <div v-if="missingItems.length > 0" class="missing-information-panel">
-            <div class="missing-information-title">待补充建议</div>
-            <div v-for="m in missingItems" :key="m" class="missing-information-item">• {{ m }}</div>
-          </div>
-
+        <div
+          class="word-page-zoom-frame"
+          :style="{ height: `${wordPageHeight * contentZoom}px` }"
+        >
           <div
-            v-if="chapter.diagram_mermaid && !chapter.diagram_mermaid.startsWith('ERROR:')"
-            class="diagram-box"
+            ref="wordPageRef"
+            class="word-page"
+            :style="{ transform: `scale(${contentZoom})` }"
           >
-            <div style="font-size:11px;font-weight:600;color:#667;margin-bottom:8px">架构图</div>
-            <div ref="mermaidContainer" class="mermaid-render"></div>
-          </div>
-          <div
-            v-else-if="chapter.diagram_mermaid && chapter.diagram_mermaid.startsWith('ERROR:')"
-            class="alert-error"
-          >
-            架构图生成失败
+            <div v-if="chapter.status === 'failed'" class="alert-error">
+              生成失败：{{ chapter.error_message || '未知错误' }}
+            </div>
+            <div v-if="conflictItems.length > 0" class="alert-conflict">
+              <div style="font-weight:600;margin-bottom:6px">内容冲突</div>
+              <div v-for="c in conflictItems" :key="c.description">• {{ c.description }}</div>
+            </div>
+
+            <editor-content :editor="editor" class="word-body" />
+
+            <div v-if="missingItems.length > 0" class="missing-information-panel">
+              <div class="missing-information-title">待补充建议</div>
+              <div v-for="m in missingItems" :key="m" class="missing-information-item">• {{ m }}</div>
+            </div>
+
+            <div
+              v-if="chapter.diagram_mermaid && !chapter.diagram_mermaid.startsWith('ERROR:')"
+              class="diagram-box"
+            >
+              <div style="font-size:11px;font-weight:600;color:#667;margin-bottom:8px">架构图</div>
+              <div ref="mermaidContainer" class="mermaid-render"></div>
+            </div>
+            <div
+              v-else-if="chapter.diagram_mermaid && chapter.diagram_mermaid.startsWith('ERROR:')"
+              class="alert-error"
+            >
+              架构图生成失败
+            </div>
           </div>
         </div>
       </template>
@@ -139,6 +180,13 @@ import {
   type AnnotationRef,
   type CitationRef,
 } from '../editor/ReferenceDecorations'
+import {
+  DEFAULT_CONTENT_ZOOM,
+  MAX_CONTENT_ZOOM,
+  MIN_CONTENT_ZOOM,
+  formatContentZoom,
+  stepContentZoom,
+} from '../editor/contentZoom.mjs'
 
 export type EditorToolbarState = {
   block: string
@@ -178,7 +226,27 @@ const showExport = ref(false)
 const selectedExportFormat = ref('')
 const mermaidContainer = ref<HTMLElement>()
 const chapterEntering = ref(false)
+const contentZoom = ref(DEFAULT_CONTENT_ZOOM)
+const wordPageRef = ref<HTMLElement | null>(null)
+const wordPageHeight = ref(0)
+let wordPageResizeObserver: ResizeObserver | null = null
 let chapterTransitionTimer: ReturnType<typeof setTimeout> | null = null
+
+const zoomLabel = computed(() => formatContentZoom(contentZoom.value))
+const canZoomOut = computed(() => contentZoom.value > MIN_CONTENT_ZOOM)
+const canZoomIn = computed(() => contentZoom.value < MAX_CONTENT_ZOOM)
+
+function syncWordPageHeight() {
+  wordPageHeight.value = wordPageRef.value?.scrollHeight || 0
+}
+
+function changeContentZoom(direction: -1 | 1) {
+  contentZoom.value = stepContentZoom(contentZoom.value, direction)
+}
+
+function resetContentZoom() {
+  contentZoom.value = DEFAULT_CONTENT_ZOOM
+}
 
 function pulseChapterEntry() {
   chapterEntering.value = true
@@ -502,6 +570,21 @@ watch(
 )
 
 watch(
+  () => props.chapter?.id,
+  async () => {
+    await nextTick()
+    wordPageResizeObserver?.disconnect()
+    wordPageResizeObserver = null
+    syncWordPageHeight()
+    if (typeof ResizeObserver !== 'undefined' && wordPageRef.value) {
+      wordPageResizeObserver = new ResizeObserver(syncWordPageHeight)
+      wordPageResizeObserver.observe(wordPageRef.value)
+    }
+  },
+  { immediate: true },
+)
+
+watch(
   () => [props.annotations, props.citations, props.activeAnnotationId, props.activeCitationKey],
   refreshReferenceDecorations,
   { deep: true },
@@ -548,9 +631,11 @@ watch(
   { immediate: true }
 )
 
-onBeforeUnmount(() => {
-  if (chapterTransitionTimer) clearTimeout(chapterTransitionTimer)
-  editor.value?.destroy()
+    onBeforeUnmount(() => {
+      wordPageResizeObserver?.disconnect()
+      wordPageResizeObserver = null
+      if (chapterTransitionTimer) clearTimeout(chapterTransitionTimer)
+      editor.value?.destroy()
 })
 </script>
 

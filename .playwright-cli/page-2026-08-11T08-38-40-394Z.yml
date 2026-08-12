@@ -1,0 +1,99 @@
+- generic [ref=e364]:
+  - complementary [ref=e366]:
+    - generic [ref=e367]:
+      - heading "项目文档工作台" [level=1] [ref=e368]:
+        - generic [ref=e369]: DF
+        - generic [ref=e370]:
+          - strong [ref=e371]: DOCFORGE
+          - generic [ref=e372]: 项目文档工作台
+      - button "收起系统菜单" [expanded] [ref=e373] [cursor=pointer]: ‹
+    - navigation "主导航" [ref=e374]:
+      - generic [ref=e375]:
+        - generic [ref=e376]: 工作区
+        - button "测试用例" [ref=e377] [cursor=pointer]
+        - link "项目文档工作台" [ref=e382] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=e386]: 项目文档
+        - link "文档列表" [ref=e387] [cursor=pointer]:
+          - /url: "#/"
+        - link "新建文档" [ref=e392] [cursor=pointer]:
+          - /url: "#/doc/new"
+        - button "模块选配" [ref=e397] [cursor=pointer]
+      - generic [ref=e402]:
+        - generic [ref=e403]: 配置与记录
+        - button "转换规则" [ref=e404] [cursor=pointer]
+        - link "日志审计" [ref=e409] [cursor=pointer]:
+          - /url: "#/audit"
+        - link "文档助手配置" [ref=e414] [cursor=pointer]:
+          - /url: "#/config"
+        - button "模块配置规则库" [ref=e419] [cursor=pointer]
+    - button "切换到深色模式" [ref=e424] [cursor=pointer]:
+      - generic [ref=e429]:
+        - strong [ref=e430]: 浅色模式
+        - generic [ref=e431]: 日间工作环境
+    - generic [ref=e432]:
+      - generic [ref=e433]: 运行环境
+      - generic [ref=e435]: 真实模型服务
+      - generic [ref=e436]: 已连接本地文档生成服务
+  - link "跳转到主要内容" [ref=e437] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=e438]:
+    - generic [ref=e439]:
+      - generic [ref=e440]:
+        - generic [ref=e441]:
+          - heading "系统配置 / 文档助手配置" [level=2] [ref=e442]
+          - paragraph [ref=e443]: 维护项目文档模板、章节结构与启用状态
+        - generic [ref=e444]: 8 个模板 · 8 个已启用
+      - generic [ref=e446]:
+        - generic [ref=e448]:
+          - heading "产品文档模板库" [level=3] [ref=e449]
+          - paragraph [ref=e450]: 业务侧新建文档时只从这里选择模板。
+          - textbox "搜索模板名称、适用阶段" [ref=e451]
+          - generic [ref=e452]:
+            - button "全部" [ref=e453] [cursor=pointer]
+            - button "设计类" [ref=e454] [cursor=pointer]
+            - button "分析类" [ref=e455] [cursor=pointer]
+            - button "验证类" [ref=e456] [cursor=pointer]
+            - button "评审类" [ref=e457] [cursor=pointer]
+          - generic [ref=e458]:
+            - generic [ref=e459] [cursor=pointer]:
+              - generic [ref=e460]:
+                - generic [ref=e461]: 总体设计方案
+                - generic [ref=e462]: 启用 · 方案设计 · 0 章
+              - generic [ref=e463]: 设计类
+            - generic [ref=e464] [cursor=pointer]:
+              - generic [ref=e465]:
+                - generic [ref=e466]: 产品设计任务书
+                - generic [ref=e467]: 启用 · 立项/需求冻结 · 0 章
+              - generic [ref=e468]: 设计类
+            - generic [ref=e469] [cursor=pointer]:
+              - generic [ref=e470]:
+                - generic [ref=e471]: 结构设计说明书
+                - generic [ref=e472]: 启用 · 详细设计 · 0 章
+              - generic [ref=e473]: 设计类
+            - generic [ref=e474] [cursor=pointer]:
+              - generic [ref=e475]:
+                - generic [ref=e476]: 液压系统设计说明书
+                - generic [ref=e477]: 启用 · 详细设计 · 0 章
+              - generic [ref=e478]: 设计类
+            - generic [ref=e479] [cursor=pointer]:
+              - generic [ref=e480]:
+                - generic [ref=e481]: 市场需求分析报告
+                - generic [ref=e482]: 启用 · 前期调研 · 0 章
+              - generic [ref=e483]: 分析类
+            - generic [ref=e484] [cursor=pointer]:
+              - generic [ref=e485]:
+                - generic [ref=e486]: 试制验证方案
+                - generic [ref=e487]: 启用 · 样机试制 · 0 章
+              - generic [ref=e488]: 验证类
+            - generic [ref=e489] [cursor=pointer]:
+              - generic [ref=e490]:
+                - generic [ref=e491]: 设计评审材料
+                - generic [ref=e492]: 启用 · 评审归档 · 0 章
+              - generic [ref=e493]: 评审类
+            - generic [ref=e494] [cursor=pointer]:
+              - generic [ref=e495]:
+                - generic [ref=e496]: 产品开发立项暨设计和开发输入报告
+                - generic [ref=e497]: 启用 · 方案设计 · 22 章
+              - generic [ref=e498]: 设计类
+        - generic [ref=e499]: 请选择一个模板

@@ -1,0 +1,79 @@
+- generic [ref=f3e3]:
+  - complementary [ref=f3e5]:
+    - heading "徐工重型" [level=1] [ref=f3e7]
+    - button "展开系统菜单" [ref=f3e9] [cursor=pointer]: ›
+    - navigation "主导航" [ref=f3e10]:
+      - generic [ref=f3e11]:
+        - button "测试用例（后续模块）" [ref=f3e12] [cursor=pointer]
+        - link "项目文档工作台" [ref=f3e16] [cursor=pointer]:
+          - /url: "#/"
+        - link "文档列表" [ref=f3e20] [cursor=pointer]:
+          - /url: "#/"
+        - link "新建文档" [ref=f3e24] [cursor=pointer]:
+          - /url: "#/doc/new"
+        - button "模块选配（后续模块）" [ref=f3e28] [cursor=pointer]
+      - generic [ref=f3e32]:
+        - button "转换规则（后续模块）" [ref=f3e33] [cursor=pointer]
+        - link "日志审计" [ref=f3e37] [cursor=pointer]:
+          - /url: "#/audit"
+        - link "文档助手配置" [ref=f3e41] [cursor=pointer]:
+          - /url: "#/config"
+        - button "规则库（后续模块）" [ref=f3e45] [cursor=pointer]
+    - button "切换到深色模式" [ref=f3e49] [cursor=pointer]:
+      - generic [ref=f3e54]: 深
+  - link "跳转到主要内容" [ref=f3e55] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=f3e56]:
+    - generic [ref=f3e57]:
+      - generic [ref=f3e58]:
+        - generic [ref=f3e59]:
+          - heading "项目文档工作台" [level=2] [ref=f3e60]
+          - paragraph [ref=f3e61]: 从项目资料到可确认文档的本地生产流程
+        - generic [ref=f3e62]:
+          - generic [ref=f3e63]: 0 份文档正在编辑
+          - link "新建文档" [ref=f3e64] [cursor=pointer]:
+            - /url: "#/doc/new"
+      - region "文档摘要" [ref=f3e65]:
+        - generic [ref=f3e66]:
+          - generic [ref=f3e67]: 当前工作区
+          - strong [ref=f3e68]: 0 份项目文档
+          - paragraph [ref=f3e69]: 从来源资料到可确认章节的工作进度
+        - generic [ref=f3e70]:
+          - strong [ref=f3e71]: "0"
+          - generic [ref=f3e72]: 待生成
+        - generic [ref=f3e73]:
+          - strong [ref=f3e74]: "0"
+          - generic [ref=f3e75]: 编辑中
+        - generic [ref=f3e76]:
+          - strong [ref=f3e77]: "0"
+          - generic [ref=f3e78]: 已归档
+      - generic [ref=f3e79]:
+        - generic [ref=f3e81]:
+          - generic [ref=f3e82]:
+            - heading "项目文档" [level=3] [ref=f3e83]
+            - paragraph [ref=f3e84]: 按项目维度管理设计任务书、总体方案、验证方案和评审材料
+            - textbox "搜索项目 / 型号 / 文档" [ref=f3e85]
+          - generic [ref=f3e86]:
+            - button "全部" [ref=f3e87] [cursor=pointer]
+            - button "设计类" [ref=f3e88] [cursor=pointer]
+            - button "分析类" [ref=f3e89] [cursor=pointer]
+            - button "评审类" [ref=f3e90] [cursor=pointer]
+          - generic [ref=f3e91]:
+            - generic [ref=f3e92] [cursor=pointer]:
+              - checkbox "全选当前列表文档" [disabled] [ref=f3e93]
+              - generic [ref=f3e94]: 全选
+            - button "批量删除" [disabled] [ref=f3e95]
+          - status [ref=f3e96]: 正在读取文档列表…
+        - generic [ref=f3e97]:
+          - generic [ref=f3e98]:
+            - heading "新建项目文档" [level=3] [ref=f3e99]
+            - paragraph [ref=f3e100]: 选择项目、模板和来源资料，生成一份可追溯的章节初稿。
+            - link "新建文档" [ref=f3e101] [cursor=pointer]:
+              - /url: "#/doc/new"
+          - generic [ref=f3e102]:
+            - heading "项目搜索" [level=4] [ref=f3e103]
+            - textbox "项目编号、名称、产品型号" [ref=f3e104]
+            - generic [ref=f3e105]: 没有找到匹配项目
+          - generic [ref=f3e106]:
+            - heading "常用模板" [level=4] [ref=f3e107]
+            - generic [ref=f3e108]: 模板列表暂时不可用

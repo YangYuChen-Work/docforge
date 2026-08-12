@@ -1,0 +1,202 @@
+- generic [ref=e3]:
+  - complementary [ref=e5]:
+    - generic [ref=e6]:
+      - heading "徐工重型" [level=1] [ref=e7]
+      - button "收起系统菜单" [expanded] [ref=e10] [cursor=pointer]: ‹
+    - navigation "主导航" [ref=e11]:
+      - generic [ref=e12]:
+        - generic [ref=e13]: 工作区
+        - button "测试用例" [ref=e14] [cursor=pointer]
+        - link "项目文档工作台" [ref=e19] [cursor=pointer]:
+          - /url: "#/"
+          - generic [ref=e23]: 项目文档
+        - link "文档列表" [ref=e24] [cursor=pointer]:
+          - /url: "#/"
+        - link "新建文档" [ref=e29] [cursor=pointer]:
+          - /url: "#/doc/new"
+        - button "模块选配" [ref=e34] [cursor=pointer]
+      - generic [ref=e39]:
+        - generic [ref=e40]: 配置与记录
+        - button "转换规则" [ref=e41] [cursor=pointer]
+        - link "日志审计" [ref=e46] [cursor=pointer]:
+          - /url: "#/audit"
+        - link "文档助手配置" [ref=e51] [cursor=pointer]:
+          - /url: "#/config"
+        - button "模块配置规则库" [ref=e56] [cursor=pointer]
+    - button "切换到深色模式" [ref=e61] [cursor=pointer]:
+      - generic [ref=e66]:
+        - strong [ref=e67]: 浅色模式
+        - generic [ref=e68]: 日间工作环境
+  - link "跳转到主要内容" [ref=e69] [cursor=pointer]:
+    - /url: "#main-content"
+  - main [ref=e70]:
+    - generic [ref=e72]:
+      - generic [ref=e73]:
+        - generic [ref=e74]:
+          - generic [ref=e75]:
+            - heading [level=2] [ref=e254]: 生成文档 - P001
+            - button [ref=e255] [cursor=pointer]: 重命名
+          - generic [ref=e78]: 文档编辑 / 章节确认
+        - generic [ref=e79]:
+          - button [ref=e256] [cursor=pointer]: 一键确认全部章节
+          - button [expanded] [ref=e257] [cursor=pointer]: 数据来源
+      - generic [ref=e81]:
+        - button [ref=e258] [cursor=pointer]: 撤销
+        - button [ref=e259] [cursor=pointer]: 重做
+        - combobox [ref=e260]
+        - combobox [ref=e261]
+        - button [ref=e262] [cursor=pointer]:
+          - generic [ref=e89]: B
+        - button [ref=e263] [cursor=pointer]:
+          - generic [ref=e91]: I
+        - button [ref=e264] [cursor=pointer]:
+          - generic [ref=e93]: U
+        - button [ref=e265] [cursor=pointer]: 高亮
+        - button [ref=e266] [cursor=pointer]: 左对齐
+        - button [ref=e267] [cursor=pointer]: 居中
+        - button [ref=e268] [cursor=pointer]: 右对齐
+        - button [ref=e269] [cursor=pointer]: 项目符号
+        - button [ref=e270] [cursor=pointer]: 编号列表
+        - button [ref=e271] [cursor=pointer]: 引用
+        - button [ref=e272] [cursor=pointer]: 链接
+        - button [ref=e273] [cursor=pointer]: 表格
+        - button [ref=e274] [cursor=pointer]: 图片
+        - button [ref=e275] [cursor=pointer]: Tx
+        - button [ref=e276] [cursor=pointer]: 更多
+      - generic [ref=e109]:
+        - generic [ref=e110]:
+          - generic [ref=e111]:
+            - generic [ref=e112]: 生成文档 - P001
+            - generic [ref=e113]: 已保存
+          - generic [ref=e114]: 文档目录
+          - generic [ref=e115]:
+            - generic [ref=e116] [cursor=pointer]:
+              - generic [ref=e117]: 1. 产品概述
+              - generic [ref=e118]: 已确认
+            - generic [ref=e119] [cursor=pointer]:
+              - generic [ref=e120]: 2. 市场需求分析
+              - generic [ref=e121]: 已确认
+            - generic [ref=e122] [cursor=pointer]:
+              - generic [ref=e123]: 3. 客户需求分析
+              - generic [ref=e124]: 已确认
+            - generic [ref=e125] [cursor=pointer]:
+              - generic [ref=e126]: 4. 竞品分析
+              - generic [ref=e127]: 已确认
+            - generic [ref=e128] [cursor=pointer]:
+              - generic [ref=e129]: 5. 质量问题分析
+              - generic [ref=e130]: 已确认
+            - generic [ref=e131] [cursor=pointer]:
+              - generic [ref=e132]: 6. 市场定位
+              - generic [ref=e133]: 已确认
+            - generic [ref=e134] [cursor=pointer]:
+              - generic [ref=e135]: 7. 产品卖点和优势
+              - generic [ref=e136]: 已确认
+            - generic [ref=e137] [cursor=pointer]:
+              - generic [ref=e138]: 8. 功能性能定位
+              - generic [ref=e139]: 已确认
+            - generic [ref=e140] [cursor=pointer]:
+              - generic [ref=e141]: 9. 质量目标
+              - generic [ref=e142]: 已确认
+            - generic [ref=e143] [cursor=pointer]:
+              - generic [ref=e144]: 10. 初步方案及技术可行性
+              - generic [ref=e145]: 已确认
+            - generic [ref=e146] [cursor=pointer]:
+              - generic [ref=e147]: 11. 标准化综合要求
+              - generic [ref=e148]: 已确认
+            - generic [ref=e149] [cursor=pointer]:
+              - generic [ref=e150]: 12. 采购可行性
+              - generic [ref=e151]: 已确认
+            - generic [ref=e152] [cursor=pointer]:
+              - generic [ref=e153]: 13. 制造可行性
+              - generic [ref=e154]: 已确认
+            - generic [ref=e155] [cursor=pointer]:
+              - generic [ref=e156]: 14. 运输方案及要求
+              - generic [ref=e157]: 待补充
+            - generic [ref=e158] [cursor=pointer]:
+              - generic [ref=e159]: 15. 营销策略
+              - generic [ref=e160]: 已确认
+            - generic [ref=e161] [cursor=pointer]:
+              - generic [ref=e162]: 16. 服务可行性
+              - generic [ref=e163]: 待补充
+            - generic [ref=e164] [cursor=pointer]:
+              - generic [ref=e165]: 17. 样机验证计划
+              - generic [ref=e166]: 待补充
+            - generic [ref=e167] [cursor=pointer]:
+              - generic [ref=e168]: 18. 资源需求
+              - generic [ref=e169]: 待补充
+            - generic [ref=e170] [cursor=pointer]:
+              - generic [ref=e171]: 19. 项目研发投入预算
+              - generic [ref=e172]: 已确认
+            - generic [ref=e173] [cursor=pointer]:
+              - generic [ref=e174]: 20. 产品经济效益分析
+              - generic [ref=e175]: 已确认
+            - generic [ref=e176] [cursor=pointer]:
+              - generic [ref=e177]: 21. 产品开发周期和里程碑
+              - generic [ref=e178]: 已确认
+            - generic [ref=e179] [cursor=pointer]:
+              - generic [ref=e180]: 22. 项目风险及应对措施
+              - generic [ref=e181]: 已确认
+          - generic [ref=e182] [cursor=pointer]: + 新增章节
+        - generic [ref=e183]:
+          - generic [ref=e184]:
+            - generic [ref=e185]: 产品概述
+            - generic [ref=e186]:
+              - button [disabled] [ref=e277]: 保存
+              - button [ref=e278] [cursor=pointer]: 重新生成
+              - button [ref=e279] [cursor=pointer]: 导出 ▾
+          - region [ref=e280]:
+            - textbox [ref=e194]:
+              - paragraph [ref=e195]: 产品概述
+              - paragraph [ref=e196]: 根据来源资料，产品概述的相关内容如下：
+              - paragraph [ref=e197]: （本内容来自本地验证结果，仅用于流程核对，请结合引用资料确认。没有来源依据的内容请标记为待补充。）
+              - paragraph [ref=e198]:
+                - strong [ref=e199]: 产品概述待补充数据
+              - table [ref=e201]:
+                - rowgroup [ref=e206]:
+                  - row [ref=e281]:
+                    - columnheader [ref=e282]:
+                      - paragraph [ref=e209]: 序号
+                    - columnheader [ref=e283]:
+                      - paragraph [ref=e211]: 待补充字段
+                    - columnheader [ref=e284]:
+                      - paragraph [ref=e213]: 待补充字段
+                  - row [ref=e285]:
+                    - cell [ref=e286]:
+                      - paragraph [ref=e216]: "1"
+                    - cell [ref=e287]:
+                      - paragraph [ref=e218]: 待补充
+                    - cell [ref=e288]:
+                      - paragraph [ref=e220]: 待补充
+                  - row [ref=e289]:
+                    - cell [ref=e290]:
+                      - paragraph [ref=e223]: "2"
+                    - cell [ref=e291]:
+                      - paragraph [ref=e225]: 待补充
+                    - cell [ref=e292]:
+                      - paragraph [ref=e227]: 待补充
+              - paragraph [ref=e228]
+        - button "关闭数据来源面板" [ref=e293] [cursor=pointer]
+        - dialog "数据来源" [ref=e294]:
+          - button "关闭" [active] [ref=e295] [cursor=pointer]
+          - complementary [ref=e230]:
+            - generic [ref=e233]:
+              - heading "数据来源" [level=4] [ref=e234]
+              - paragraph [ref=e235]: 只展示本章最终引用的文件和参考原文。
+            - tablist "文档协作功能" [ref=e236]:
+              - tab "数据来源" [selected] [ref=e237] [cursor=pointer]
+              - tab "批注" [ref=e238] [cursor=pointer]
+              - tab "生成建议" [ref=e239] [cursor=pointer]
+            - generic [ref=e240]:
+              - generic [ref=e241]:
+                - text: 本章最终来源
+                - generic [ref=e242]: "1"
+              - article [ref=e243] [cursor=pointer]:
+                - generic [ref=e244]:
+                  - generic [ref=e245]: 文
+                  - strong [ref=e246]: XG-ZX-2026-042-XCT80L7-市场调研报告.docx
+                - generic [ref=e247]: 定位：未提供定位
+                - generic [ref=e248]: 参考原文
+                - generic [ref=e249]: 产品名称：XCT80L7 型汽车起重机
+                - generic [ref=e250]:
+                  - button "展开详情" [ref=e251]
+                  - button "定位正文" [ref=e252]
