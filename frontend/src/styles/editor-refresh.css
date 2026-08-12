@@ -30,6 +30,8 @@
 }
 
 .editor-body {
+  position: relative;
+  grid-template-columns: minmax(200px, 224px) minmax(0, 1fr) minmax(260px, 300px);
   height: 0;
   min-height: 0;
   overscroll-behavior: contain;
@@ -37,7 +39,7 @@
 
 .editor-body > .editor-outline,
 .editor-body > .content-panel,
-.editor-body > .editor-ai-panel {
+.editor-body > .editor-evidence-shell {
   min-height: 0;
 }
 
@@ -47,18 +49,60 @@
 
 .editor-outline,
 .editor-content,
-.editor-ai-panel {
+.editor-evidence-shell,
+.editor-evidence-shell > .editor-ai-panel {
   min-height: 0;
   scrollbar-gutter: stable;
 }
 
 .editor-content {
-  background: #eef2f6;
+  background: var(--ui-canvas);
 }
 
 .content-panel {
   min-width: 0;
   min-height: 0;
+}
+
+.editor-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.editor-evidence-toggle,
+.editor-evidence-close,
+.editor-evidence-backdrop {
+  display: none;
+}
+
+.editor-evidence-shell {
+  display: flex;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ui-surface-muted);
+}
+
+.editor-evidence-shell > .editor-ai-panel {
+  width: 100%;
+  flex: 1 1 auto;
+}
+
+.editor-toolbar {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-gutter: stable;
+}
+
+.editor-toolbar > * {
+  flex: 0 0 auto;
+}
+
+.word-page {
+  background: var(--ui-paper);
+  color: var(--ui-paper-ink);
 }
 
 .editor-export-feedback {
@@ -193,9 +237,104 @@
   to { transform: rotate(360deg); }
 }
 
-@media (max-width: 1024px) and (min-width: 768px) {
+@media (min-width: 1440px) {
+  .editor-shell > .editor-body {
+    grid-template-columns: minmax(214px, 248px) minmax(0, 1fr) minmax(280px, 320px);
+  }
+}
+
+@media (min-width: 1180px) {
+  .editor-evidence-shell {
+    position: static;
+    transform: none;
+  }
+
+  .editor-evidence-toggle,
+  .editor-evidence-close,
+  .editor-evidence-backdrop {
+    display: none;
+  }
+}
+
+@media (max-width: 1179px) and (min-width: 768px) {
   .editor-body {
-    grid-template-columns: 214px minmax(0, 1fr) 284px;
+    grid-template-columns: minmax(184px, 214px) minmax(0, 1fr);
+  }
+
+  .editor-evidence-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 6px 11px;
+    border: 1px solid var(--ui-line-strong);
+    border-radius: var(--ui-radius-sm);
+    background: var(--ui-surface);
+    color: var(--ui-primary-strong);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .editor-evidence-toggle:hover,
+  .editor-evidence-toggle[aria-expanded="true"] {
+    border-color: var(--ui-primary);
+    background: var(--ui-primary-wash);
+  }
+
+  .editor-evidence-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: var(--ui-z-overlay);
+    display: block;
+    border: 0;
+    background: rgba(13, 23, 29, 0.42);
+    cursor: pointer;
+  }
+
+  .editor-evidence-shell {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--ui-z-nav);
+    width: min(340px, calc(100vw - 80px));
+    height: 100dvh;
+    flex-direction: column;
+    border-left: 1px solid var(--ui-line-strong);
+    background: var(--ui-surface-muted);
+    box-shadow: var(--ui-shadow-float);
+    transform: translateX(105%);
+    visibility: hidden;
+    pointer-events: none;
+    transition: transform 220ms var(--ui-ease), visibility 0s linear 220ms;
+  }
+
+  .editor-evidence-shell.is-open {
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
+    transition-delay: 0s;
+  }
+
+  .editor-evidence-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 36px;
+    padding: 8px 14px;
+    border: 0;
+    border-bottom: 1px solid var(--ui-line);
+    background: var(--ui-surface);
+    color: var(--ui-primary-strong);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .editor-evidence-close:hover {
+    background: var(--ui-primary-wash);
   }
 
   .editor-topbar,
@@ -237,6 +376,11 @@
     align-self: flex-start;
   }
 
+  .editor-topbar-actions {
+    align-self: flex-start;
+    flex-wrap: wrap;
+  }
+
   .editor-toolbar {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -265,7 +409,12 @@
     min-height: 480px;
   }
 
-  .editor-ai-panel {
+  .editor-evidence-shell {
+    min-height: 360px;
+    overflow: hidden;
+  }
+
+  .editor-evidence-shell > .editor-ai-panel {
     min-height: 360px;
     border-top: 1px solid var(--ui-line);
     border-left: 0;

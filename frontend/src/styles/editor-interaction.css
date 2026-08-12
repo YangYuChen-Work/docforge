@@ -43,7 +43,12 @@
 
 .editor-body > .editor-outline,
 .editor-body > .content-panel,
-.editor-body > .editor-ai-panel {
+.editor-body > .editor-evidence-shell {
+  min-width: 0;
+  min-height: 0;
+}
+
+.editor-evidence-shell > .editor-ai-panel {
   min-width: 0;
   min-height: 0;
 }
@@ -201,6 +206,10 @@
     overflow: visible;
   }
 
+  .editor-evidence-shell {
+    height: auto;
+  }
+
   .editor-content {
     min-height: 560px;
     overflow: visible;
@@ -221,6 +230,10 @@
   .editor-content.is-chapter-entering .word-page {
     animation: none !important;
     transition: none !important;
+  }
+
+  .editor-evidence-shell {
+    transition: none;
   }
 
   .editor-content {

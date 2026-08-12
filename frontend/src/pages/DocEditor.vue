@@ -25,16 +25,27 @@
         </span>
         <span v-if="renameError" class="title-error">{{ renameError }}</span>
       </div>
-      <button
-        v-if="confirmableChapterCount"
-        class="document-confirm-button"
-        type="button"
-        :disabled="confirmingAllChapters || generating || isSaving"
-        :title="`确认当前文档 ${confirmableChapterCount} 个已生成章节`"
-        @click="confirmAllChapters"
-      >
-        {{ confirmingAllChapters ? `确认中 ${confirmedChapterCount}/${confirmableChapterCount}` : '一键确认全部章节' }}
-      </button>
+      <div class="editor-topbar-actions">
+        <button
+          v-if="confirmableChapterCount"
+          class="document-confirm-button"
+          type="button"
+          :disabled="confirmingAllChapters || generating || isSaving"
+          :title="`确认当前文档 ${confirmableChapterCount} 个已生成章节`"
+          @click="confirmAllChapters"
+        >
+          {{ confirmingAllChapters ? `确认中 ${confirmedChapterCount}/${confirmableChapterCount}` : '一键确认全部章节' }}
+        </button>
+        <button
+          class="editor-evidence-toggle"
+          type="button"
+          :aria-expanded="evidencePanelOpen"
+          aria-controls="editor-evidence-panel"
+          @click="evidencePanelOpen = !evidencePanelOpen"
+        >
+          数据来源
+        </button>
+      </div>
     </div>
 
     <!-- Editor Toolbar -->
@@ -156,24 +167,38 @@
         @citationSelect="onCitationSelect"
         @focusResult="showFocusMessage"
       />
-      <AiPanel
-        ref="aiPanelRef"
-        :annotations="annotations"
-        :citations="chapterCitations"
-        :sourceDetails="sourceDetails"
-        :citationState="citationState"
-        :selectionText="selectionText"
-        :activeAnnotationId="activeAnnotationId"
-        :activeCitationKey="activeCitationKey"
-        @updateAnnotation="updateAnnotation"
-        @replaceSelection="replaceSelection"
-        @insertAtCursor="insertAtCursor"
-        @aiAction="doAiAction"
-        @createAnnotation="handleCreateAnnotation"
-        @annotationFocus="focusAnnotation"
-        @citationFocus="focusCitation"
-        @commentAiAction="handleCommentAiAction"
+      <button
+        v-if="evidencePanelOpen"
+        class="editor-evidence-backdrop"
+        type="button"
+        aria-label="关闭数据来源面板"
+        @click="evidencePanelOpen = false"
       />
+      <div
+        id="editor-evidence-panel"
+        class="editor-evidence-shell"
+        :class="{ 'is-open': evidencePanelOpen }"
+      >
+        <button class="editor-evidence-close" type="button" @click="evidencePanelOpen = false">关闭</button>
+        <AiPanel
+          ref="aiPanelRef"
+          :annotations="annotations"
+          :citations="chapterCitations"
+          :sourceDetails="sourceDetails"
+          :citationState="citationState"
+          :selectionText="selectionText"
+          :activeAnnotationId="activeAnnotationId"
+          :activeCitationKey="activeCitationKey"
+          @updateAnnotation="updateAnnotation"
+          @replaceSelection="replaceSelection"
+          @insertAtCursor="insertAtCursor"
+          @aiAction="doAiAction"
+          @createAnnotation="handleCreateAnnotation"
+          @annotationFocus="focusAnnotation"
+          @citationFocus="focusCitation"
+          @commentAiAction="handleCommentAiAction"
+        />
+      </div>
     </div>
 
     <div v-if="focusMessage" class="editor-focus-message" role="status">{{ focusMessage }}</div>
@@ -267,6 +292,7 @@ const isSaving = ref(false)
 const saveError = ref('')
 const showRegenModal = ref(false)
 const regenInstruction = ref('')
+const evidencePanelOpen = ref(false)
 const aiPanelRef = ref()
 const contentPanelRef = ref()
 const imageInputRef = ref<HTMLInputElement | null>(null)
