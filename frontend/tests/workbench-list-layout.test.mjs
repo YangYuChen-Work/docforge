@@ -26,3 +26,24 @@ test('shared controls use the compact desktop rhythm', () => {
   assert.match(css, /\.doc-search[\s\S]*min-height:\s*36px;/)
   assert.match(css, /\.doc-table tbody td\s*\{[\s\S]*height:\s*42px;/)
 })
+
+test('document work surface keeps its layout, scroll, and action contracts', () => {
+  assert.match(css, /\.doc-main-layout\s*\{[\s\S]*grid-template-columns:\s*minmax\(0,\s*1fr\)\s+minmax\(248px,\s*300px\);/)
+  assert.match(css, /\.doc-table-scroll\s*\{[\s\S]*scrollbar-gutter:\s*stable;/)
+  assert.match(css, /\.doc-table-scroll:focus-visible\s*\{[\s\S]*outline:\s*2px solid var\(--ui-primary\);/)
+  assert.match(css, /\.doc-table-scroll \.doc-actions-header,\s*\.doc-table-scroll \.doc-actions-cell\s*\{[\s\S]*position:\s*sticky;[\s\S]*right:\s*0;/)
+})
+
+test('document metric labels remain muted supporting text', () => {
+  assert.match(css, /\.doc-stat-metric span\s*\{[^}]*color:\s*var\(--ui-ink-faint\);[^}]*font-size:\s*11px;/)
+})
+
+test('document rows keep compact title and metadata rhythm within 42px', () => {
+  assert.match(css, /\.doc-name\s*\{[^}]*font-size:\s*13px;[^}]*line-height:\s*1\.2;/)
+  assert.match(css, /\.doc-meta\s*\{[^}]*font-size:\s*11px;[^}]*line-height:\s*1\.2;/)
+  assert.match(css, /\.doc-table tbody td\s*\{[^}]*padding:\s*4px 8px;/)
+})
+
+test('document delete controls use the 36px shared control height', () => {
+  assert.match(css, /\.doc-bulk-delete-btn,\s*\.doc-delete-btn\s*\{[\s\S]*min-height:\s*36px;/)
+})

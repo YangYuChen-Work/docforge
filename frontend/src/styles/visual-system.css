@@ -665,7 +665,7 @@ textarea {
 }
 
 .summary-kicker,
-.summary-metric span {
+.doc-stat-metric span {
   display: block;
   color: var(--ui-ink-faint);
   font-size: 11px;
@@ -735,7 +735,7 @@ textarea {
 .doc-table thead th { padding: 12px 8px; border-bottom-color: var(--ui-line-strong); color: var(--ui-ink-faint); font-size: 10px; letter-spacing: 0.08em; }
 .doc-table tbody tr { transition: background 180ms var(--ui-ease); }
 .doc-table tbody tr:hover { background: rgba(207, 224, 230, 0.44); }
-.doc-table tbody td { height: 42px; padding: 0 8px; border-bottom-color: var(--ui-line); }
+.doc-table tbody td { height: 42px; padding: 4px 8px; border-bottom-color: var(--ui-line); vertical-align: middle; }
 .doc-table-scroll .doc-actions-header,
 .doc-table-scroll .doc-actions-cell {
   position: sticky;
@@ -745,8 +745,11 @@ textarea {
 }
 .doc-table-scroll .doc-actions-header { z-index: 2; }
 .doc-table-scroll .doc-actions-cell { z-index: 1; }
-.doc-name { color: var(--ui-ink); font-weight: 700; }
+.doc-name { color: var(--ui-ink); font-size: 13px; font-weight: 700; line-height: 1.2; }
 .doc-meta, .doc-project, .doc-updated-at { color: var(--ui-ink-soft); }
+.doc-meta { margin-top: 2px; font-size: 11px; line-height: 1.2; }
+.doc-bulk-delete-btn,
+.doc-delete-btn { min-height: 36px; }
 .status-tag { padding: 3px 7px; border-radius: var(--ui-radius-xs); font-weight: 700; }
 .status-tag.editing, .status-tag.generating { background: var(--ui-primary-wash); color: var(--ui-primary-strong); }
 .status-tag.pending, .status-tag.draft { background: var(--ui-warning-wash); color: var(--ui-warning); }
