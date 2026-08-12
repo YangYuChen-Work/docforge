@@ -31,6 +31,7 @@ htmlcov/
 /docs/media/
 /.agents
 /.playwright-cli
+/skills-lock.json
 
 # Local editor and OS files
 .idea/
