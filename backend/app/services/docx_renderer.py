@@ -1178,13 +1178,19 @@ def _write_native_comments_part(docx_path: Path, comments: list[dict]):
                 content_types_root, encoding="utf-8", xml_declaration=True
             )
 
-        temporary_path = docx_path.with_suffix(".comments.tmp.docx")
-        with zipfile.ZipFile(temporary_path, "w", zipfile.ZIP_DEFLATED) as target:
-            for info in source.infolist():
-                target.writestr(info, replacements.get(info.filename, source.read(info.filename)))
-            if "word/comments.xml" not in names:
-                target.writestr("word/comments.xml", replacements["word/comments.xml"])
-        temporary_path.replace(docx_path)
+        # Pre-read all zip entries while source is still open
+        zip_entries = [
+            (info, source.read(info.filename)) for info in source.infolist()
+        ]
+
+    # Write temp file and replace AFTER source zipfile is closed (Windows fix)
+    temporary_path = docx_path.with_suffix(".comments.tmp.docx")
+    with zipfile.ZipFile(temporary_path, "w", zipfile.ZIP_DEFLATED) as target:
+        for info, data in zip_entries:
+            target.writestr(info, replacements.get(info.filename, data))
+        if "word/comments.xml" not in names:
+            target.writestr("word/comments.xml", replacements["word/comments.xml"])
+    temporary_path.replace(docx_path)
 
 
 def _comment_element(comment: dict):

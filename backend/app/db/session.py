@@ -1,8 +1,21 @@
+from pathlib import Path
+from urllib.parse import urlparse
+
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import normalize_persisted_path, settings
 
 
+def _ensure_db_directory(database_url: str) -> None:
+    """Create the parent directory for a file-based SQLite database."""
+    parsed = urlparse(database_url)
+    if parsed.scheme == "sqlite":
+        db_path = parsed.path.lstrip("/")
+        if db_path and db_path != ":memory:":
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+
+
+_ensure_db_directory(settings.database_url)
 engine = create_engine(
     settings.database_url,
     connect_args={"check_same_thread": False},
