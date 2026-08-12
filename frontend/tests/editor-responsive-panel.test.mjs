@@ -6,6 +6,9 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const page = readFileSync(resolve(root, 'src/pages/DocEditor.vue'), 'utf8')
 const css = readFileSync(resolve(root, 'src/styles/editor-refresh.css'), 'utf8')
+const aiPanel = readFileSync(resolve(root, 'src/components/AiPanel.vue'), 'utf8')
+const pageDocCss = readFileSync(resolve(root, 'src/styles/page-doc.css'), 'utf8')
+const contentPanel = readFileSync(resolve(root, 'src/components/ContentPanel.vue'), 'utf8')
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -30,11 +33,16 @@ function vueTag(source, name) {
   return match[0]
 }
 
+function classSpecificity(selector) {
+  return (selector.match(/\.[A-Za-z_][\w-]*/g) ?? []).length
+}
+
 test('narrow evidence drawer manages focus, Escape, inert background, and modal semantics', () => {
   assert.match(page, /ref="evidenceToggleRef"/)
   assert.match(page, /ref="evidenceCloseRef"/)
   assert.match(page, /@click="openEvidencePanel"/)
-  assert.match(page, /@keydown\.esc\.stop\.prevent="closeEvidencePanel\(\)"/)
+  assert.match(page, /class="editor-evidence-backdrop"[\s\S]*?tabindex="-1"/)
+  assert.match(page, /ref="evidenceShellRef"/)
   assert.match(page, /const drawerModalActive = computed\(\(\) => narrowEvidenceMode\.value && evidencePanelOpen\.value\)/)
   assert.match(page, /await nextTick\(\)\s*evidenceCloseRef\.value\?\.focus\(\)/)
   assert.match(page, /await nextTick\(\)\s*evidenceToggleRef\.value\?\.focus\(\)/)
@@ -45,6 +53,21 @@ test('narrow evidence drawer manages focus, Escape, inert background, and modal 
   const inertBindings = page.match(/:inert="drawerModalActive \|\| undefined"/g) ?? []
   assert.ok(inertBindings.length >= 4, 'topbar, toolbar, outline, and content must leave the tab order')
   assert.match(page, /const evidenceModeQuery = window\.matchMedia\('\(min-width: 768px\) and \(max-width: 1179px\)'\)/)
+
+  const mounted = block(page, 'onMounted(async () =>')
+  const unmounted = block(page, 'onUnmounted(() =>')
+  assert.match(mounted, /window\.addEventListener\('keydown', handleEvidenceKeydown\)/)
+  assert.match(unmounted, /window\.removeEventListener\('keydown', handleEvidenceKeydown\)/)
+
+  const keyboard = block(page, 'function handleEvidenceKeydown(event: KeyboardEvent)')
+  assert.match(keyboard, /if \(!drawerModalActive\.value\) return/)
+  assert.match(keyboard, /event\.key === 'Escape'/)
+  assert.match(keyboard, /closeEvidencePanel\(\)/)
+  assert.match(keyboard, /event\.key !== 'Tab'/)
+  assert.match(keyboard, /querySelectorAll<HTMLElement>/)
+  assert.match(keyboard, /event\.shiftKey/)
+  assert.match(keyboard, /last\.focus\(\)/)
+  assert.match(keyboard, /first\.focus\(\)/)
 })
 
 test('AiPanel keeps its complete existing ref, seven props, and eight events', () => {
@@ -77,9 +100,19 @@ test('narrow editor uses two columns and a correctly layered fixed drawer', () =
 
   const drawer = block(narrow, '.editor-evidence-shell')
   assert.match(drawer, /position:\s*fixed;/)
+  assert.match(drawer, /top:\s*0;/)
+  assert.match(drawer, /right:\s*0;/)
+  assert.match(drawer, /bottom:\s*0;/)
   assert.match(drawer, /width:\s*min\(340px, calc\(100vw - 80px\)\);/)
+  assert.match(drawer, /height:\s*100dvh;/)
   assert.match(drawer, /transform:\s*translateX\(105%\);/)
-  assert.match(block(narrow, '.editor-evidence-shell.is-open'), /transform:\s*translateX\(0\);/)
+  assert.match(drawer, /visibility:\s*hidden;/)
+  assert.match(drawer, /pointer-events:\s*none;/)
+
+  const openDrawer = block(narrow, '.editor-evidence-shell.is-open')
+  assert.match(openDrawer, /transform:\s*translateX\(0\);/)
+  assert.match(openDrawer, /visibility:\s*visible;/)
+  assert.match(openDrawer, /pointer-events:\s*auto;/)
 
   const backdropZ = Number(block(narrow, '.editor-evidence-backdrop').match(/z-index:\s*(\d+);/)?.[1])
   const drawerZ = Number(drawer.match(/z-index:\s*(\d+);/)?.[1])
@@ -90,6 +123,12 @@ test('outline, paper viewport, evidence contents, and toolbar keep independent o
   assert.match(block(css, '.editor-outline'), /overflow-y:\s*auto;/)
   assert.match(block(css, '.editor-content'), /overflow:\s*auto;/)
   assert.match(block(css, '.editor-evidence-shell > .editor-ai-panel'), /overflow:\s*hidden;/)
+  assert.match(aiPanel, /class="ai-panel-prelude"/)
+  assert.match(aiPanel, /class="ai-chat-scroll"/)
+  assert.match(aiPanel, /class="panel-tab-scroll"/)
+  assert.match(block(pageDocCss, '.ai-panel-prelude'), /overflow-y:\s*auto;/)
+  assert.match(block(pageDocCss, '.ai-chat-scroll'), /overflow-y:\s*auto;/)
+  assert.match(block(pageDocCss, '.panel-tab-scroll'), /overflow-y:\s*auto;/)
   const toolbar = block(css, '.editor-toolbar')
   assert.match(toolbar, /flex-wrap:\s*nowrap;/)
   assert.match(toolbar, /overflow-x:\s*auto;/)
@@ -97,6 +136,17 @@ test('outline, paper viewport, evidence contents, and toolbar keep independent o
 })
 
 test('editor-scoped paper rules outrank ContentPanel scoped defaults at each desktop range', () => {
+  const baselinePaper = block(contentPanel, '.word-page')
+  assert.match(baselinePaper, /background:\s*#fff;/)
+  assert.match(baselinePaper, /padding:\s*60px 80px;/)
+  assert.match(block(contentPanel, '.word-body :deep(h1)'), /color:\s*#111;/)
+  assert.match(block(contentPanel, '.word-body :deep(h2)'), /color:\s*#222;/)
+  assert.match(block(contentPanel, '.word-body :deep(p)'), /color:\s*#1a1a1a;/)
+
+  const scopedClassWeight = 2 // component class plus Vue's generated data-v attribute
+  assert.ok(classSpecificity('.editor-shell .content-panel .word-page') > scopedClassWeight)
+  assert.ok(classSpecificity('.editor-shell .content-panel .word-body p') > scopedClassWeight)
+
   const paper = block(css, '.editor-shell .content-panel .word-page')
   assert.match(paper, /background:\s*var\(--ui-paper\);/)
   assert.match(paper, /color:\s*var\(--ui-paper-ink\);/)
@@ -107,6 +157,7 @@ test('editor-scoped paper rules outrank ContentPanel scoped defaults at each des
     block(css, '.editor-shell .content-panel .word-body h1,\n.editor-shell .content-panel .word-body h2,\n.editor-shell .content-panel .word-body h3'),
     /color:\s*var\(--ui-paper-ink\);/,
   )
+  assert.match(block(css, '.editor-shell .content-panel .word-body p'), /color:\s*var\(--ui-paper-ink\);/)
 
   const narrow = block(css, '@media (max-width: 1179px) and (min-width: 768px)')
   const narrowPaper = block(narrow, '.editor-shell .content-panel .word-page')

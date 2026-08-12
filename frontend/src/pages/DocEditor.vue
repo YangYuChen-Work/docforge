@@ -186,10 +186,12 @@
         v-if="evidencePanelOpen"
         class="editor-evidence-backdrop"
         type="button"
+        tabindex="-1"
         aria-label="关闭数据来源面板"
         @click="closeEvidencePanel()"
       />
       <div
+        ref="evidenceShellRef"
         id="editor-evidence-panel"
         class="editor-evidence-shell"
         :class="{ 'is-open': evidencePanelOpen }"
@@ -316,6 +318,7 @@ const evidencePanelOpen = ref(false)
 const narrowEvidenceMode = ref(false)
 const evidenceToggleRef = ref<HTMLButtonElement | null>(null)
 const evidenceCloseRef = ref<HTMLButtonElement | null>(null)
+const evidenceShellRef = ref<HTMLElement | null>(null)
 const aiPanelRef = ref()
 const contentPanelRef = ref()
 const imageInputRef = ref<HTMLInputElement | null>(null)
@@ -411,6 +414,7 @@ const confirmableChapterCount = computed(() => {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleSaveShortcut)
+  window.addEventListener('keydown', handleEvidenceKeydown)
   syncEvidenceMode()
   evidenceModeQuery.addEventListener('change', syncEvidenceMode)
   doc.value = await getDocument(docId)
@@ -421,6 +425,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleSaveShortcut)
+  window.removeEventListener('keydown', handleEvidenceKeydown)
   evidenceModeQuery.removeEventListener('change', syncEvidenceMode)
   if (saveTimer) clearTimeout(saveTimer)
   stopGenerationPolling()
@@ -446,6 +451,36 @@ async function closeEvidencePanel() {
   evidencePanelOpen.value = false
   await nextTick()
   evidenceToggleRef.value?.focus()
+}
+
+function handleEvidenceKeydown(event: KeyboardEvent) {
+  if (!drawerModalActive.value) return
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    void closeEvidencePanel()
+    return
+  }
+  if (event.key !== 'Tab') return
+
+  const shell = evidenceShellRef.value
+  if (!shell) return
+  const focusable = Array.from(
+    shell.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((element) => element.getAttribute('aria-hidden') !== 'true')
+  if (focusable.length === 0) return
+
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  const active = document.activeElement
+  if (event.shiftKey && (active === first || !shell.contains(active))) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && (active === last || !shell.contains(active))) {
+    event.preventDefault()
+    first.focus()
+  }
 }
 
 function isStillGenerating(d: any) {
