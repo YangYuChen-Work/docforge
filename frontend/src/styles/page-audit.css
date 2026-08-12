@@ -105,15 +105,20 @@
 
 /* Audit Table */
 .audit-table-wrapper {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    height: clamp(420px, calc(100dvh - 330px), 680px);
+    min-height: 0;
     border: 1px solid var(--ui-line);
     border-radius: var(--ui-radius-sm);
     background: var(--ui-surface);
     box-shadow: none;
-    overflow: visible;
+    overflow: hidden;
     margin-bottom: 16px;
 }
 
 .audit-table-scroll {
+    min-height: 0;
     overflow: auto;
     scrollbar-gutter: stable;
 }
@@ -221,6 +226,7 @@
 
 /* Pagination */
 .audit-pagination {
+    position: relative;
     display: flex;
     justify-content: space-between;
     align-items: center;

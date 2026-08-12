@@ -6,6 +6,8 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const page = readFileSync(resolve(root, 'src/pages/DocList.vue'), 'utf8')
 const css = readFileSync(resolve(root, 'src/styles/visual-system.css'), 'utf8')
+const legacyCss = readFileSync(resolve(root, 'src/styles/modern-shell.css'), 'utf8')
+const main = readFileSync(resolve(root, 'src/main.ts'), 'utf8')
 
 function extractCssBlock(source, prelude) {
   const blockStart = source.indexOf(`${prelude} {`)
@@ -23,6 +25,55 @@ function extractCssBlock(source, prelude) {
   assert.fail(`unterminated CSS block: ${prelude}`)
 }
 
+function declarations(source, selector) {
+  return Object.fromEntries(
+    extractCssBlock(source, selector)
+      .split(';')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry) => {
+        const colon = entry.indexOf(':')
+        return [entry.slice(0, colon).trim(), entry.slice(colon + 1).trim()]
+      }),
+  )
+}
+
+function specificity(selector) {
+  const ids = (selector.match(/#[\w-]+/g) ?? []).length
+  const classLike = (selector.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g) ?? []).length
+  const elements = (selector.replace(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+|[>+~*]/g, ' ').match(/\b[a-z][\w-]*\b/gi) ?? []).length
+  return [ids, classLike, elements]
+}
+
+function compareSpecificity(left, right) {
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] !== right[index]) return left[index] - right[index]
+  }
+  return 0
+}
+
+function themeTokens(source, selector) {
+  const entries = extractCssBlock(source, selector).matchAll(/(--[\w-]+):\s*(#[0-9a-f]{6});/gi)
+  return Object.fromEntries([...entries].map((match) => [match[1], match[2]]))
+}
+
+function resolveToken(value, tokens) {
+  const token = value.match(/^var\((--[\w-]+)\)$/)?.[1]
+  assert.ok(token, `expected semantic color token, received ${value}`)
+  assert.ok(tokens[token], `missing ${token}`)
+  return tokens[token]
+}
+
+function contrastRatio(foreground, background) {
+  const luminance = (hex) => {
+    const channels = hex.slice(1).match(/../g).map((value) => Number.parseInt(value, 16) / 255)
+    const [red, green, blue] = channels.map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+  }
+  const values = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
+  return (values[0] + 0.05) / (values[1] + 0.05)
+}
+
 test('document table owns horizontal scrolling and exposes a named region', () => {
   assert.match(page, /class="doc-table-scroll"[^>]*tabindex="0"/)
   assert.match(page, /class="doc-table-scroll"[^>]*role="region"/)
@@ -35,6 +86,49 @@ test('document metrics use one contiguous work surface', () => {
   assert.match(css, /\.doc-stats\s*\{[\s\S]*gap:\s*0;/)
   assert.match(css, /\.doc-stat-card\s*\{[\s\S]*border-radius:\s*0;/)
   assert.match(css, /\.doc-stat-card\s*\+[\s\S]*border-left:/)
+})
+
+test('primary document metric wins the loaded cascade and stays readable in both themes', () => {
+  assert.ok(
+    main.indexOf("./styles/modern-shell.css") < main.indexOf("./styles/visual-system.css"),
+    'the cascade simulation must follow the application stylesheet order',
+  )
+
+  const legacySelector = '.doc-stat-card:first-child'
+  const surfaceSelector = '.doc-stats > .doc-stat-card:first-child'
+  const strongSelector = '.doc-stats > .doc-stat-card.doc-stat-primary:first-child strong'
+  const descriptionSelector = '.doc-stats > .doc-stat-card.doc-stat-primary:first-child p'
+  const kickerSelector = '.doc-stats > .doc-stat-card.doc-stat-primary:first-child .summary-kicker'
+  const legacy = declarations(legacyCss, legacySelector)
+  const surface = declarations(css, surfaceSelector)
+
+  assert.equal(legacy.background, 'var(--ui-ink)')
+  assert.ok(
+    compareSpecificity(specificity(surfaceSelector), specificity(legacySelector)) >= 0,
+    'the later visual-system surface rule must match or outrank the legacy first-card rule',
+  )
+  assert.equal(surface.background, 'var(--ui-surface)')
+
+  const textRules = [
+    ['strong', declarations(css, strongSelector), '--ui-ink'],
+    ['description', declarations(css, descriptionSelector), '--ui-ink-soft'],
+    ['kicker', declarations(css, kickerSelector), '--ui-ink-soft'],
+  ]
+  const themes = [themeTokens(css, ':root'), themeTokens(css, '[data-theme="dark"]')]
+
+  for (const [label, rule, expectedToken] of textRules) {
+    assert.equal(rule.color, `var(${expectedToken})`, `${label} must use its semantic ink token`)
+    assert.ok(
+      compareSpecificity(specificity(label === 'strong' ? strongSelector : label === 'description' ? descriptionSelector : kickerSelector), specificity('.doc-stat-card:first-child .doc-stat-label')) >= 0,
+      `${label} rule must outrank the legacy first-card text rule`,
+    )
+    for (const tokens of themes) {
+      assert.ok(
+        contrastRatio(resolveToken(rule.color, tokens), resolveToken(surface.background, tokens)) >= 4.5,
+        `${label} must reach 4.5:1 against the shared metric surface`,
+      )
+    }
+  }
 })
 
 test('shared controls use the compact desktop rhythm', () => {

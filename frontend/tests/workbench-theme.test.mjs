@@ -60,6 +60,33 @@ test('uses dedicated high-contrast navigation tokens in both themes', () => {
   assert.match(css, /\.sidebar \.nav-item:focus-visible,[\s\S]*outline-color:\s*var\(--ui-nav-focus\)/)
 })
 
+test('status tokens stay readable and use semantic borders in both themes', () => {
+  const lightTokens = css.match(/:root\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+  const darkTokens = css.match(/\[data-theme="dark"\]\s*\{([\s\S]*?)\}/)?.[1] ?? ''
+  const statuses = [
+    ['primary', '--ui-primary-strong', '--ui-primary-wash', '--ui-primary-border'],
+    ['success', '--ui-success', '--ui-success-wash', '--ui-success-border'],
+    ['warning', '--ui-warning', '--ui-warning-wash', '--ui-warning-border'],
+    ['danger', '--ui-danger', '--ui-danger-wash', '--ui-danger-border'],
+  ]
+
+  for (const [themeName, tokens] of [['light', lightTokens], ['dark', darkTokens]]) {
+    for (const [status, textToken, washToken, borderToken] of statuses) {
+      assert.ok(
+        contrastRatio(tokenValue(tokens, textToken), tokenValue(tokens, washToken)) >= 4.5,
+        `${themeName} ${status} status text must reach 4.5:1 against its wash`,
+      )
+      tokenValue(tokens, borderToken)
+    }
+  }
+
+  assert.match(css, /\.status-tag\s*\{[^}]*border:\s*1px solid transparent;/)
+  assert.match(css, /\.status-tag\.editing, \.status-tag\.generating\s*\{[^}]*border-color:\s*var\(--ui-primary-border\);/)
+  assert.match(css, /\.status-tag\.pending, \.status-tag\.draft\s*\{[^}]*border-color:\s*var\(--ui-warning-border\);/)
+  assert.match(css, /\.status-tag\.archived\s*\{[^}]*border-color:\s*var\(--ui-success-border\);/)
+  assert.match(css, /\.status-tag\.failed\s*\{[^}]*border-color:\s*var\(--ui-danger-border\);/)
+})
+
 test('preserves the 208px expanded and 60px collapsed sidebar geometry', () => {
   assert.match(css, /:root\s*\{[\s\S]*--ui-nav-width:\s*208px;/)
   assert.match(css, /:root\s*\{[\s\S]*--ui-nav-collapsed:\s*60px;/)

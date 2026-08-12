@@ -46,7 +46,6 @@ test('narrow evidence drawer manages focus, Escape, inert background, and modal 
   assert.match(page, /ref="evidenceShellRef"/)
   assert.match(page, /const drawerModalActive = computed\(\(\) => narrowEvidenceMode\.value && evidencePanelOpen\.value\)/)
   assert.match(page, /await nextTick\(\)\s*evidenceCloseRef\.value\?\.focus\(\)/)
-  assert.match(page, /await nextTick\(\)\s*evidenceToggleRef\.value\?\.focus\(\)/)
   assert.match(page, /:role="narrowEvidenceMode \? 'dialog' : undefined"/)
   assert.match(page, /:aria-modal="drawerModalActive \? 'true' : undefined"/)
   assert.match(page, /:aria-label="narrowEvidenceMode \? '数据来源' : undefined"/)
@@ -69,6 +68,30 @@ test('narrow evidence drawer manages focus, Escape, inert background, and modal 
   assert.match(keyboard, /event\.shiftKey/)
   assert.match(keyboard, /last\.focus\(\)/)
   assert.match(keyboard, /first\.focus\(\)/)
+})
+
+test('leaving narrow drawer mode closes through focus-aware logic and focuses inline evidence', () => {
+  assert.match(page, /type EvidenceCloseFocus = 'toggle' \| 'inline'/)
+
+  const syncMode = block(page, 'async function syncEvidenceMode(event?: MediaQueryListEvent)')
+  assert.match(syncMode, /const leavingOpenDrawer = narrowEvidenceMode\.value && evidencePanelOpen\.value && !matches/)
+  assert.match(syncMode, /narrowEvidenceMode\.value = matches/)
+  assert.match(syncMode, /if \(leavingOpenDrawer\) await closeEvidencePanel\('inline'\)/)
+  assert.doesNotMatch(syncMode, /evidencePanelOpen\.value = false/)
+
+  const closePanel = block(page, "async function closeEvidencePanel(focusTarget: EvidenceCloseFocus = 'toggle')")
+  assert.match(closePanel, /evidencePanelOpen\.value = false/)
+  assert.match(closePanel, /if \(focusTarget === 'inline'\)/)
+  assert.match(closePanel, /focusInlineEvidenceControl\(\)/)
+  assert.match(closePanel, /evidenceToggleRef\.value\?\.focus\(\)/)
+
+  const focusInline = block(page, 'function focusInlineEvidenceControl()')
+  assert.match(focusInline, /evidenceShellRef\.value\?\.querySelector<HTMLElement>/)
+  assert.match(focusInline, /\.editor-ai-panel button:not\(\[disabled\]\)/)
+  assert.match(focusInline, /control\?\.focus\(\)/)
+
+  assert.match(page, /@click="closeEvidencePanel\(\)"/)
+  assert.match(block(page, 'function handleEvidenceKeydown(event: KeyboardEvent)'), /closeEvidencePanel\(\)/)
 })
 
 test('AiPanel keeps its complete existing ref, seven props, and eight events', () => {

@@ -319,6 +319,7 @@ const narrowEvidenceMode = ref(false)
 const evidenceToggleRef = ref<HTMLButtonElement | null>(null)
 const evidenceCloseRef = ref<HTMLButtonElement | null>(null)
 const evidenceShellRef = ref<HTMLElement | null>(null)
+type EvidenceCloseFocus = 'toggle' | 'inline'
 const aiPanelRef = ref()
 const contentPanelRef = ref()
 const imageInputRef = ref<HTMLInputElement | null>(null)
@@ -433,10 +434,11 @@ onUnmounted(() => {
   stopExportFeedback()
 })
 
-function syncEvidenceMode(event?: MediaQueryListEvent) {
+async function syncEvidenceMode(event?: MediaQueryListEvent) {
   const matches = event?.matches ?? evidenceModeQuery.matches
+  const leavingOpenDrawer = narrowEvidenceMode.value && evidencePanelOpen.value && !matches
   narrowEvidenceMode.value = matches
-  if (!matches) evidencePanelOpen.value = false
+  if (leavingOpenDrawer) await closeEvidencePanel('inline')
 }
 
 async function openEvidencePanel() {
@@ -446,10 +448,21 @@ async function openEvidencePanel() {
   evidenceCloseRef.value?.focus()
 }
 
-async function closeEvidencePanel() {
+function focusInlineEvidenceControl() {
+  const control = evidenceShellRef.value?.querySelector<HTMLElement>(
+    '.editor-ai-panel button:not([disabled]), .editor-ai-panel input:not([disabled]), .editor-ai-panel textarea:not([disabled]), .editor-ai-panel select:not([disabled]), .editor-ai-panel a[href], .editor-ai-panel [tabindex]:not([tabindex="-1"])',
+  )
+  control?.focus()
+}
+
+async function closeEvidencePanel(focusTarget: EvidenceCloseFocus = 'toggle') {
   if (!evidencePanelOpen.value) return
   evidencePanelOpen.value = false
   await nextTick()
+  if (focusTarget === 'inline') {
+    focusInlineEvidenceControl()
+    return
+  }
   evidenceToggleRef.value?.focus()
 }
 
