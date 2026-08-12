@@ -10,21 +10,21 @@
     </div>
   </header>
 
-  <section class="doc-summary" aria-label="文档摘要">
-    <div class="summary-primary">
+  <section class="doc-stats" aria-label="文档摘要">
+    <div class="doc-stat-card doc-stat-primary">
       <span class="summary-kicker">当前工作区</span>
       <strong>{{ docs.length }} 份项目文档</strong>
       <p>从来源资料到可确认章节的工作进度</p>
     </div>
-    <div class="summary-metric">
+    <div class="doc-stat-card doc-stat-metric">
       <strong>{{ draftCount }}</strong>
       <span>待生成</span>
     </div>
-    <div class="summary-metric">
+    <div class="doc-stat-card doc-stat-metric">
       <strong>{{ editingCount }}</strong>
       <span>编辑中</span>
     </div>
-    <div class="summary-metric">
+    <div class="doc-stat-card doc-stat-metric">
       <strong>{{ archivedCount }}</strong>
       <span>已归档</span>
     </div>
@@ -92,7 +92,13 @@
           <p>{{ search || currentTab !== '全部' ? '试试更换搜索词或分类。' : '从一个项目和模板开始建立第一份文档。' }}</p>
           <RouterLink v-if="!search && currentTab === '全部'" class="btn btn-primary" to="/doc/new">新建文档</RouterLink>
         </div>
-        <div v-else class="doc-table-scroll">
+        <div
+          v-else
+          class="doc-table-scroll"
+          tabindex="0"
+          role="region"
+          aria-label="项目文档列表"
+        >
           <table class="doc-table">
             <thead>
               <tr>
@@ -101,7 +107,7 @@
                 <th>项目</th>
                 <th>状态</th>
                 <th>更新时间</th>
-                <th>操作</th>
+                <th class="doc-actions-header">操作</th>
               </tr>
             </thead>
             <tbody>
