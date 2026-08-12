@@ -1,7 +1,11 @@
 <template>
   <div class="editor-shell">
     <!-- Editor Top Bar -->
-    <div class="editor-topbar">
+    <div
+      class="editor-topbar"
+      :inert="drawerModalActive || undefined"
+      :aria-hidden="drawerModalActive ? 'true' : undefined"
+    >
       <div class="editor-topbar-left">
         <div v-if="!renaming" class="editor-title-view">
           <h2 class="editor-doc-title">{{ doc?.title || '加载中...' }}</h2>
@@ -37,11 +41,12 @@
           {{ confirmingAllChapters ? `确认中 ${confirmedChapterCount}/${confirmableChapterCount}` : '一键确认全部章节' }}
         </button>
         <button
+          ref="evidenceToggleRef"
           class="editor-evidence-toggle"
           type="button"
-          :aria-expanded="evidencePanelOpen"
+          :aria-expanded="drawerModalActive"
           aria-controls="editor-evidence-panel"
-          @click="evidencePanelOpen = !evidencePanelOpen"
+          @click="openEvidencePanel"
         >
           数据来源
         </button>
@@ -49,7 +54,11 @@
     </div>
 
     <!-- Editor Toolbar -->
-    <div class="editor-toolbar">
+    <div
+      class="editor-toolbar"
+      :inert="drawerModalActive || undefined"
+      :aria-hidden="drawerModalActive ? 'true' : undefined"
+    >
       <button class="tb-btn" title="撤销" @mousedown.prevent @click="runEditorCommand('undo')">撤销</button>
       <button class="tb-btn" title="重做" @mousedown.prevent @click="runEditorCommand('redo')">重做</button>
       <span class="tb-sep"></span>
@@ -127,6 +136,8 @@
       class="editor-operation-feedback"
       role="status"
       aria-live="polite"
+      :inert="drawerModalActive || undefined"
+      :aria-hidden="drawerModalActive ? 'true' : undefined"
     >
       <span class="editor-operation-pulse" aria-hidden="true"></span>
       <span>
@@ -137,6 +148,8 @@
     <!-- Editor Body: 3-column layout -->
     <div class="editor-body">
       <OutlinePanel
+        :inert="drawerModalActive || undefined"
+        :aria-hidden="drawerModalActive ? 'true' : undefined"
         :docTitle="doc?.title || ''"
         :chapters="doc?.chapters || []"
         :activeId="currentChapterId"
@@ -148,6 +161,8 @@
       />
       <ContentPanel
         ref="contentPanelRef"
+        :inert="drawerModalActive || undefined"
+        :aria-hidden="drawerModalActive ? 'true' : undefined"
         :chapter="currentChapter"
         :hasUnsavedChanges="hasUnsavedChanges"
         :isSaving="isSaving"
@@ -172,14 +187,19 @@
         class="editor-evidence-backdrop"
         type="button"
         aria-label="关闭数据来源面板"
-        @click="evidencePanelOpen = false"
+        @click="closeEvidencePanel()"
       />
       <div
         id="editor-evidence-panel"
         class="editor-evidence-shell"
         :class="{ 'is-open': evidencePanelOpen }"
+        :role="narrowEvidenceMode ? 'dialog' : undefined"
+        :aria-modal="drawerModalActive ? 'true' : undefined"
+        :aria-label="narrowEvidenceMode ? '数据来源' : undefined"
+        :aria-hidden="narrowEvidenceMode && !evidencePanelOpen ? 'true' : undefined"
+        @keydown.esc.stop.prevent="closeEvidencePanel()"
       >
-        <button class="editor-evidence-close" type="button" @click="evidencePanelOpen = false">关闭</button>
+        <button ref="evidenceCloseRef" class="editor-evidence-close" type="button" @click="closeEvidencePanel()">关闭</button>
         <AiPanel
           ref="aiPanelRef"
           :annotations="annotations"
@@ -293,6 +313,9 @@ const saveError = ref('')
 const showRegenModal = ref(false)
 const regenInstruction = ref('')
 const evidencePanelOpen = ref(false)
+const narrowEvidenceMode = ref(false)
+const evidenceToggleRef = ref<HTMLButtonElement | null>(null)
+const evidenceCloseRef = ref<HTMLButtonElement | null>(null)
 const aiPanelRef = ref()
 const contentPanelRef = ref()
 const imageInputRef = ref<HTMLInputElement | null>(null)
@@ -342,6 +365,9 @@ const confirmedChapterCount = ref(0)
 let focusMessageTimer: ReturnType<typeof setTimeout> | null = null
 const regenerationTransition = ref<RegenerationTransition | null>(null)
 let latestGenerationRefreshId = 0
+const evidenceModeQuery = window.matchMedia('(min-width: 768px) and (max-width: 1179px)')
+
+const drawerModalActive = computed(() => narrowEvidenceMode.value && evidencePanelOpen.value)
 
 const chapterCitations = computed(() =>
   (currentChapter.value?.citations || []).map((citation: any, index: number) => ({
@@ -385,6 +411,8 @@ const confirmableChapterCount = computed(() => {
 
 onMounted(async () => {
   window.addEventListener('keydown', handleSaveShortcut)
+  syncEvidenceMode()
+  evidenceModeQuery.addEventListener('change', syncEvidenceMode)
   doc.value = await getDocument(docId)
   titleDraft.value = doc.value.title || ''
   if (doc.value.chapters.length > 0) await selectChapter(doc.value.chapters[0])
@@ -393,11 +421,32 @@ onMounted(async () => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleSaveShortcut)
+  evidenceModeQuery.removeEventListener('change', syncEvidenceMode)
   if (saveTimer) clearTimeout(saveTimer)
   stopGenerationPolling()
   if (focusMessageTimer) clearTimeout(focusMessageTimer)
   stopExportFeedback()
 })
+
+function syncEvidenceMode(event?: MediaQueryListEvent) {
+  const matches = event?.matches ?? evidenceModeQuery.matches
+  narrowEvidenceMode.value = matches
+  if (!matches) evidencePanelOpen.value = false
+}
+
+async function openEvidencePanel() {
+  if (!narrowEvidenceMode.value) return
+  evidencePanelOpen.value = true
+  await nextTick()
+  evidenceCloseRef.value?.focus()
+}
+
+async function closeEvidencePanel() {
+  if (!evidencePanelOpen.value) return
+  evidencePanelOpen.value = false
+  await nextTick()
+  evidenceToggleRef.value?.focus()
+}
 
 function isStillGenerating(d: any) {
   if (!d) return false
