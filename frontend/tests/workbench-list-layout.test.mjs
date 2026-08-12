@@ -47,3 +47,17 @@ test('document rows keep compact title and metadata rhythm within 42px', () => {
 test('document delete controls use the 36px shared control height', () => {
   assert.match(css, /\.doc-bulk-delete-btn,\s*\.doc-delete-btn\s*\{[\s\S]*min-height:\s*36px;/)
 })
+
+test('document action cells fit 36px delete controls within 42px rows', () => {
+  const rowHeight = css.match(/\.doc-table tbody td\s*\{[^}]*height:\s*(\d+)px;/)
+  const actionCellPadding = css.match(/\.doc-table tbody \.doc-actions-cell\s*\{[^}]*padding:\s*(\d+)px\s+8px;/)
+  const deleteControlHeight = css.match(/\.doc-bulk-delete-btn,\s*\.doc-delete-btn\s*\{[^}]*min-height:\s*(\d+)px;/)
+
+  assert.ok(rowHeight, 'document rows define a pixel height')
+  assert.ok(actionCellPadding, 'action cells define their own vertical padding')
+  assert.ok(deleteControlHeight, 'delete controls define a minimum height')
+  assert.ok(
+    Number(deleteControlHeight[1]) + Number(actionCellPadding[1]) * 2 <= Number(rowHeight[1]),
+    'delete control and action-cell padding fit within the data-row height',
+  )
+})

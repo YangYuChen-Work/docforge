@@ -745,6 +745,7 @@ textarea {
 }
 .doc-table-scroll .doc-actions-header { z-index: 2; }
 .doc-table-scroll .doc-actions-cell { z-index: 1; }
+.doc-table tbody .doc-actions-cell { padding: 2px 8px; }
 .doc-name { color: var(--ui-ink); font-size: 13px; font-weight: 700; line-height: 1.2; }
 .doc-meta, .doc-project, .doc-updated-at { color: var(--ui-ink-soft); }
 .doc-meta { margin-top: 2px; font-size: 11px; line-height: 1.2; }
