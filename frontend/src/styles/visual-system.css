@@ -998,6 +998,10 @@ textarea {
 
 @media (max-width: 1179px) and (min-width: 768px) {
   .editor-body { grid-template-columns: minmax(184px, 214px) minmax(0, 1fr); }
+  .editor-evidence-shell {
+    transition: transform 220ms var(--ui-ease), visibility 0s linear 220ms, background-color 260ms var(--ui-ease), border-color 260ms var(--ui-ease), color 220ms var(--ui-ease), box-shadow 260ms var(--ui-ease);
+  }
+  .editor-evidence-shell.is-open { transition-delay: 0s; }
 }
 
 @media (max-width: 767px) {

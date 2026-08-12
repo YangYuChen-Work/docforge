@@ -6,6 +6,7 @@ import { resolve } from 'node:path'
 const root = resolve(import.meta.dirname, '..')
 const page = readFileSync(resolve(root, 'src/pages/DocEditor.vue'), 'utf8')
 const css = readFileSync(resolve(root, 'src/styles/editor-refresh.css'), 'utf8')
+const visualSystemCss = readFileSync(resolve(root, 'src/styles/visual-system.css'), 'utf8')
 const aiPanel = readFileSync(resolve(root, 'src/components/AiPanel.vue'), 'utf8')
 const pageDocCss = readFileSync(resolve(root, 'src/styles/page-doc.css'), 'utf8')
 const contentPanel = readFileSync(resolve(root, 'src/components/ContentPanel.vue'), 'utf8')
@@ -117,6 +118,29 @@ test('narrow editor uses two columns and a correctly layered fixed drawer', () =
   const backdropZ = Number(block(narrow, '.editor-evidence-backdrop').match(/z-index:\s*(\d+);/)?.[1])
   const drawerZ = Number(drawer.match(/z-index:\s*(\d+);/)?.[1])
   assert.ok(Number.isFinite(backdropZ) && Number.isFinite(drawerZ) && backdropZ < drawerZ)
+})
+
+test('final visual layer preserves narrow drawer motion alongside theme transitions', () => {
+  const narrow = block(visualSystemCss, '@media (max-width: 1179px) and (min-width: 768px)')
+  const drawer = block(narrow, '.editor-evidence-shell')
+  const transition = drawer.match(/transition:\s*([^;]+);/)
+
+  assert.ok(transition, 'narrow drawer must define its final transition in visual-system.css')
+  assert.deepEqual(
+    transition[1].split(',').map((item) => item.trim()),
+    [
+      'transform 220ms var(--ui-ease)',
+      'visibility 0s linear 220ms',
+      'background-color 260ms var(--ui-ease)',
+      'border-color 260ms var(--ui-ease)',
+      'color 220ms var(--ui-ease)',
+      'box-shadow 260ms var(--ui-ease)',
+    ],
+  )
+  assert.match(
+    block(narrow, '.editor-evidence-shell.is-open'),
+    /transition-delay:\s*0s;/,
+  )
 })
 
 test('outline, paper viewport, evidence contents, and toolbar keep independent overflow', () => {
