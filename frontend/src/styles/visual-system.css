@@ -11,6 +11,10 @@
   --ui-line-strong: #afc1ca;
   --ui-nav: #086783;
   --ui-nav-strong: #07546b;
+  --ui-nav-foreground: #f4fbfd;
+  --ui-nav-active: #eaf8fc;
+  --ui-nav-active-foreground: #07546b;
+  --ui-nav-focus: #ffffff;
   --ui-primary: #2e8eae;
   --ui-primary-strong: #176d8a;
   --ui-primary-wash: #e5f3f8;
@@ -22,7 +26,7 @@
   --ui-warning-wash: #f3e9d8;
   --ui-danger: #a34f4f;
   --ui-danger-wash: #f3e2e2;
-  --ui-nav-muted: #b9d7e1;
+  --ui-nav-muted: #c6e4ec;
   --ui-nav-line: rgba(255, 255, 255, 0.2);
   --ui-shadow-soft: 0 1px 2px rgba(20, 39, 48, 0.06);
   --ui-shadow-float: 0 10px 24px rgba(20, 39, 48, 0.14);
@@ -52,6 +56,10 @@
   --ui-line-strong: #3b5864;
   --ui-nav: #083f53;
   --ui-nav-strong: #062f3e;
+  --ui-nav-foreground: #e6f7fc;
+  --ui-nav-active: #bcecf8;
+  --ui-nav-active-foreground: #062f3e;
+  --ui-nav-focus: #ffffff;
   --ui-primary: #61b6d2;
   --ui-primary-strong: #8bcce0;
   --ui-primary-wash: #1c3c48;
@@ -172,7 +180,7 @@ textarea {
   z-index: var(--ui-z-nav);
   border-right: 1px solid var(--ui-nav-line);
   background: var(--ui-nav);
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   transition: width 220ms var(--ui-ease), transform 220ms var(--ui-ease);
 }
 
@@ -187,7 +195,7 @@ textarea {
 }
 
 .sidebar-header h1 {
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -211,7 +219,7 @@ textarea {
 
 .brand-name {
   overflow: hidden;
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   font-family: 'STKaiti', 'KaiTi', 'BiauKai', serif;
   font-size: 20px;
   font-weight: 600;
@@ -244,7 +252,7 @@ textarea {
   border: 1px solid var(--ui-nav-line);
   border-radius: var(--ui-radius-sm);
   background: transparent;
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   transition: transform 180ms var(--ui-ease), background 180ms var(--ui-ease), color 180ms var(--ui-ease);
 }
 
@@ -292,7 +300,7 @@ textarea {
   margin: 3px 0;
   padding: 8px 10px;
   border-radius: var(--ui-radius-xs);
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   text-decoration: none;
   text-align: left;
   transition: transform 180ms var(--ui-ease), background 180ms var(--ui-ease), color 180ms var(--ui-ease);
@@ -300,12 +308,12 @@ textarea {
 
 .nav-item:hover {
   background: rgba(255, 255, 255, 0.12);
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
 }
 
 .nav-item.active {
-  background: var(--ui-surface);
-  color: var(--ui-nav-strong);
+  background: var(--ui-nav-active);
+  color: var(--ui-nav-active-foreground);
   font-weight: 700;
 }
 
@@ -313,7 +321,7 @@ textarea {
 .sidebar .theme-toggle:focus-visible,
 .sidebar .sidebar-collapse-toggle:focus-visible,
 .sidebar .sidebar-restore-toggle:focus-visible {
-  outline-color: var(--ui-surface);
+  outline-color: var(--ui-nav-focus);
 }
 
 .nav-item.active::before {
@@ -329,7 +337,7 @@ textarea {
 
 .nav-module-item {
   margin-bottom: 8px;
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   font-weight: 700;
 }
 
@@ -406,13 +414,13 @@ textarea {
   border: 0;
   border-top: 1px solid var(--ui-nav-line);
   background: transparent;
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   text-align: left;
   cursor: pointer;
 }
 
 .theme-toggle:hover {
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
 }
 
 .theme-toggle-icon {
@@ -424,7 +432,7 @@ textarea {
   border: 1px solid var(--ui-nav-line);
   border-radius: var(--ui-radius-xs);
   background: var(--ui-nav-strong);
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
 }
 
 .theme-toggle-icon svg {
@@ -446,7 +454,7 @@ textarea {
 
 .theme-toggle-copy strong {
   overflow: hidden;
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   font-size: 11px;
   font-weight: 700;
   text-overflow: ellipsis;
@@ -466,7 +474,7 @@ textarea {
 }
 
 .theme-toggle[aria-pressed="true"] .theme-toggle-icon {
-  border-color: var(--ui-surface);
+  border-color: var(--ui-nav-foreground);
   background: var(--ui-nav-strong);
 }
 
@@ -490,7 +498,7 @@ textarea {
 
 .sidebar.collapsed .theme-toggle-short {
   display: block;
-  color: var(--ui-surface);
+  color: var(--ui-nav-foreground);
   font-size: 10px;
   font-weight: 700;
 }
@@ -887,7 +895,7 @@ textarea {
 
 /* Hard-coded legacy accents need a dark counterpart so the transition remains coherent. */
 [data-theme="dark"] .nav-item:hover { background: rgba(255, 255, 255, 0.12); }
-[data-theme="dark"] .nav-item.active { background: var(--ui-surface); }
+[data-theme="dark"] .nav-item.active { background: var(--ui-nav-active); }
 [data-theme="dark"] .app .word-page,
 .app[data-theme="dark"] .word-page { border-color: #50616a; background: #f5f8f9; color: #152229; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.26); }
 [data-theme="dark"] .word-body,
