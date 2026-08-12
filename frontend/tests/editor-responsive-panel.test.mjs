@@ -4,12 +4,16 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const root = resolve(import.meta.dirname, '..')
-const page = readFileSync(resolve(root, 'src/pages/DocEditor.vue'), 'utf8')
-const css = readFileSync(resolve(root, 'src/styles/editor-refresh.css'), 'utf8')
-const visualSystemCss = readFileSync(resolve(root, 'src/styles/visual-system.css'), 'utf8')
-const aiPanel = readFileSync(resolve(root, 'src/components/AiPanel.vue'), 'utf8')
-const pageDocCss = readFileSync(resolve(root, 'src/styles/page-doc.css'), 'utf8')
-const contentPanel = readFileSync(resolve(root, 'src/components/ContentPanel.vue'), 'utf8')
+function readText(path) {
+  return readFileSync(path, 'utf8').replace(/\r\n/g, '\n')
+}
+
+const page = readText(resolve(root, 'src/pages/DocEditor.vue'))
+const css = readText(resolve(root, 'src/styles/editor-refresh.css'))
+const visualSystemCss = readText(resolve(root, 'src/styles/visual-system.css'))
+const aiPanel = readText(resolve(root, 'src/components/AiPanel.vue'))
+const pageDocCss = readText(resolve(root, 'src/styles/page-doc.css'))
+const contentPanel = readText(resolve(root, 'src/components/ContentPanel.vue'))
 
 function escapeRegExp(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
