@@ -231,7 +231,7 @@
 
 .page-info {
     font-size: 13px;
-    color: #666;
+    color: var(--ui-ink-soft);
 }
 
 .page-buttons {
@@ -243,31 +243,41 @@
 
 .page-btn {
     padding: 6px 12px;
-    border: 1px solid #d9d9d9;
-    background: #fff;
+    border: 1px solid var(--ui-line);
+    background: var(--ui-surface);
+    color: var(--ui-ink);
     border-radius: 4px;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
 }
 
 .page-btn:hover:not(:disabled) {
-    border-color: #1890ff;
-    color: #1890ff;
+    border-color: var(--ui-primary);
+    background: var(--ui-primary-wash);
+    color: var(--ui-primary);
 }
 
 .page-btn.active {
-    background: #1890ff;
-    border-color: #1890ff;
-    color: #fff;
+    border-color: var(--ui-primary);
+    background: var(--ui-primary-wash);
+    color: var(--ui-ink);
+}
+
+.page-btn:focus-visible {
+    outline: 2px solid var(--ui-primary);
+    outline-offset: 2px;
 }
 
 .page-btn:disabled {
-    opacity: 0.4;
+    border-color: var(--ui-line);
+    background: var(--ui-surface-muted);
+    color: var(--ui-ink-soft);
+    opacity: 0.55;
     cursor: not-allowed;
 }
 
 .page-ellipsis {
     padding: 0 8px;
-    color: #999;
+    color: var(--ui-ink-soft);
 }

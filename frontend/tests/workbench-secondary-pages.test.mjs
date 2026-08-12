@@ -28,3 +28,15 @@ test('audit table owns scrolling and keeps pagination outside the scrollport', (
   assert.ok(page.indexOf('audit-table-scroll') < page.indexOf('audit-pagination'))
   assert.match(read('src/styles/page-audit.css'), /\.audit-table-scroll\s*\{[\s\S]*overflow:\s*auto;/)
 })
+
+test('audit pagination uses semantic theme tokens without hardcoded colors', () => {
+  const css = read('src/styles/page-audit.css')
+  const pagination = css.slice(css.indexOf('/* Pagination */'))
+
+  assert.doesNotMatch(pagination, /#[0-9a-f]{3,8}\b/i)
+  assert.match(pagination, /\.page-info\s*\{[^}]*color:\s*var\(--ui-ink-soft\);/)
+  assert.match(pagination, /\.page-btn\s*\{[^}]*border:\s*1px solid var\(--ui-line\);[^}]*background:\s*var\(--ui-surface\);[^}]*color:\s*var\(--ui-ink\);/)
+  assert.match(pagination, /\.page-btn:hover:not\(:disabled\)\s*\{[^}]*border-color:\s*var\(--ui-primary\);[^}]*background:\s*var\(--ui-primary-wash\);[^}]*color:\s*var\(--ui-primary\);/)
+  assert.match(pagination, /\.page-btn:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--ui-primary\);/)
+  assert.match(pagination, /\.page-btn:disabled\s*\{[^}]*background:\s*var\(--ui-surface-muted\);[^}]*color:\s*var\(--ui-ink-soft\);/)
+})
